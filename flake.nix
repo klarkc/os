@@ -7,15 +7,7 @@
   };
 
   outputs = { self, utils, ... }@inputs:
-    utils.apply-systems
-      {
-        inherit inputs;
-        make-pkgs = system: import inputs.nixpkgs {
-          inherit system;
-          # enable ca-derivations globally
-          config.contentAddressedByDefault = true;
-        };
-      }
+    utils.apply-systems { inherit inputs; }
       ({ pkgs, system, ... }:
         let
           purs-nix = inputs.purs-nix { inherit system; };
