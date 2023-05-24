@@ -8,8 +8,13 @@
   };
 
   outputs = { self, utils, ... }@inputs:
-    utils.apply-systems { inherit inputs; }
-      ({ pkgs, system, purenix, ... }:
+    let
+      # TODO add missing arm to match standard systems
+      #  right now purs-nix is only compatible with x86_64-linux
+      systems = [ "x86_64-linux" ];
+    in
+    utils.apply-systems { inherit inputs systems; }
+      ({ pkgs, system, purenix, ps-tools, ... }:
         let
           purs-nix = inputs.purs-nix
             {
@@ -27,12 +32,10 @@
                   "prelude"
                 ];
             };
-          ps-command = ps.command { };
-          ps-output = ps.output { };
           os = pkgs.stdenv.mkDerivation
             {
               name = "os";
-              src = ps-output;
+              src = ps.output { };
               nativeBuildInputs = with pkgs; [ purenix ];
               dontInstall = true;
               prefix = "output";
@@ -54,7 +57,6 @@
                 packages =
                   with pkgs;
                   [
-                    ps-command
                     ps-tools.for-0_15.purescript-language-server
                   ];
               };
