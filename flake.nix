@@ -1,4 +1,6 @@
 {
+  description = "This is my brand new attempt to use NixOS as my personal OS.";
+
   inputs = {
     utils.url = "github:ursi/flake-utils";
     purs-nix.url = "github:purs-nix/purs-nix";
@@ -11,10 +13,13 @@
     let
       # TODO add missing arm to match standard systems
       #  right now purs-nix is only compatible with x86_64-linux
-      systems = [ "x86_64-linux" ];
+      system = "x86_64-linux";
+      systems = [ system ];
+      nixosConfigurations.os = self.packages.${system}.default;
     in
-    utils.apply-systems { inherit inputs systems; }
-      ({ pkgs, system, purenix, ps-tools, ... }:
+    utils.apply-systems
+      { inherit inputs systems; }
+      ({ pkgs, system, purenix, ps-tools, ... }@ctx:
         let
           purs-nix = inputs.purs-nix
             {
