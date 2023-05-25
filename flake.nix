@@ -2,11 +2,12 @@
   description = "This is my brand new attempt to use NixOS as my personal OS.";
 
   inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs";
     utils.url = "github:ursi/flake-utils";
     purs-nix.url = "github:purs-nix/purs-nix";
     purenix.url = "github:purenix-org/purenix";
     ps-tools.follows = "purs-nix/ps-tools";
-    nixpkgs.follows = "purs-nix/nixpkgs";
+    microvm.url = "github:astro/microvm.nix";
   };
 
   outputs = { self, utils, ... }@inputs:
@@ -15,16 +16,17 @@
       #  right now purs-nix is only compatible with x86_64-linux
       system = "x86_64-linux";
       systems = [ system ];
-      nixosConfigurations.os = self.packages.${system}.default;
+      nixosConfigurations.default = self.packages.${system}.default;
     in
     utils.apply-systems
       { inherit inputs systems; }
       ({ pkgs, system, purenix, ps-tools, ... }@ctx:
         let
+          compile = { codegen = "corefn"; };
           purs-nix = inputs.purs-nix
             {
               inherit system;
-              defaults.compile.codegen = "corefn";
+              defaults = { inherit compile; };
             };
           ps = purs-nix.purs
             {
@@ -37,32 +39,35 @@
                   "prelude"
                 ];
             };
-          os = pkgs.stdenv.mkDerivation
+          prefix = "output";
+          Main = import (pkgs.stdenv.mkDerivation
             {
-              name = "os";
+              inherit prefix;
+              name = "Main";
               src = ps.output { };
               nativeBuildInputs = with pkgs; [ purenix ];
               dontInstall = true;
-              prefix = "output";
               postBuild = ''
                 mkdir -p $out
-                cp -L -r $src $out/output
-                chmod -R u+w $out/output
+                cp -L -r $src $out/${prefix}
+                chmod -R u+w $out/${prefix}
                 cd $out
                 purenix
               '';
-            };
-
+            } + "/${prefix}/Main");
+          os = Main.main inputs ctx;
         in
         {
-          packages.default = os;
+          packages.default = os.config.microvm.runner.qemu;
           devShells.default =
             pkgs.mkShell
               {
                 packages =
                   with pkgs;
                   [
+                    (ps.command { inherit compile; })
                     ps-tools.for-0_15.purescript-language-server
+                    ps-tools.for-0_15.purty
                   ];
               };
         });
