@@ -1,13 +1,48 @@
 {
   inputs = {
-    utils.url = "github:ursi/flake-utils";
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    microvm.url = "github:astro/microvm.nix";
   };
 
-  outputs = { self, utils, ... }@inputs:
-    utils.apply-systems { inherit inputs; }
-      ({ pkgs, system, ... }:
-        { });
+  outputs = { self, ... }@inputs:
+    let
+      # TODO add cross-platform build
+      system = "x86_64-linux";
+      pkgs = import inputs.nixpkgs { inherit system; };
+      nixosConfigurations = self.packages.${system};
+      networking = import ./networking.nix;
+      users = import ./users.nix;
+      recover = inputs.nixpkgs.lib.nixosSystem
+        {
+          inherit system;
+          modules =
+            [
+              inputs.microvm.nixosModules.microvm
+              networking
+              users
+            ];
+        };
+    in
+    {
+      nixosConfigurations = {
+        inherit recover;
+      };
+
+      devShells.${system}.default =
+        pkgs.mkShell
+          {
+            packages =
+              let
+                inherit (recover.config.microvm.runner) qemu;
+              in
+              with pkgs;
+              [
+                # adds microvm-*
+                qemu
+              ];
+
+          };
+    };
 
   # --- Flake Local Nix Configuration ----------------------------
   nixConfig = {
