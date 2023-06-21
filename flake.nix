@@ -12,19 +12,41 @@
       nixosConfigurations = self.packages.${system};
       networking = import ./networking.nix;
       users = import ./users.nix;
-      recover = inputs.nixpkgs.lib.nixosSystem
-        {
-          inherit system;
-          modules =
-            [
-              inputs.microvm.nixosModules.microvm
-              networking
-              users
-            ];
-        };
+      mkSystem = options:
+        let 
+          inherit (inputs.nixpkgs.lib) nixosSystem;
+          inherit (builtins) removeAttrs;
+          unmakeOverridable = r: removeAttrs r [
+            "override"
+            "overrideDerivation"
+          ];
+        in nixosSystem (unmakeOverridable options);
+      systemOptions =
+          let
+            inherit (pkgs.lib) makeOverridable; 
+            inherit (pkgs.lib.trivial) id;
+          in pkgs.lib.makeOverridable id 
+          {
+              inherit system;
+              modules =
+                [
+                  networking
+                  users
+                ];
+          };
+      recover = mkSystem systemOptions;
+      recover-vm = mkSystem systemOptions.override {
+        modules = systemOptions.modules ++ [
+          inputs.microvm.nixosModules.microvm
+        ];
+      };
     in
     {
       nixosConfigurations = {
+        inherit recover;
+      };
+
+      packages.${system} = {
         inherit recover;
       };
 
@@ -33,7 +55,7 @@
           {
             packages =
               let
-                inherit (recover.config.microvm.runner) qemu;
+                inherit (recover-vm.config.microvm.runner) qemu;
               in
               with pkgs;
               [
