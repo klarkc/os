@@ -1,44 +1,54 @@
 {
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    microvm.url = "github:astro/microvm.nix";
+    generators.url = "github:nix-community/nixos-generators";
   };
 
   outputs = { self, ... }@inputs:
     let
       # TODO add cross-platform build
-      system = "x86_64-linux";
+      platform = "x86_64";
+      os = "linux";
+      system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
-      nixosConfigurations = self.packages.${system};
-      networking = import ./networking.nix;
-      users = import ./users.nix;
       mkSystem = options:
-        let 
+        let
           inherit (inputs.nixpkgs.lib) nixosSystem;
-          inherit (builtins) removeAttrs;
-          unmakeOverridable = r: removeAttrs r [
-            "override"
-            "overrideDerivation"
-          ];
-        in nixosSystem (unmakeOverridable options);
-      systemOptions =
-          let
-            inherit (pkgs.lib) makeOverridable; 
-            inherit (pkgs.lib.trivial) id;
-          in pkgs.lib.makeOverridable id 
-          {
-              inherit system;
-              modules =
-                [
-                  networking
-                  users
-                ];
-          };
-      recover = mkSystem systemOptions;
-      recover-vm = mkSystem systemOptions.override {
-        modules = systemOptions.modules ++ [
-          inputs.microvm.nixosModules.microvm
-        ];
+          inherit (inputs.generators) nixosGenerate;
+          inherit (builtins) hasAttr;
+        in
+        if hasAttr "format" options then
+          nixosGenerate options
+        else
+          nixosSystem options;
+      recover = mkSystem {
+        inherit system;
+        modules = [ ./recover.nix ];
+      };
+
+      recover-efi = mkSystem {
+        inherit system;
+        modules = [ ./recover.nix ];
+        format = "raw-efi";
+      };
+
+      # TODO: find a faster way to run recover in devShell
+      recover-vm = pkgs.writeShellApplication {
+        name = "recover-vm";
+        text = ''
+          IMG=recover-efi.img
+          BIOS=recover-efi-bios.img
+          cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
+          chmod a+w "$BIOS"
+          cp -ui --reflink=auto ${recover-efi}/nixos.img "$IMG"
+          chmod a+w "$IMG"
+          qemu-system-${platform} \
+            -nographic \
+            -bios "$BIOS" \
+            -drive file="$IMG",format=raw \
+            -m 2G
+        '';
+        runtimeInputs = with pkgs; [ tree rsync qemu ];
       };
     in
     {
@@ -47,20 +57,15 @@
       };
 
       packages.${system} = {
-        inherit recover;
+        inherit recover-efi;
       };
 
       devShells.${system}.default =
         pkgs.mkShell
           {
             packages =
-              let
-                inherit (recover-vm.config.microvm.runner) qemu;
-              in
-              with pkgs;
               [
-                # adds microvm-*
-                qemu
+                recover-vm
               ];
 
           };

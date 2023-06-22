@@ -1,1 +1,0 @@
-{ networking.hostName = "klarkc-os"; }
