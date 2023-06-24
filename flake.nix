@@ -36,8 +36,10 @@
       recover-vm = pkgs.writeShellApplication {
         name = "recover-vm";
         text = ''
-          IMG=recover-efi.img
-          BIOS=recover-efi-bios.img
+          TMPD=$(mktemp -d)
+          echo "$TMPD"
+          IMG="$TMPD/recover-efi.img"
+          BIOS="$TMPD/recover-efi-bios.img"
           cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
           chmod a+w "$BIOS"
           cp -ui --reflink=auto ${recover-efi}/nixos.img "$IMG"
@@ -57,7 +59,7 @@
       };
 
       packages.${system} = {
-        inherit recover-efi;
+        inherit recover-efi recover-vm;
       };
 
       devShells.${system}.default =
