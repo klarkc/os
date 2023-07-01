@@ -2,7 +2,7 @@
   hardware.enableAllFirmware = true;
   nixpkgs.config.allowUnfree = true;
   users = {
-    users.root.password = "";
+    users.root.password = "root";
     mutableUsers = false;
   };
   networking = {
@@ -64,11 +64,7 @@
     zip
   ];
 
-  services.openssh = {
-    enable = true;
-    settings.PermitRootLogin = "without-password";
-  };
-
+  services.openssh.enable = true;
 
   programs = {
     tmux.enable = true;
