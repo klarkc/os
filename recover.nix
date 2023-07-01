@@ -8,9 +8,22 @@
   };
   networking = {
     hostName = "recover";
-    networkmanager.enable = true;
+    wireless = {
+      enable = true;
+      userControlled.enable = true;
+    };
   };
   boot = {
+    supportedFilesystems = [
+      "btrfs"
+      "exfat"
+      "ext2"
+      "ext4"
+      "ntfs"
+      "vfat"
+      "xfs"
+      "zfs"
+    ];
     loader = {
       timeout = 15;
       grub = {
