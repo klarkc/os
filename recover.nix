@@ -10,6 +10,7 @@
     wireless = {
       enable = true;
       userControlled.enable = true;
+      iwd.enable = true;
     };
   };
   boot = {
