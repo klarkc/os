@@ -7,11 +7,7 @@
   };
   networking = {
     hostName = "recover";
-    wireless = {
-      enable = true;
-      userControlled.enable = true;
-      iwd.enable = true;
-    };
+    networkmanager.enable = true;
   };
   boot = {
     supportedFilesystems = [
