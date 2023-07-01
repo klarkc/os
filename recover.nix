@@ -1,7 +1,6 @@
 { lib, pkgs, ... }: {
-  nixpkgs.config.allowUnfreePredicate = pkg: builtins.elem (lib.getName pkg) [
-    "memtest86-efi"
-  ];
+  hardware.enableAllFirmware = true;
+  nixpkgs.config.allowUnfree = true;
   users = {
     users.root.password = "";
     mutableUsers = false;
@@ -14,6 +13,7 @@
     };
   };
   boot = {
+    consoleLogLevel = 6; #INFO
     supportedFilesystems = [
       "btrfs"
       "exfat"
