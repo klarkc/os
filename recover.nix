@@ -40,9 +40,35 @@
   systemd.services.firstboot.enable = true;
 
   environment.systemPackages = with pkgs; [
-    ddrescue
     btop
+    coreutils
+    curl
+    ddrescue
+    efibootmgr
+    efivar
+    findutils
+    gnugrep
+    gnused
+    gnutar
+    gptfdisk
+    hdparm
+    inetutils
+    less
+    lsof
     parted
+    pciutils
+    ripgrep
+    rsync
+    sdparm
+    smartmontools
+    time
+    testdisk
+    unzip
+    usbutils
+    wget
+    which
+    zip
+    zstd
   ];
 
   services.openssh = {
