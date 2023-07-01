@@ -21,8 +21,6 @@
       "ext4"
       "ntfs"
       "vfat"
-      "xfs"
-      "zfs"
     ];
     loader = {
       timeout = 15;
@@ -68,7 +66,6 @@
     wget
     which
     zip
-    zstd
   ];
 
   services.openssh = {
