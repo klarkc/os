@@ -13,7 +13,6 @@
     };
   };
   boot = {
-    consoleLogLevel = 6; #INFO
     supportedFilesystems = [
       "btrfs"
       "exfat"

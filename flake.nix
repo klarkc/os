@@ -49,6 +49,7 @@
             -bios "$BIOS" \
             -drive file="$IMG",format=raw \
             -m 2G
+          rm -Rf "$TMPD"
         '';
         runtimeInputs = with pkgs; [ tree rsync qemu ];
       };
