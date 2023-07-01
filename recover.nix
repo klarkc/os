@@ -37,7 +37,7 @@
   };
   fileSystems."/".device = lib.mkDefault "none";
 
-  systemd.services.firstboot.enable = true;
+  systemd.services.firstBoot.enable = true;
 
   environment.systemPackages = with pkgs; [
     btop
