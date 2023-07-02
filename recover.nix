@@ -31,8 +31,6 @@
   };
   fileSystems."/".device = lib.mkDefault "none";
 
-  systemd.services.firstBoot.enable = true;
-
   environment.systemPackages = with pkgs; [
     btop
     coreutils
@@ -64,7 +62,10 @@
     zip
   ];
 
-  services.openssh.enable = true;
+  services.openssh = {
+    enable = true;
+    settings.PermitRootLogin = "yes";
+  };
 
   programs = {
     tmux.enable = true;
