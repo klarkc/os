@@ -53,6 +53,7 @@
     rsync
     sdparm
     smartmontools
+    sshfs
     time
     testdisk
     unzip
