@@ -1,15 +1,32 @@
 { lib, pkgs, ... }: {
-  hardware.enableAllFirmware = true;
+  nix = {
+    extraOptions = ''
+      experimental-features = nix-command flakes repl-flake
+    '';
+  };
   nixpkgs.config.allowUnfree = true;
+  hardware.enableAllFirmware = true;
   users = {
-    users.root.password = "root";
+    users.recover = {
+      password = "recover";
+      isNormalUser = true;
+      home = "/home/recover";
+      description = "Recover";
+      extraGroups = [ "wheel" "networkmanager" ];
+    };
     mutableUsers = false;
   };
   networking = {
-    hostName = "recover";
+    hostName = "recover-os";
     networkmanager.enable = true;
   };
   boot = {
+    kernelParams = [
+      "copytoram"
+      "console=ttyS0,115200"
+      "console=tty1"
+      "boot.shell_on_fail"
+    ];
     supportedFilesystems = [
       "btrfs"
       "exfat"
@@ -61,11 +78,30 @@
     wget
     which
     zip
+    ntfs3g
+    f2fs-tools
+    jfsutils
+    nilfs-utils
+    reiserfsprogs
+    xfsprogs
+    xfsdump
+    gparted
   ];
 
-  services.openssh = {
-    enable = true;
-    settings.PermitRootLogin = "yes";
+  services = {
+    openssh.enable = true;
+
+    xserver = {
+      enable = true;
+      windowManager.xmonad.enable = true;
+      displayManager = {
+        defaultSession = "none+xmonad";
+        autoLogin = {
+          enable = true;
+          user = "recover";
+        };
+      };
+    };
   };
 
   programs = {

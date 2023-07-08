@@ -33,26 +33,26 @@
       };
 
       # TODO: find a faster way to run recover in devShell
-      recover-vm = pkgs.writeShellApplication {
+      mk-recover-vm = args: pkgs.writeShellApplication {
         name = "recover-vm";
         text = ''
-          TMPD=$(mktemp -d)
-          echo "$TMPD"
-          IMG="$TMPD/recover-efi.img"
-          BIOS="$TMPD/recover-efi-bios.img"
+          IMG="recover-efi.img"
+          BIOS="recover-efi-bios.img"
+          ARGS="${args}"
           cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
           chmod a+w "$BIOS"
           cp -ui --reflink=auto ${recover-efi}/nixos.img "$IMG"
           chmod a+w "$IMG"
           qemu-system-${platform} \
-            -nographic \
             -bios "$BIOS" \
             -drive file="$IMG",format=raw \
-            -m 2G
-          rm -Rf "$TMPD"
+            -m 2G \
+            $ARGS
         '';
         runtimeInputs = with pkgs; [ tree rsync qemu ];
       };
+      recover-vm = mk-recover-vm "";
+      recover-kvm = mk-recover-vm "--enable-kvm";
     in
     {
       nixosConfigurations = {
@@ -60,7 +60,7 @@
       };
 
       packages.${system} = {
-        inherit recover-efi recover-vm;
+        inherit recover-efi recover-vm recover-kvm;
       };
 
       devShells.${system}.default =
@@ -69,6 +69,7 @@
             packages =
               [
                 recover-vm
+                recover-kvm
               ];
 
           };
