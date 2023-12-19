@@ -39,7 +39,7 @@ rec {
     format = "raw-efi";
   };
 
-  cache-vm = mkVirtualMachine cache-efi "cache" "";
+  cache-vm = mkVirtualMachine cache-efi "cache" "--nographic";
 
-  cache-kvm = mkVirtualMachine cache-efi "cache" "--enable-kvm";
+  cache-kvm = mkVirtualMachine cache-efi "cache" "--nographic --enable-kvm";
 }
