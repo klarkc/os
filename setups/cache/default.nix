@@ -2,7 +2,7 @@
 let
   inherit (flake.inputs.everyday.nixosModules) logger;
   inherit (flake.inputs.attic.nixosModules) atticd;
-  inherit (flake.outputs.lib) mkSystem vm;
+  inherit (flake.outputs.lib) mkSystem;
   domain = "cache.klarkc.is-a.dev";
   cache-module = { config, ... }: {
     system.stateVersion = config.system.nixos.version;
@@ -43,15 +43,17 @@ in
 rec {
   modules.cache = cache-module;
 
+  packages.cache-vm = mkSystem {
+    modules = with modules; [ cache ];
+    format = "vm-nogui";
+  };
+
   machines.cache_0 = mkSystem {
-    inherit system;
-    modules = [
-      cache-module
+    modules = with modules; [
+      cache
       {
         networking.hostName = "cache_0";
       }
     ];
   };
-
-  packages.cache-vm = vm "cache_0";
 }

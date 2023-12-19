@@ -7,7 +7,6 @@
     # optimizations
     generators.inputs.nixpkgs.follows = "nixpkgs";
     attic.inputs.nixpkgs.follows = "nixpkgs";
-    everyday.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
@@ -23,18 +22,12 @@
             inherit (inputs.nixpkgs.lib) nixosSystem;
             inherit (inputs.generators) nixosGenerate;
             inherit (builtins) hasAttr;
+            finalOptions = options // { inherit system; };
           in
           if hasAttr "format" options then
-            nixosGenerate options
+            nixosGenerate finalOptions
           else
-            nixosSystem options;
-        vm = name: pkgs.writeShellApplication {
-          inherit name;
-          text = ''
-            export USE_TMPDIR=0
-            ${self.nixosConfigurations.${name}.config.formats.vm-nogui}
-          '';
-        };
+            nixosSystem finalOptions;
       };
       setups = import ./setups {
         inherit system pkgs;

@@ -1,8 +1,8 @@
 { system, pkgs, flake, ... }:
 let
   inherit (pkgs.lib) mkDefault version;
-  inherit (flake.outputs.lib) mkSystem vm;
-  recover-module = { config, ...}: {
+  inherit (flake.outputs.lib) mkSystem;
+  recover-module = { config, ... }: {
     system.stateVersion = config.system.nixos.version;
     nix = {
       extraOptions = ''
@@ -121,23 +121,24 @@ in
 rec {
   modules.recover = recover-module;
 
+  packages = {
+    recover-efi = mkSystem {
+      modules = with modules; [ recover ];
+      format = "raw-efi";
+    };
+
+    recover-vm = mkSystem {
+      modules = with modules; [ recover ];
+      format = "vm-nogui";
+    };
+  };
+
   machines.recover_0 = mkSystem {
-    inherit system;
-    modules = [
-      recover-module
+    modules = with modules; [
+      recover
       {
         networking.hostName = "recover_0";
       }
     ];
-  };
-
-  packages = {
-    recover-efi = mkSystem {
-      inherit system;
-      modules = [ recover-module ];
-      format = "raw-efi";
-    };
-
-    recover-vm = vm "recover_0";
   };
 }
