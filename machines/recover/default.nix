@@ -1,6 +1,6 @@
 { system, lib, pkgs, ... }:
 let
-  inherit (lib) mkSystem mkRecoverVm;
+  inherit (lib) mkSystem mkVirtualMachine;
   inherit (pkgs.lib) mkDefault;
   recover-module = {
     nix = {
@@ -132,7 +132,7 @@ rec {
     format = "raw-efi";
   };
 
-  recover-vm = mkRecoverVm recover-efi "recover" "";
+  recover-vm = mkVirtualMachine recover-efi "recover" "";
 
-  recover-kvm = mkRecoverVm recover-efi "recover" "--enable-kvm";
+  recover-kvm = mkVirtualMachine recover-efi "recover" "--enable-kvm";
 }

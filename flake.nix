@@ -23,7 +23,7 @@
           else
             nixosSystem options;
         # TODO: find a faster way to run vm in devShell
-        mkRecoverVm = efi: name: args: pkgs.writeShellApplication {
+        mkVirtualMachine = efi: name: args: pkgs.writeShellApplication {
           name = "${name}-vm";
           text = ''
             IMG="${name}-efi.img"
@@ -47,19 +47,23 @@
     {
       nixosConfigurations = {
         inherit (machines.recover) recover-os;
+        inherit (machines.cache) cache-os;
       };
 
       packages.${system} = {
         inherit (machines.recover) recover-efi recover-vm recover-kvm;
+        inherit (machines.cache) cache-efi cache-vm cache-kvm;
       };
 
       devShells.${system}.default =
         pkgs.mkShell
           {
             packages =
-              with machines.recover; [
-                recover-vm
-                recover-kvm
+              with machines; [
+                recover.recover-vm
+                recover.recover-kvm
+                cache.cache-vm
+                cache.cache-kvm
               ];
 
           };
