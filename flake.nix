@@ -25,6 +25,8 @@
         # TODO: find a faster way to run vm in devShell
         mkVirtualMachine = efi: name: args: pkgs.writeShellApplication {
           name = "${name}-vm";
+          # disable spellcheck to build a command line
+          excludeShellChecks = [ "SC2086" ];
           text = ''
             IMG="${name}-efi.img"
             BIOS="${name}-efi-bios.img"
