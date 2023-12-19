@@ -11,63 +11,53 @@
       os = "linux";
       system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
-      mkSystem = options:
-        let
-          inherit (inputs.nixpkgs.lib) nixosSystem;
-          inherit (inputs.generators) nixosGenerate;
-          inherit (builtins) hasAttr;
-        in
-        if hasAttr "format" options then
-          nixosGenerate options
-        else
-          nixosSystem options;
-      recover = mkSystem {
-        inherit system;
-        modules = [ ./recover.nix ];
+      lib = {
+        mkSystem = options:
+          let
+            inherit (inputs.nixpkgs.lib) nixosSystem;
+            inherit (inputs.generators) nixosGenerate;
+            inherit (builtins) hasAttr;
+          in
+          if hasAttr "format" options then
+            nixosGenerate options
+          else
+            nixosSystem options;
+        # TODO: find a faster way to run vm in devShell
+        mkRecoverVm = efi: name: args: pkgs.writeShellApplication {
+          name = "${name}-vm";
+          text = ''
+            IMG="${name}-efi.img"
+            BIOS="${name}-efi-bios.img"
+            ARGS="${args}"
+            cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
+            chmod a+w "$BIOS"
+            cp -ui --reflink=auto ${efi}/nixos.img "$IMG"
+            chmod a+w "$IMG"
+            qemu-system-${platform} \
+              -bios "$BIOS" \
+              -drive file="$IMG",format=raw \
+              -m 2G \
+              $ARGS
+          '';
+          runtimeInputs = with pkgs; [ qemu ];
+        };
       };
-
-      recover-efi = mkSystem {
-        inherit system;
-        modules = [ ./recover.nix ];
-        format = "raw-efi";
-      };
-
-      # TODO: find a faster way to run recover in devShell
-      mk-recover-vm = args: pkgs.writeShellApplication {
-        name = "recover-vm";
-        text = ''
-          IMG="recover-efi.img"
-          BIOS="recover-efi-bios.img"
-          ARGS="${args}"
-          cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
-          chmod a+w "$BIOS"
-          cp -ui --reflink=auto ${recover-efi}/nixos.img "$IMG"
-          chmod a+w "$IMG"
-          qemu-system-${platform} \
-            -bios "$BIOS" \
-            -drive file="$IMG",format=raw \
-            -m 2G \
-            $ARGS
-        '';
-        runtimeInputs = with pkgs; [ tree rsync qemu ];
-      };
-      recover-vm = mk-recover-vm "";
-      recover-kvm = mk-recover-vm "--enable-kvm";
+      machines = import ./machines { inherit system pkgs lib; };
     in
     {
       nixosConfigurations = {
-        inherit recover;
+        inherit (machines.recover) recover-os;
       };
 
       packages.${system} = {
-        inherit recover-efi recover-vm recover-kvm;
+        inherit (machines.recover) recover-efi recover-vm recover-kvm;
       };
 
       devShells.${system}.default =
         pkgs.mkShell
           {
             packages =
-              [
+              with machines.recover; [
                 recover-vm
                 recover-kvm
               ];
