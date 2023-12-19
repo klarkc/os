@@ -2,6 +2,12 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     generators.url = "github:nix-community/nixos-generators";
+    attic.url = "github:zhaofengli/attic";
+    everyday.url = "github:klarkc/nixos-everyday";
+    # optimizations
+    generators.inputs.nixpkgs.follows = "nixpkgs";
+    attic.inputs.nixpkgs.follows = "nixpkgs";
+    everyday.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
@@ -44,9 +50,14 @@
           runtimeInputs = with pkgs; [ qemu ];
         };
       };
-      machines = import ./machines { inherit system pkgs lib; };
+      machines = import ./machines {
+        inherit system pkgs;
+        flake = self;
+      };
     in
     {
+      inherit lib;
+
       nixosConfigurations = {
         inherit (machines.recover) recover-os;
         inherit (machines.cache) cache-os;
@@ -56,19 +67,6 @@
         inherit (machines.recover) recover-efi recover-vm recover-kvm;
         inherit (machines.cache) cache-efi cache-vm cache-kvm;
       };
-
-      devShells.${system}.default =
-        pkgs.mkShell
-          {
-            packages =
-              with machines; [
-                recover.recover-vm
-                recover.recover-kvm
-                cache.cache-vm
-                cache.cache-kvm
-              ];
-
-          };
     };
 
   # --- Flake Local Nix Configuration ----------------------------

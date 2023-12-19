@@ -1,7 +1,7 @@
-{ system, lib, pkgs, ... }:
+{ system, pkgs, flake, ... }:
 let
-  inherit (lib) mkSystem mkVirtualMachine;
   inherit (pkgs.lib) mkDefault;
+  inherit (flake.outputs.lib) mkSystem mkVirtualMachine;
   recover-module = {
     nix = {
       extraOptions = ''
