@@ -1,30 +1,14 @@
 { system, pkgs, flake, ... }:
 let
-  inherit (pkgs.lib) mkDefault;
   inherit (flake.inputs.everyday.nixosModules) logger;
   inherit (flake.inputs.attic.nixosModules) atticd;
-  inherit (flake.outputs.lib) mkSystem mkVirtualMachine;
+  inherit (flake.outputs.lib) mkSystem vm;
   domain = "cache.klarkc.is-a.dev";
   cache-module = { config, ... }: {
+    system.stateVersion = config.system.nixos.version;
     imports = [ logger atticd ];
-    networking = {
-      hostName = "cache-os";
-      networkmanager.enable = true;
-    };
-    boot = {
-      kernelParams = [
-        "console=ttyS0,115200"
-        "console=tty1"
-      ];
-      loader.grub = {
-        enable = true;
-        device = "nodev";
-        efiSupport = true;
-        useOSProber = true;
-      };
-    };
-    fileSystems."/".device = mkDefault "none";
-
+    fileSystems."/".device = "none";
+    boot.loader.grub.device = "nodev";
     services.atticd = {
       enable = true;
       # echo -n 'ATTIC_SERVER_TOKEN_HS256_SECRET_BASE64="' > /tmp/atticd.env
@@ -57,18 +41,17 @@ let
   };
 in
 rec {
-  cache-os = mkSystem {
+  modules.cache = cache-module;
+
+  machines.cache_0 = mkSystem {
     inherit system;
-    modules = [ cache-module ];
+    modules = [
+      cache-module
+      {
+        networking.hostName = "cache_0";
+      }
+    ];
   };
 
-  cache-efi = mkSystem {
-    inherit system;
-    modules = [ cache-module ];
-    format = "raw-efi";
-  };
-
-  cache-vm = mkVirtualMachine cache-efi "cache" "--nographic";
-
-  cache-kvm = mkVirtualMachine cache-efi "cache" "--nographic --enable-kvm";
+  packages.cache-vm = vm "cache_0";
 }

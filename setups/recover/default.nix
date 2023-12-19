@@ -1,8 +1,9 @@
 { system, pkgs, flake, ... }:
 let
-  inherit (pkgs.lib) mkDefault;
-  inherit (flake.outputs.lib) mkSystem mkVirtualMachine;
-  recover-module = {
+  inherit (pkgs.lib) mkDefault version;
+  inherit (flake.outputs.lib) mkSystem vm;
+  recover-module = { config, ...}: {
+    system.stateVersion = config.system.nixos.version;
     nix = {
       extraOptions = ''
         experimental-features = nix-command flakes repl-flake
@@ -20,10 +21,7 @@ let
       };
       mutableUsers = false;
     };
-    networking = {
-      hostName = "recover-os";
-      networkmanager.enable = true;
-    };
+    networking.networkmanager.enable = true;
     boot = {
       kernelParams = [
         "copytoram"
@@ -121,18 +119,25 @@ let
   };
 in
 rec {
-  recover-os = mkSystem {
+  modules.recover = recover-module;
+
+  machines.recover_0 = mkSystem {
     inherit system;
-    modules = [ recover-module ];
+    modules = [
+      recover-module
+      {
+        networking.hostName = "recover_0";
+      }
+    ];
   };
 
-  recover-efi = mkSystem {
-    inherit system;
-    modules = [ recover-module ];
-    format = "raw-efi";
+  packages = {
+    recover-efi = mkSystem {
+      inherit system;
+      modules = [ recover-module ];
+      format = "raw-efi";
+    };
+
+    recover-vm = vm "recover_0";
   };
-
-  recover-vm = mkVirtualMachine recover-efi "recover" "";
-
-  recover-kvm = mkVirtualMachine recover-efi "recover" "--enable-kvm";
 }

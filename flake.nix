@@ -28,29 +28,15 @@
             nixosGenerate options
           else
             nixosSystem options;
-        # TODO: find a faster way to run vm in devShell
-        mkVirtualMachine = efi: name: args: pkgs.writeShellApplication {
-          name = "${name}-vm";
-          # disable spellcheck to build a command line
-          excludeShellChecks = [ "SC2086" ];
+        vm = name: pkgs.writeShellApplication {
+          inherit name;
           text = ''
-            IMG="${name}-efi.img"
-            BIOS="${name}-efi-bios.img"
-            ARGS="${args}"
-            cp -ui --reflink=auto ${pkgs.OVMF.fd}/FV/OVMF.fd "$BIOS"
-            chmod a+w "$BIOS"
-            cp -ui --reflink=auto ${efi}/nixos.img "$IMG"
-            chmod a+w "$IMG"
-            qemu-system-${platform} \
-              -bios "$BIOS" \
-              -drive file="$IMG",format=raw \
-              -m 2G \
-              $ARGS
+            export USE_TMPDIR=0
+            ${self.nixosConfigurations.${name}.config.formats.vm-nogui}
           '';
-          runtimeInputs = with pkgs; [ qemu ];
         };
       };
-      machines = import ./machines {
+      setups = import ./setups {
         inherit system pkgs;
         flake = self;
       };
@@ -58,14 +44,19 @@
     {
       inherit lib;
 
+      nixosModules = {
+        inherit (setups.recover.modules) recover;
+        inherit (setups.cache.modules) cache;
+      };
+
       nixosConfigurations = {
-        inherit (machines.recover) recover-os;
-        inherit (machines.cache) cache-os;
+        inherit (setups.recover.machines) recover_0;
+        inherit (setups.cache.machines) cache_0;
       };
 
       packages.${system} = {
-        inherit (machines.recover) recover-efi recover-vm recover-kvm;
-        inherit (machines.cache) cache-efi cache-vm cache-kvm;
+        inherit (setups.recover.packages) recover-efi recover-vm;
+        inherit (setups.cache.packages) cache-vm;
       };
     };
 
