@@ -3,12 +3,12 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     generators.url = "github:nix-community/nixos-generators";
     agenix.url = "github:ryantm/agenix";
-    attic.url = "github:zhaofengli/attic";
+    nix-serve-ng.url = github:aristanetworks/nix-serve-ng;
     everyday.url = "github:klarkc/nixos-everyday";
     # optimizations
     generators.inputs.nixpkgs.follows = "nixpkgs";
-    attic.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
+    nix-serve-ng.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
