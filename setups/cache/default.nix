@@ -22,18 +22,27 @@ let
       system.stateVersion = config.system.nixos.version;
       fileSystems."/".device = "none";
       boot.loader.grub.device = "nodev";
-      services.nix-serve = {
-        enable = true;
-        secretKeyFile = config.age.secrets.cache.path;
+      services = {
+        sshd.enable =true;
+        nix-serve = {
+          enable = true;
+          secretKeyFile = config.age.secrets.cache.path;
+        };
       };
-      users.users.cache = {
-        password = "cache";
-        isNormalUser = true;
-        home = "/home/cache";
-        extraGroups = [ "wheel" ];
+      users = {
+        users.klarkc = {
+          isNormalUser = true;
+          inherit home;
+          extraGroups = [ "wheel" ];
+          openssh.authorizedKeys.keys = [
+            (builtins.readFile ../../secrets/klarkc.pub)
+          ];
+        };
+        mutableUsers = false;
       };
-      networking.firewall.allowedTCPPorts = [ port ];
+      networking.firewall.enable = false;
       virtualisation.forwardPorts = [
+        { from = "host"; host.port = 2222; guest.port = 22; }
         { from = "host"; host.port = port; guest.port = port; }
       ];
       # Web server
