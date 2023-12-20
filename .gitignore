@@ -1,2 +1,7 @@
 /result
 /*.img
+/*.qcow2
+/secrets/*
+!/secrets/*.nix
+!/secrets/*.age
+!/secrets/*.pub

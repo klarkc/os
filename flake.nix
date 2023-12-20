@@ -2,11 +2,13 @@
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     generators.url = "github:nix-community/nixos-generators";
+    agenix.url = "github:ryantm/agenix";
     attic.url = "github:zhaofengli/attic";
     everyday.url = "github:klarkc/nixos-everyday";
     # optimizations
     generators.inputs.nixpkgs.follows = "nixpkgs";
     attic.inputs.nixpkgs.follows = "nixpkgs";
+    agenix.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
@@ -17,6 +19,7 @@
       system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
       lib = {
+        secrets = ./secrets;
         mkSystem = options:
           let
             inherit (inputs.nixpkgs.lib) nixosSystem;
