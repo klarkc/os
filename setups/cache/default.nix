@@ -7,6 +7,7 @@ let
   agenix = flake.inputs.agenix.nixosModules.default;
   domain = "cache.klarkc.is-a.dev";
   home = "/home/klarkc";
+  port = 8080;
   cache-module = { config, ... }: {
     imports = [ logger atticd vm-nogui agenix host-keys ];
     # cd secrets
@@ -33,13 +34,20 @@ let
         };
       };
     };
+    networking.firewall.allowedTCPPorts = [
+      80
+      port
+    ];
+    virtualisation.forwardPorts = [
+      { from = "host"; host.port = port; guest.port = port; }
+    ];
     # Web server
     services.nginx = {
       virtualHosts.${domain} = {
         forceSSL = true;
         enableACME = true;
         locations."/".extraConfig = ''
-          proxy_pass http://localhost:8080;
+          proxy_pass http://localhost:${port};
           proxy_set_header Host $host;
           proxy_set_header X-Real-IP $remote_addr;
           proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
