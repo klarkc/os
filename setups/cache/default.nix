@@ -4,13 +4,13 @@ let
   inherit (flake.outputs.lib) mkSystem secrets;
   agenix = flake.inputs.agenix.nixosModules.default;
   nix-serve = flake.inputs.nix-serve-ng.nixosModules.default;
-  domain = "wcasa.wifizone.org";
+  domain = "cache.64-b.it";
   home = "/home/klarkc";
   cache-module = { config, ... }:
     {
       imports = [ logger nix-serve agenix ];
       # cd secrets
-      # nix-store --generate-binary-cache-key wcasa.wifizone.org ./cache ./cache.skey
+      # nix-store --generate-binary-cache-key cache.64-b.it ./cache ./cache.skey
       # cat cache | nix run github:ryantm/agenix -- -e cache.age -i ~/.ssh/id_ed25519
       # cp ~/.ssh/id_ed25519.pub klarkc.pub
       age.secrets.cache.file = "${secrets}/cache.age";
