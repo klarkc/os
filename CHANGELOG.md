@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.2.0](https://github.com/klarkc/os/compare/v1.1.0...v1.2.0) (2023-12-21)
+
+
+### Features
+
+* **cache:** add garbage collection ([f5e082c](https://github.com/klarkc/os/commit/f5e082c185f717472b939cea58a5659ba68940fa))
+* **cache:** change domain ([07a1747](https://github.com/klarkc/os/commit/07a17477a31813ec81584c68157ef1417c6d34e2))
+
 ## [1.1.0](https://github.com/klarkc/os/compare/v1.0.0...v1.1.0) (2023-12-21)
 
 
