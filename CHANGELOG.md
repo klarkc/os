@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.3.0](https://github.com/klarkc/os/compare/v1.2.0...v1.3.0) (2023-12-21)
+
+
+### Features
+
+* **cache:** add firewall ([eba5965](https://github.com/klarkc/os/commit/eba5965c709631002dbe8ee49022ce420907266a))
+* **cache:** add SSL and https ([aaf5daf](https://github.com/klarkc/os/commit/aaf5dafd8bdfb375deb917340b045d4530ef1b1e))
+
 ## [1.2.0](https://github.com/klarkc/os/compare/v1.1.0...v1.2.0) (2023-12-21)
 
 
