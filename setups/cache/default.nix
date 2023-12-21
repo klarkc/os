@@ -5,7 +5,7 @@ let
   inherit (flake.outputs.lib) mkSystem secrets;
   agenix = flake.inputs.agenix.nixosModules.default;
   nix-serve = flake.inputs.nix-serve-ng.nixosModules.default;
-  domain = "cache.64-b.it";
+  domain = "cache.tcp4.me";
   home = "/home/klarkc";
   authorizedKeys.keys = [
     (builtins.readFile ../../secrets/klarkc.pub)
@@ -18,9 +18,9 @@ let
         disko
       ];
       # cd secrets
-      # nix-store --generate-binary-cache-key cache.64-b.it ./cache ./cache.skey
-      # cat cache | nix run github:ryantm/agenix -- -e cache.age -i ~/.ssh/id_ed25519
-      # cp ~/.ssh/id_ed25519.pub klarkc.pub
+      # nix-store --generate-binary-cache-key cache.tcp4.me ./cache ./cache.skey
+      # cat cache | nix run github:ryantm/agenix -- -e cache.age -i cache-vultr.pub 
+      # scp ssh://root@cache.tcp4.me:/etc/ssh/ssh_host_ed25519_key.pub cache-vultr.pub
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
       boot.loader.systemd-boot.enable = true;

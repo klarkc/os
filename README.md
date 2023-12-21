@@ -4,3 +4,10 @@
 
 Personal collection of NixOS machines.
 
+## Deploying
+
+### Cache
+
+```bash
+nixos-rebuild switch --flake .#cache-vultr --target-host "root@cache.tcp4.me"
+```
