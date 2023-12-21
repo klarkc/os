@@ -44,6 +44,26 @@
         "type": "github"
       }
     },
+    "disko": {
+      "inputs": {
+        "nixpkgs": [
+          "nixpkgs"
+        ]
+      },
+      "locked": {
+        "lastModified": 1703112848,
+        "narHash": "sha256-7b7fGKJvy9E0ZeQuVeV8QYTfsl/VQbqkPdSyf1EbJOQ=",
+        "owner": "nix-community",
+        "repo": "disko",
+        "rev": "3ca75072ad771d9bc8d0dec6c64e407ee29d5d8f",
+        "type": "github"
+      },
+      "original": {
+        "owner": "nix-community",
+        "repo": "disko",
+        "type": "github"
+      }
+    },
     "everyday": {
       "locked": {
         "lastModified": 1703045794,
@@ -173,6 +193,7 @@
     "root": {
       "inputs": {
         "agenix": "agenix",
+        "disko": "disko",
         "everyday": "everyday",
         "generators": "generators",
         "nix-serve-ng": "nix-serve-ng",

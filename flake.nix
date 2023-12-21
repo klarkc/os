@@ -5,10 +5,12 @@
     agenix.url = "github:ryantm/agenix";
     nix-serve-ng.url = github:aristanetworks/nix-serve-ng;
     everyday.url = "github:klarkc/nixos-everyday";
+    disko.url = "github:nix-community/disko";
     # optimizations
     generators.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     nix-serve-ng.inputs.nixpkgs.follows = "nixpkgs";
+    disko.inputs.nixpkgs.follows = "nixpkgs"; 
   };
 
   outputs = { self, ... }@inputs:
@@ -42,12 +44,12 @@
 
       nixosModules = {
         inherit (setups.recover.modules) recover;
-        inherit (setups.cache.modules) cache;
+        inherit (setups.cache.modules) cache-module;
       };
 
       nixosConfigurations = {
         inherit (setups.recover.machines) recover_0;
-        inherit (setups.cache.machines) cache_0;
+        inherit (setups.cache.machines) cache-vultr;
       };
 
       packages.${system} = {
