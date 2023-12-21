@@ -8,9 +8,6 @@ let
   domain = "cache.tcp4.me";
   home = "/home/klarkc";
   email = "walkerleite490@gmail.com";
-  authorizedKeys.keys = [
-    (builtins.readFile ../../secrets/klarkc.pub)
-  ];
   cache-module = { disks ? [ "/dev/vda" ], config, ... }:
     {
       imports = [
@@ -30,6 +27,14 @@ let
         22
         config.services.nix-serve.port
       ];
+      # builders
+      users.users.klarkc = {
+        inherit home;
+        isNormalUser = true;
+        openssh. authorizedKeys.keys = [
+          (builtins.readFile ../../secrets/klarkc.pub)
+        ];
+      };
       # cache service
       services.nix-serve = {
         enable = true;
@@ -41,7 +46,9 @@ let
       '';
       # SSH
       services.sshd.enable = true;
-      users.users.root.openssh = { inherit authorizedKeys; };
+      users.users.root.openssh.authorizedKeys.keys = [
+        (builtins.readFile ../../secrets/klarkc.pub)
+      ];
       # beesd
       services.beesd.filesystems = {
         root = {
