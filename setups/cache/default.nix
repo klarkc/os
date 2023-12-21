@@ -24,26 +24,32 @@ let
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
       boot.loader.systemd-boot.enable = true;
-      services = {
-        sshd.enable = true;
-        nix-serve = {
-          enable = true;
-          secretKeyFile = config.age.secrets.cache.path;
-        };
+      # nix-serve
+      services.nix-serve = {
+        enable = true;
+        secretKeyFile = config.age.secrets.cache.path;
       };
-      users.users.root.openssh = { inherit authorizedKeys; };
       networking.firewall.enable = false;
+      # SSH
+      services.sshd.enable = true;
+      users.users.root.openssh = { inherit authorizedKeys; };
       # Web server
-      services.nginx = {
-        virtualHosts.${domain} = {
-          forceSSL = true;
-          enableACME = true;
-          locations."/".extraConfig = ''
-            proxy_pass http://localhost:${config.services.nix-serve.port};
-            proxy_set_header Host $host;
-            proxy_set_header X-Real-IP $remote_addr;
-            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-          '';
+      services.nginx.virtualHosts.${domain} = {
+        forceSSL = true;
+        enableACME = true;
+        locations."/".extraConfig = ''
+          proxy_pass http://localhost:${config.services.nix-serve.port};
+          proxy_set_header Host $host;
+          proxy_set_header X-Real-IP $remote_addr;
+          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        '';
+      };
+      # beesd
+      services.beesd.filesystems = {
+        root = {
+          spec = "/";
+          hashTableSizeMB = 256;
+          extraOptions = [ "--loadavg-target" "2" ];
         };
       };
       # disko
@@ -71,7 +77,10 @@ let
                   size = "100%";
                   content = {
                     type = "btrfs";
-                    extraArgs = [ "-f" ]; # Override existing partition
+                    extraArgs = [
+                      "--label" "root"
+                      "-f" # Override existing partition
+                    ]; 
                     # Subvolumes must set a mountpoint in order to be mounted,
                     # unless their parent is mounted
                     subvolumes = {
