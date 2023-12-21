@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.1.0](https://github.com/klarkc/os/compare/v1.0.0...v1.1.0) (2023-12-21)
+
+
+### Features
+
+* **cache:** add admin user ([fdf563b](https://github.com/klarkc/os/commit/fdf563b95529c8ebb5e946a29407bee56dd4ac31))
+* **cache:** add beesd ([9a645b1](https://github.com/klarkc/os/commit/9a645b18f6c49ea9d4b6ba605da1340ba4a3b0de))
+* **cache:** add vultr server ([c036fca](https://github.com/klarkc/os/commit/c036fcae4658ba5ccf25a135a61c764bcf977ef3))
+* **cache:** change to nix-serve-ng ([aa9d4f8](https://github.com/klarkc/os/commit/aa9d4f8154a71c651af1c03d72209469d27bb62e))
+* **cache:** update domain ([7787a65](https://github.com/klarkc/os/commit/7787a65437ec7ce056c9d3aadafbf74bc2e928b8))
+* **cache:** upgrade secrets ([b61029b](https://github.com/klarkc/os/commit/b61029bb0776139a7ffe284ee72368b613c69e3d))
+
 ## 1.0.0 (2023-12-20)
 
 
