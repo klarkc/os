@@ -1,4 +1,6 @@
-let klarkc = builtins.readFile ./klarkc.pub; in
+let klarkc = builtins.readFile ./klarkc.pub;
+    cache-vultr = builtins.readFile ./cache-vultr.pub;
+in
 {
-  "cache.age".publicKeys = [ klarkc ];
+  "cache.age".publicKeys = [ klarkc cache-vultr ];
 }
