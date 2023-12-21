@@ -28,12 +28,21 @@ let
         config.services.nix-serve.port
       ];
       # builders
-      users.users.klarkc = {
-        inherit home;
-        isNormalUser = true;
-        openssh. authorizedKeys.keys = [
-          (builtins.readFile ../../secrets/klarkc.pub)
-        ];
+      users.users = {
+        klarkc = {
+          inherit home;
+          isNormalUser = true;
+          openssh. authorizedKeys.keys = [
+            (builtins.readFile ../../secrets/klarkc.pub)
+          ];
+        };
+        github = {
+          home = "/home/github";
+          isNormalUser = true;
+          openssh. authorizedKeys.keys = [
+            (builtins.readFile ../../secrets/github.pub)
+          ];
+        };
       };
       # cache service
       services.nix-serve = {
