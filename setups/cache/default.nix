@@ -25,7 +25,11 @@ let
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
       boot.loader.systemd-boot.enable = true;
-      networking.firewall.enable = false;
+      # firewall
+      networking.firewall.allowedTCPPorts = [
+        22
+        config.services.nix-serve.port
+      ];
       # cache service
       services.nix-serve = {
         enable = true;
@@ -149,6 +153,11 @@ rec {
           pkgs.gitMinimal
         ];
         # HTTPS web server
+        networking.firewall.allowedTCPPorts = [
+          22
+          80
+          443
+        ];
         services.nginx.enable = true;
         services.nginx.virtualHosts.${domain} = {
           addSSL = true;
