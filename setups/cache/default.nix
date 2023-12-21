@@ -24,12 +24,16 @@ let
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
       boot.loader.systemd-boot.enable = true;
-      # nix-serve
+      networking.firewall.enable = false;
+      # cache service
       services.nix-serve = {
         enable = true;
         secretKeyFile = config.age.secrets.cache.path;
       };
-      networking.firewall.enable = false;
+      nix.extraOptions = ''
+        min-free = 2684354560
+        max-free = 5368709120 
+      '';
       # SSH
       services.sshd.enable = true;
       users.users.root.openssh = { inherit authorizedKeys; };
@@ -78,9 +82,10 @@ let
                   content = {
                     type = "btrfs";
                     extraArgs = [
-                      "--label" "root"
+                      "--label"
+                      "root"
                       "-f" # Override existing partition
-                    ]; 
+                    ];
                     # Subvolumes must set a mountpoint in order to be mounted,
                     # unless their parent is mounted
                     subvolumes = {
