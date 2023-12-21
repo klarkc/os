@@ -7,6 +7,7 @@ let
   nix-serve = flake.inputs.nix-serve-ng.nixosModules.default;
   domain = "cache.tcp4.me";
   home = "/home/klarkc";
+  email = "walkerleite490@gmail.com";
   authorizedKeys.keys = [
     (builtins.readFile ../../secrets/klarkc.pub)
   ];
@@ -37,17 +38,6 @@ let
       # SSH
       services.sshd.enable = true;
       users.users.root.openssh = { inherit authorizedKeys; };
-      # Web server
-      services.nginx.virtualHosts.${domain} = {
-        forceSSL = true;
-        enableACME = true;
-        locations."/".extraConfig = ''
-          proxy_pass http://localhost:${config.services.nix-serve.port};
-          proxy_set_header Host $host;
-          proxy_set_header X-Real-IP $remote_addr;
-          proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        '';
-      };
       # beesd
       services.beesd.filesystems = {
         root = {
@@ -143,7 +133,7 @@ rec {
   machines.cache-vultr = mkSystem {
     modules = with modules; [
       cache-module
-      ({ modulesPath, lib, ... }: {
+      ({ config, modulesPath, lib, ... }: {
         _module.args.disks = [ "/dev/vda" ];
         imports = [
           (modulesPath + "/profiles/qemu-guest.nix")
@@ -158,6 +148,22 @@ rec {
           pkgs.curl
           pkgs.gitMinimal
         ];
+        # HTTPS web server
+        services.nginx.enable = true;
+        services.nginx.virtualHosts.${domain} = {
+          addSSL = true;
+          enableACME = true;
+          locations."/".extraConfig = ''
+            proxy_pass http://localhost:${builtins.toString config.services.nix-serve.port};
+            proxy_set_header Host $host;
+            proxy_set_header X-Real-IP $remote_addr;
+            proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+          '';
+        };
+        security.acme = {
+          acceptTerms = true;
+          defaults = { inherit email; };
+        };
       })
     ];
   };
