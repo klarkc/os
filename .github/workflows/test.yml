@@ -22,6 +22,4 @@ jobs:
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
             TARGET="ssh://builder@cache.tcp4.me"
-            # took this filter list from cachix action
-            # find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" | xargs -L 10 nix-copy-closure -k --use-substitutes --include-outputs --to $TARGET
-            nix-copy-closure -k --use-substitutes --include-outputs --to $TARGET /nix/store/0kmx26k1zk1gclfswwk0hbvkv6l2ahfx-aws-c-http-0.7.6
+            nix copy --to $TARGET --all
