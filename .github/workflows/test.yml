@@ -15,15 +15,14 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: |
-          mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
-          ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
-          eval $(ssh-agent)
-          ssh-add - <<< "${{ secrets.BUILDER_TOKEN }}"
       - uses: gacts/run-and-post-run@v1
         with:
           #run: nix flake check
           post: |
+            mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
+            ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
+            eval $(ssh-agent)
+            ssh-add - <<< "${{ secrets.BUILDER_TOKEN }}"
             ssh -v builder@cache.tcp4.me -t exit
             TARGET="ssh://builder@cache.tcp4.me"
             # took this filter list from cachix action
