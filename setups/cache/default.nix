@@ -15,6 +15,8 @@ let
         agenix
         disko
       ];
+      nix.settings.experimental-features = "nix-command flakes";
+
       # cd secrets
       # nix-store --generate-binary-cache-key cache.tcp4.me ./cache ./cache.pub
       # scp ssh://root@cache.tcp4.me:/etc/ssh/ssh_host_ed25519_key.pub cache-vultr.pub
