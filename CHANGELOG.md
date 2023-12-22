@@ -1,5 +1,13 @@
 # Changelog
 
+## [1.4.0](https://github.com/klarkc/os/compare/v1.3.0...v1.4.0) (2023-12-22)
+
+
+### Features
+
+* **cache:** add exp feats ([a65ec89](https://github.com/klarkc/os/commit/a65ec89d7a3320ed409454a2a296412f0bf2a17e))
+* **cache:** upgrade server keys ([c2ad69d](https://github.com/klarkc/os/commit/c2ad69d3448078ba1551144190b8bb55f4dfda82))
+
 ## [1.3.0](https://github.com/klarkc/os/compare/v1.2.0...v1.3.0) (2023-12-21)
 
 
