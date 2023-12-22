@@ -10,6 +10,8 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - uses: DeterminateSystems/nix-installer-action@main
+        with:
+            extra-conf: extra-experimental-features = nix-command flakes impure-derivations
       - uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
@@ -21,5 +23,5 @@ jobs:
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
             TARGET="ssh-ng://builder@cache.tcp4.me"
             # took this filter list from cachix action
-            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET {} \;
+            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET --from {} \;
 
