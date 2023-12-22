@@ -19,7 +19,7 @@ let
 
       # cd secrets
       # nix-store --generate-binary-cache-key cache.tcp4.me ./cache ./cache.pub
-      # scp ssh://root@cache.tcp4.me:/etc/ssh/ssh_host_ed25519_key.pub cache-vultr.pub
+      # scp root@cache.tcp4.me:/etc/ssh/ssh_host_ed25519_key.pub cache-vultr.pub
       # cat cache | nix run github:ryantm/agenix -- -e cache.age -i cache-vultr.pub 
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
