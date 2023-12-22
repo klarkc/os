@@ -28,6 +28,7 @@ let
         config.services.nix-serve.port
       ];
       # builders
+      nix.settings.trusted-user = [ "builder" ];
       users.users.builder = {
         home = "/home/builder";
         isNormalUser = true;
