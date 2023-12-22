@@ -22,6 +22,8 @@ jobs:
         with:
           run: nix -v flake check -L --show-trace
           post: |
+            TARGET="ssh://builder@cache.tcp4.me"
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             cp .github/workflows/known_hosts ~/.ssh/known_hosts
-            nix -v copy -s --all --to ssh://builder@cache.tcp4.me
+            # took this filter list from cachix action
+            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" | xargs -n 10 nix-copy-closure -k -s --to $TARGET
