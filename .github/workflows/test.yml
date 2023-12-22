@@ -9,12 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: cachix/install-nix-action@v20
-        with:
-          install_url: https://releases.nixos.org/nix/nix-2.19.1/install
-          extra_nix_config: |
-            accept-flake-config = true
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+      - uses: DeterminateSystems/nix-installer-action@main
       - uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
@@ -26,5 +21,5 @@ jobs:
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
             TARGET="ssh-ng://builder@cache.tcp4.me"
             # took this filter list from cachix action
-            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET --all --from {} \;
+            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET {} \;
 
