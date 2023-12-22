@@ -20,9 +20,8 @@ jobs:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
       - uses: gacts/run-and-post-run@v1
         with:
-          run: nix flake check
+          run: nix -v flake check -L --show-trace
           post: |
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
-            TARGET="ssh://builder@cache.tcp4.me"
-            nix -v copy -s --to $TARGET --all
+            nix -v copy -s --all --to ssh://builder@cache.tcp4.me
