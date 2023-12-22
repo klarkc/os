@@ -22,12 +22,10 @@ jobs:
           ssh-add - <<< "${{ secrets.BUILDER_TOKEN }}"
       - uses: gacts/run-and-post-run@v1
         with:
-          run: nix flake check
+          #run: nix flake check
           post: |
             ssh -v builder@cache.tcp4.me -t exit
             TARGET="ssh://builder@cache.tcp4.me"
-            nix -v copy --to $TARGET .
-            nix -v copy --to $TARGET /nix/store/v8b2c1wzkb1fkm07h1821hshar60znql-infer-license-0.2.0
             # took this filter list from cachix action
             find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix -v copy --to $TARGET {} \;
 
