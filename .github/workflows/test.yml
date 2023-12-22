@@ -9,9 +9,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: DeterminateSystems/nix-installer-action@main
+      - uses: cachix/install-nix-action@v20
         with:
-            extra-conf: extra-experimental-features = nix-command flakes impure-derivations
+          install_url: https://releases.nixos.org/nix/nix-2.19.1/install
+          extra_nix_config: |
+            accept-flake-config = true
+            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
       - uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
