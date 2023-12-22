@@ -23,5 +23,5 @@ jobs:
           run: nix -v flake check -L --show-trace
           post: |
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
-            ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
+            cp .github/workflows/known_hosts ~/.ssh/known_hosts
             nix -v copy -s --all --to ssh://builder@cache.tcp4.me
