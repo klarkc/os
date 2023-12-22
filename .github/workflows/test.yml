@@ -24,9 +24,7 @@ jobs:
           post: |
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
-            ls -la /nix/store/71rwvvhg1s2g50b6as072q0bb90hi19b-nghttp2-1.51.0-lib
-            TARGET="ssh://builder@cache.tcp4.me"
-            nix -v copy --to $TARGET /nix/store/71rwvvhg1s2g50b6as072q0bb90hi19b-nghttp2-1.51.0-lib
+            TARGET="ssh-ng://builder@cache.tcp4.me"
             # took this filter list from cachix action
             find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix -v copy --to $TARGET {} \;
 
