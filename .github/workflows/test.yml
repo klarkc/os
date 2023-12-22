@@ -14,4 +14,14 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-      - run: nix flake check
+      - uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
+      - uses: gacts/run-and-post-run@v1
+        with:
+          run: nix flake check
+          post: |
+            TARGET="ssh://builder@cache.tcp4.me"
+            # took this filter list from cachix action
+            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET {} \;
+
