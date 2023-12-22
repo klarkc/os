@@ -32,9 +32,7 @@ let
         home = "/home/builder";
         isNormalUser = true;
         openssh. authorizedKeys.keys = [
-          (builtins.readFile ../../secrets/klarkc.pub)
-          (builtins.readFile ../../secrets/root-ssdinarch.pub)
-          (builtins.readFile ../../secrets/github.pub)
+          (builtins.readFile ../../secrets/builder.pub)
         ];
       };
       # cache service
