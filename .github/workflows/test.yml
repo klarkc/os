@@ -23,5 +23,5 @@ jobs:
             ssh-keyscan cache.tcp4.me >> ~/.ssh/known_hosts
             TARGET="ssh-ng://builder@cache.tcp4.me"
             # took this filter list from cachix action
-            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix copy --to $TARGET --from {} \;
+            find /nix/store -mindepth 1 -maxdepth 1 -type d -not -name ".*" -not -name "*.{drv,drv.chroot,check,lock}" -print -exec nix-copy-closure -k -s --to $TARGET {} \;
 
