@@ -52,7 +52,8 @@
         inherit (setups.cache.machines) cache-vultr;
       };
 
-      packages.${system} = {
+      packages.${system} = rec {
+        default = cache-vm;
         inherit (setups.recover.packages) recover-efi recover-vm;
         inherit (setups.cache.packages) cache-vm;
       };
