@@ -8,9 +8,6 @@ let
   domain = "cache.tcp4.me";
   home = "/home/klarkc";
   email = "walkerleite490@gmail.com";
-  authorizedKeys.keys = [
-    (builtins.readFile ../../secrets/klarkc.pub)
-  ];
   cache-module = { disks ? [ "/dev/vda" ], config, ... }:
     {
       imports = [
@@ -19,9 +16,9 @@ let
         disko
       ];
       # cd secrets
-      # nix-store --generate-binary-cache-key cache.tcp4.me ./cache ./cache.skey
-      # cat cache | nix run github:ryantm/agenix -- -e cache.age -i cache-vultr.pub 
+      # nix-store --generate-binary-cache-key cache.tcp4.me ./cache ./cache.pub
       # scp ssh://root@cache.tcp4.me:/etc/ssh/ssh_host_ed25519_key.pub cache-vultr.pub
+      # cat cache | nix run github:ryantm/agenix -- -e cache.age -i cache-vultr.pub 
       age.secrets.cache.file = "${secrets}/cache.age";
       system.stateVersion = config.system.nixos.version;
       boot.loader.systemd-boot.enable = true;
@@ -30,6 +27,15 @@ let
         22
         config.services.nix-serve.port
       ];
+      # builders
+      nix.settings.trusted-users = [ "builder" ];
+      users.users.builder = {
+        home = "/home/builder";
+        isNormalUser = true;
+        openssh. authorizedKeys.keys = [
+          (builtins.readFile ../../secrets/builder.pub)
+        ];
+      };
       # cache service
       services.nix-serve = {
         enable = true;
@@ -41,7 +47,9 @@ let
       '';
       # SSH
       services.sshd.enable = true;
-      users.users.root.openssh = { inherit authorizedKeys; };
+      users.users.root.openssh.authorizedKeys.keys = [
+        (builtins.readFile ../../secrets/klarkc.pub)
+      ];
       # beesd
       services.beesd.filesystems = {
         root = {
