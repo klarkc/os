@@ -36,6 +36,7 @@ let
         isNormalUser = true;
         openssh. authorizedKeys.keys = [
           (builtins.readFile ../../secrets/builder.pub)
+          (builtins.readFile ../../secrets/bridge-service.pub)
         ];
       };
       # cache service
