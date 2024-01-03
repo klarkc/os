@@ -20,8 +20,15 @@ jobs:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
       - uses: gacts/run-and-post-run@v1
         with:
-          run: nix -v flake check -L --show-trace
+          run: |
+            curl https://raw.githubusercontent.com/cachix/cachix-action/master/dist/main/list-nix-store.sh --output ./.github/workflows/list-nix-store.sh
+            chmod +x ./.github/workflows/list-nix-store.sh
+            ./.github/workflows/list-nix-store.sh > /tmp/store
+            nix -v flake check -L --show-trace
           post: |
+            ./.github/workflows/list-nix-store.sh > /tmp/store-new
+            comm -13 <(sort /tmp/store) <(./.github/workflows/list-nix-store.sh) > /tmp/store-new
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             cp .github/workflows/known_hosts ~/.ssh/known_hosts
-            nix -v copy -s --all --to ssh://builder@cache.tcp4.me
+            (cat /tmp/store-new | nix -v copy -s --stdin --to ssh://builder@cache.tcp4.me) || EXIT_CODE=$?
+            echo $EXIT_CODE
