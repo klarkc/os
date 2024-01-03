@@ -45,6 +45,12 @@ let
         enable = true;
         secretKeyFile = config.age.secrets.cache.path;
       };
+      nix.settings.trusted-substituters = [
+        "https://${domain}"
+      ];
+      nix.settings.trusted-public-keys = [
+        (builtins.readFile ../../secrets/cache.pub)
+      ];
       nix.extraOptions = ''
         min-free = 2684354560
         max-free = 5368709120 
