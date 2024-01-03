@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.5.0](https://github.com/klarkc/os/compare/v1.4.0...v1.5.0) (2024-01-03)
+
+
+### Features
+
+* **cache:** add bridge-service pk ([1537500](https://github.com/klarkc/os/commit/1537500421bf4d5f8ec49fdb3dbe9149ca86ccf9))
+* **cache:** add klarkc as a builder ([4d30322](https://github.com/klarkc/os/commit/4d30322b9441567ba4d1c0264b828806956bfcd4))
+
+
+### Bug Fixes
+
+* **cache:** add missing self substituter ([ad3512f](https://github.com/klarkc/os/commit/ad3512faf879839169262b6c82d9d15cf6d57b08))
+
 ## [1.4.0](https://github.com/klarkc/os/compare/v1.3.0...v1.4.0) (2023-12-22)
 
 
