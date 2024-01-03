@@ -47,9 +47,21 @@ let
       };
       nix.settings.trusted-substituters = [
         "https://${domain}"
+        # TODO check if common substituters are really required
+        # common substituters
+        "https://klarkc.cachix.org"
+        "https://cache.iog.io"
+        "https://cache.zw3rk.com"
+        "https://hercules-ci.cachix.org"
+        "https://horizon.cachix.org"
       ];
       nix.settings.trusted-public-keys = [
         (builtins.readFile ../../secrets/cache.pub)
+        "klarkc.cachix.org-1:R+z+m4Cq0hMgfZ7AQ42WRpGuHJumLLx3k0XhwpNFq9U="
+        "hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ="
+        "loony-tools:pr9m4BkM/5/eSTZlkQyRt57Jz7OMBxNSUiMC4FkcNfk="
+        "hercules-ci.cachix.org-1:ZZeDl9Va+xe9j+KqdzoBZMFJHVQ42Uu/c/1/KMC5Lw0="
+        "horizon.cachix.org-1:MeEEDRhRZTgv/FFGCv3479/dmJDfJ82G6kfUDxMSAw0="
       ];
       nix.extraOptions = ''
         min-free = 2684354560
