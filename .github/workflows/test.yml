@@ -15,6 +15,9 @@ jobs:
           extra_nix_config: |
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
+            # currently there is no way to nix copy to use the flake settings so we need them
+            substituters = https://cache.tcp4.me?priority=99
+            trusted-public-keys = cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew=
       - uses: webfactory/ssh-agent@v0.8.0
         with:
           ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
