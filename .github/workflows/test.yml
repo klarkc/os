@@ -30,5 +30,6 @@ jobs:
             comm -13 <(sort /tmp/store) <(./.github/workflows/list-nix-store.sh) > /tmp/store-new
             mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
             cp .github/workflows/known_hosts ~/.ssh/known_hosts
+            ssh ssh://builder@cache.tcp4.me "free_space_kb=$(df -k --output=avail / | tail -n 1) nix-collect-garbage -d --delete-older-than 30d --max-freed $(( (d=5000000-free_space_kb) < 0 ? 0 : d ))"
             (cat /tmp/store-new | nix -v copy -s --stdin --to ssh://builder@cache.tcp4.me) || EXIT_CODE=$?
             echo $EXIT_CODE
