@@ -6,6 +6,7 @@
     nix-serve-ng.url = github:aristanetworks/nix-serve-ng;
     everyday.url = "github:klarkc/nixos-everyday";
     disko.url = "github:nix-community/disko";
+    nix-heuristic-gc.url = "github:risicle/nix-heuristic-gc";
     # optimizations
     generators.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.nixpkgs.follows = "nixpkgs";

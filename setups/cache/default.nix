@@ -5,6 +5,7 @@ let
   inherit (flake.outputs.lib) mkSystem secrets;
   agenix = flake.inputs.agenix.nixosModules.default;
   nix-serve = flake.inputs.nix-serve-ng.nixosModules.default;
+  nix-heuristic-gc = flake.inputs.nix-heuristic-gc.packages.${system}.default;
   domain = "cache.tcp4.me";
   home = "/home/klarkc";
   email = "walkerleite490@gmail.com";
@@ -44,6 +45,26 @@ let
       services.nix-serve = {
         enable = true;
         secretKeyFile = config.age.secrets.cache.path;
+      };
+      systemd.services.nix-gc-ng = {
+        description = "nix-gc-ng";
+        wantedBy = [ "multi-user.target" ];
+        requires = [ "nix-daemon.service" ];
+        path = [ nix-heuristic-gc ];
+        script = ''
+          available_space=$(df -k --output=avail / | tail -n 1)
+          required_space=5114792 # in KB
+          if [ "$available_space" -ge "$required_space" ]; then
+            systemd-cat -t nix-gc-ng -p debug echo "Skipping garbage collection, the current available space $available_space is greater than the required space $required_space"
+          else
+            nix-heuristic-gc $(( (d=required_space-available_space) < 0 ? 0 : d ))K
+          fi
+        '';
+      };
+      systemd.timers.nix-gc-ng = {
+        description = "nix-gc-ng timer";
+        wantedBy = [ "multi-user.target" ];
+        timerConfig.OnCalendar = "*:0/5"; # Run every 5 minutes
       };
       nix.settings.trusted-substituters = [
         "https://${domain}"
@@ -181,6 +202,8 @@ rec {
         environment.systemPackages = map lib.lowPrio [
           pkgs.curl
           pkgs.gitMinimal
+          pkgs.vim
+          nix-heuristic-gc
         ];
         # HTTPS web server
         networking.firewall.allowedTCPPorts = [
