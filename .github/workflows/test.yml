@@ -16,8 +16,9 @@ jobs:
             accept-flake-config = true
             access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
             # currently there is no way to nix copy to use the flake settings so we need them
-            substituters = https://cache.tcp4.me?priority=99
-            trusted-public-keys = cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew=
+            substituters = https://cache.nixos.org https://cache.tcp4.me?priotity=99
+            trusted-substituters = https://cache.nixos.org https://cache.tcp4.me
+            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew= klarkc.cachix.org-1:R+z+m4Cq0hMgfZ7AQ42WRpGuHJumLLx3k0XhwpNFq9U= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
             # if substituters fail, build it again
             fallback = true
       - uses: webfactory/ssh-agent@v0.8.0
