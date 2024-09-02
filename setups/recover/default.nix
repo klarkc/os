@@ -93,16 +93,17 @@ let
     services = {
       openssh.enable = true;
 
+      displayManager = {
+        defaultSession = "none+xmonad";
+        autoLogin = {
+          enable = true;
+          user = "recover";
+        };
+      };
+
       xserver = {
         enable = true;
         windowManager.xmonad.enable = true;
-        displayManager = {
-          defaultSession = "none+xmonad";
-          autoLogin = {
-            enable = true;
-            user = "recover";
-          };
-        };
       };
     };
 

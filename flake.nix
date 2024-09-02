@@ -1,9 +1,9 @@
 {
   inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-24.05";
     generators.url = "github:nix-community/nixos-generators";
     agenix.url = "github:ryantm/agenix";
-    nix-serve-ng.url = github:aristanetworks/nix-serve-ng;
+    nix-serve-ng.url = "github:aristanetworks/nix-serve-ng";
     everyday.url = "github:klarkc/nixos-everyday";
     disko.url = "github:nix-community/disko";
     nix-heuristic-gc.url = "github:risicle/nix-heuristic-gc";
