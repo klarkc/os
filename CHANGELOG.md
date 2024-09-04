@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.6.0](https://github.com/klarkc/os/compare/v1.5.0...v1.6.0) (2024-02-12)
+
+
+### Features
+
+* **cache:** add nix-gc-ng ([c4f4ed3](https://github.com/klarkc/os/commit/c4f4ed39be3cfbe84d225f450938ef9e4451fa21))
+
+
+### Bug Fixes
+
+* **cache:** add common substituters to solve untrusted verifications ([7f41647](https://github.com/klarkc/os/commit/7f4164740735308f38de8b2b2f1238d4d380407d))
+
 ## [1.5.0](https://github.com/klarkc/os/compare/v1.4.0...v1.5.0) (2024-01-03)
 
 
