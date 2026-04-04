@@ -64,6 +64,8 @@ Example task names:
 - `deployment:install-system`
 - `deployment:update-system`
 
+For safe local validation, prefer running deployment tasks with `--input validate_only=true` before attempting any real target operation.
+
 ### Test loading
 
 Every `.test.sh` must be loaded by a `devenv.nix` module.
@@ -88,6 +90,17 @@ At present, operator-side secret material is handled out of band and documented 
 
 CI must call `devenv` only.
 Repository tests must run through `devenv test`.
+
+### Validation status
+
+Local validation has confirmed that:
+
+- `devenv tasks list` loads the deployment tasks
+- `deployment:install-system` accepts `host` and `validate_only=true`
+- `deployment:update-system` accepts `host` and `validate_only=true`
+- `devenv test` completes successfully on this branch
+
+Do not overstate this as a real deployment validation. A real target-host deployment still needs separate confirmation.
 
 ### Commits
 

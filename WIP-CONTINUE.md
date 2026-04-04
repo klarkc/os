@@ -74,6 +74,26 @@ These items are already present on `devenv-2-migration`:
 - `cache-vultr` has been migrated to `cache-0`.
 - `recover_0` has been migrated to `recover-0`.
 
+## Validation performed locally
+
+The following commands were executed successfully on this branch:
+
+```bash
+devenv tasks list
+devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
+devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
+devenv test
+```
+
+These results confirm that:
+
+- deployment tasks are discovered correctly
+- `host` input is accepted by the deployment tasks
+- `validate_only=true` prevents real install/update execution
+- local `devenv test` execution completes successfully
+
+These results do **not** yet prove that a real install/update against a target machine succeeds.
+
 ## Secrets
 
 User decided that:
@@ -84,7 +104,7 @@ User decided that:
 - Enpass is the operator's secret source.
 - README should explain how SecretSpec is enabled and how local secret injection is expected to work.
 
-The exact SecretSpec configuration syntax should still be verified against current devenv docs before calling the migration fully finished.
+The exact SecretSpec configuration syntax may still be worth checking against current devenv docs, but it no longer blocks basic local validation of this branch.
 
 ## What was already created or updated on the branch
 
@@ -115,52 +135,36 @@ The exact SecretSpec configuration syntax should still be verified against curre
 
 ## Open items that still need verification
 
-### 1. Verify current devenv conventions
+### 1. Real deployment against a target host
 
-Still worth validating against current devenv docs or local execution:
+What remains unverified is a real install or update against an actual machine.
+Until that happens, do not claim operational deployment has been validated end-to-end.
+
+### 2. CI status on GitHub Actions
+
+CI configuration exists, but GitHub Actions status still has not been confirmed from this handoff alone.
+Do not claim CI is passing until the branch is actually checked on GitHub.
+
+### 3. Optional refinement of devenv conventions
+
+Still worth validating against current devenv docs if desired:
 
 - whether the `secretspec` block in `devenv.yaml` matches current expected syntax
 - whether the current task/input shape in `modules/deployment/devenv.nix` is the preferred contemporary syntax
 - whether `enterTest` is the intended long-term test aggregation mechanism here
 
-### 2. Validate deployment flows end-to-end
-
-`install-system.sh` and `update-system.sh` should be treated as implemented but not yet fully verified end-to-end.
-
-They already:
-
-- validate the host argument robustly
-- use the repository layout under `modules/<domain>/instances/`
-- stay behind `devenv` tasks as the intended interface
-
-What remains is confirming they behave correctly under real `devenv` execution for the declared hosts.
-
-### 3. Tighten docs wording
-
-The main docs task left is alignment, not creation.
-
-Recommended focus:
-
-- keep `README.md` tightly aligned with the current branch behavior
-- keep `AGENTS.md` focused on rules that are actually reflected in the repo
-- avoid describing README or CI as missing, because they already exist on this branch
-
-### 4. CI status is still unknown
-
-CI configuration exists, but passing status has not been verified from this handoff alone.
-Do not claim CI is passing until the branch is actually checked.
+These are refinement questions now, not blockers for the validated local workflow above.
 
 ## Practical next steps in a new conversation
 
 1. Open `WIP-CONTINUE.md` first.
 2. Inspect `README.md`, `AGENTS.md`, `devenv.yaml`, and `modules/deployment/devenv.nix`.
-3. Verify current devenv docs or local execution for task syntax, test integration, and SecretSpec syntax.
-4. Run or ask the user to run the smallest useful local validation commands.
-5. Only then claim the migration is fully verified.
+3. Distinguish clearly between local validation already completed and operational validation still pending.
+4. Only claim the migration is fully verified after real target-host deployment and CI confirmation.
 
 ## Explicit warnings for the next assistant
 
 - Prefer updating the existing docs over creating parallel replacements.
-- Distinguish clearly between implemented state and verified state.
+- Distinguish clearly between implemented state, locally validated state, and fully operationally verified state.
 - Keep the user-visible interface restricted to `devenv`.
 - Do not claim CI is passing without evidence.

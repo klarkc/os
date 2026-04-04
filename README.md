@@ -44,6 +44,20 @@ DEPLOY_TARGET_USER=root DEPLOY_TARGET_HOST=ssdinarch-0 DEPLOY_TARGET_PORT=22 \
 
 Use the same `DEPLOY_TARGET_*` environment variables for update.
 
+## Safe validation
+
+You can validate task wiring without performing a real install or update:
+
+```bash
+devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
+```
+
+```bash
+devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
+```
+
+With `validate_only=true`, the current deployment scripts exit before invoking `nixos-anywhere`.
+
 ## Tests
 
 Run repository tests with:
@@ -53,6 +67,19 @@ devenv test
 ```
 
 The current branch wires shell-based tests through domain `devenv.nix` modules.
+
+## Validated locally on this branch
+
+The following commands were executed successfully on `devenv-2-migration`:
+
+```bash
+devenv tasks list
+devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
+devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
+devenv test
+```
+
+This validates task discovery, safe deployment-task input handling, and local test execution. It does not by itself validate a real deploy to a target host.
 
 ## Hosts
 
