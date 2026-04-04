@@ -16,10 +16,10 @@ Prefer the Determinate Nix GitHub Action and `magic-nix-cache-action` for CI set
 - Read target files before editing.
 - Match existing whitespace/indentation exactly when editing.
 - Prefer `devenv` commands and documented tasks over raw `nix`.
-- Do not run `devenv test` while `devenv up` is running.
+- Do not run `devenv test` while `devenv up` is running or vice-versa.
 - Run the most local/fast relevant tests first.
 - For `devenv test`, redirect output to a file (no stdout/`tee`).
-- When given a new summary, update `docs/wip.md` (if it exists) before any other action.
+- When given a new summary, update WIP docs (if it exists) before any other action.
 
 ### Layout
 
