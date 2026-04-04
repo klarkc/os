@@ -5,9 +5,10 @@ inputs:
       nixpkgs:
         follows: nixpkgs
 imports:
-- ./modules/deployment
-- ./modules/ssdinarch
-- ./modules/cache
-- ./modules/recover
+  - ./modules/deployment
+  - ./modules/shared
+  - ./modules/ssdinarch
+  - ./modules/cache
+  - ./modules/recover
 secretspec:
   enable: true
