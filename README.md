@@ -7,6 +7,7 @@ Personal NixOS machines and operations, managed via `devenv`.
 ## Interface
 
 All human and CI interaction goes through `devenv`.
+Do not run scripts directly.
 
 ## Tasks
 
@@ -16,11 +17,22 @@ Install a host (optionally runs `disko` if `modules/<domain>/instances/<host>.di
 devenv tasks run deployment:install-system --input host=ssdinarch-0
 ```
 
+Target SSH defaults to `root@<host>:22`. Override with:
+
+```bash
+DEPLOY_TARGET_USER=root DEPLOY_TARGET_HOST=ssdinarch-0 DEPLOY_TARGET_PORT=22 \
+  devenv tasks run deployment:install-system --input host=ssdinarch-0
+```
+
 Update a host:
 
 ```bash
 devenv tasks run deployment:update-system --input host=ssdinarch-0
 ```
+
+Use the same `DEPLOY_TARGET_*` environment variables for update.
+
+Install uses `nixos-anywhere` with a temporary flake generated from `modules/<domain>/instances/<host>.nix`.
 
 Run repository tests:
 
@@ -31,7 +43,7 @@ devenv test
 ## Hosts
 
 - `ssdinarch-0`
-- `cache-vultr`
+- `cache-0`
 - `recover-0`
 
 ## Secrets

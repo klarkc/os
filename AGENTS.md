@@ -7,6 +7,8 @@
 The only public interface for humans and CI is `devenv`.
 
 Do not expose `nix`, `nixos-rebuild`, `nixos-install`, `disko`, or ad-hoc shell entrypoints as the primary interface.
+Do not call `nix` or `devenv` inside scripts; scripts are executed only via `devenv` tasks.
+Do not call scripts directly from humans or CI; the only interface is `devenv`.
 
 When running `devenv` in CI, use the latest `devenv` via `nix run` rather than relying on a pinned global install.
 Prefer the Determinate Nix GitHub Action and `magic-nix-cache-action` for CI setup.
@@ -48,6 +50,13 @@ They are not directly tested.
 
 Executable behavior must live in `.sh` scripts.
 Every `.sh` script must have a co-localized `.test.sh` script.
+Deployment scripts should use helper flows (e.g., `nixos-anywhere` and `nix copy`) instead of manual `nixos-install` or `nixos-rebuild`.
+
+### Shared system defaults
+
+Maintain a global shared module at `modules/shared/system.nix` and include it in every system.
+Put default NixOS options there (including store auto-deduplication) and remove duplicated settings from per-host modules.
+The shared domain must include `modules/shared/devenv.nix`.
 
 ### Script layout
 
