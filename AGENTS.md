@@ -96,7 +96,7 @@ Instance configs live under `modules/<domain>/instances/<instance>.nix`, with op
 CI must call `devenv` only.
 Repository tests must run through `devenv test`.
 
-For install/update scripts, avoid manual Nix steps where a helper exists; check `../Solo/solosig` for the preferred helper workflow.
+For install/update scripts, avoid manual Nix steps where a helper exists.
 
 ### Task naming
 
