@@ -1,8 +1,9 @@
 imports:
-  - ./modules/install-system
-  - ./modules/update-system
+  - ./modules/deployment
   - ./modules/ssdinarch
+  - ./modules/cache
+  - ./modules/recover
 
 # SecretSpec enabled globally (no per-module secret wiring required)
-secrets:
+secretspec:
   enable: true
