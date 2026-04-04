@@ -1,40 +1,15 @@
-name: "Test"
+name: Test
+
 on:
   pull_request:
   push:
-    branches:
-      - main
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v3
-      - uses: cachix/install-nix-action@v20
-        with:
-          install_url: https://releases.nixos.org/nix/nix-2.19.1/install
-          extra_nix_config: |
-            accept-flake-config = true
-            access-tokens = github.com=${{ secrets.GITHUB_TOKEN }}
-            # currently there is no way to nix copy to use the flake settings so we need them
-            substituters = https://cache.nixos.org https://cache.tcp4.me?priotity=99
-            trusted-substituters = https://cache.nixos.org https://cache.tcp4.me
-            trusted-public-keys = cache.nixos.org-1:6NCHdD59X431o0gWypbMrAURkbJ16ZPMQFGspcDShjY= cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew= klarkc.cachix.org-1:R+z+m4Cq0hMgfZ7AQ42WRpGuHJumLLx3k0XhwpNFq9U= hydra.iohk.io:f/Ea+s+dFdN+3Y/G+FDgSq+a5NEWhJGzdjvKNGv0/EQ=
-            # if substituters fail, build it again
-            fallback = true
-      - uses: webfactory/ssh-agent@v0.8.0
-        with:
-          ssh-private-key: ${{ secrets.BUILDER_TOKEN }}
-      - uses: gacts/run-and-post-run@v1
-        with:
-          run: |
-            curl https://raw.githubusercontent.com/cachix/cachix-action/master/dist/main/list-nix-store.sh --output ./.github/workflows/list-nix-store.sh
-            chmod +x ./.github/workflows/list-nix-store.sh
-            ./.github/workflows/list-nix-store.sh > /tmp/store
-            nix -v flake check -L --show-trace
-          post: |
-            ./.github/workflows/list-nix-store.sh > /tmp/store-new
-            comm -13 <(sort /tmp/store) <(./.github/workflows/list-nix-store.sh) > /tmp/store-new
-            mkdir -p ~/.ssh/ && touch ~/.ssh/known_hosts
-            cp .github/workflows/known_hosts ~/.ssh/known_hosts
-            (cat /tmp/store-new | nix -v copy -s --stdin --to ssh://builder@cache.tcp4.me) || EXIT_CODE=$?
-            echo $EXIT_CODE
+      - uses: actions/checkout@v5
+      - uses: DeterminateSystems/nix-installer-action@v16
+      - uses: DeterminateSystems/magic-nix-cache-action@v7
+      - name: Run devenv tests
+        run: nix run github:cachix/devenv -- test
