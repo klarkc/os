@@ -121,6 +121,6 @@ Include a `BREAKING CHANGE:` block with migration steps when required.
 ### Testing/CI notes
 
 - Suggested sequence: lint/hooks → targeted tests → `devenv test`.
+- Prefer running `devenv tasks run devenv:git-hooks:run` to execute hooks.
 - CI note: prefer `devenv outputs` over `devenv shell` in CI.
 - CI note: use deterministic `devenv build --out-link` paths when applicable.
-- CI note: `devenv test` may emit expected noise (missing package.json/dotenv warnings) before workloads start.
