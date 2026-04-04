@@ -1,6 +1,7 @@
 /result
 /*.img
 /*.qcow2
+/.devenv/
 /secrets/*
 !/secrets/*.nix
 !/secrets/*.age
