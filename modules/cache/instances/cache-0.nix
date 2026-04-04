@@ -1,5 +1,5 @@
 { ... }: {
   imports = [ ../machine.nix ];
 
-  networking.hostName = "cache-vultr";
+  networking.hostName = "cache-0";
 }
