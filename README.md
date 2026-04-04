@@ -11,19 +11,31 @@ Personal NixOS machines and operations, managed through a `devenv`-only interfac
 - Machine definitions live under `modules/<domain>/`.
 - Instances live under `modules/<domain>/instances/<domain>-<number>.nix`.
 
-## Interface
+## Intended interface
 
-Install a host:
+Install a host through `devenv` tasks.
+
+The intended long-term `install-system` interface is target-oriented:
+
+- remote machine target over SSH, or
+- local target such as a disk device or an image file
+
+The exact task inputs for the local-target flow are still being finalized.
+
+`update-system` is conceptually different from install: it is intended to be run from inside an already installed machine, not as a remote deployment command.
+
+## Current branch status
+
+The current branch still implements deployment tasks with an SSH-oriented interface.
+
+Today, the documented and locally validated commands are:
 
 ```bash
 devenv tasks run deployment:install-system --input host=ssdinarch-0
-```
-
-Update a host:
-
-```bash
 devenv tasks run deployment:update-system --input host=ssdinarch-0
 ```
+
+This is an implementation snapshot, not the final desired interface.
 
 The `host` input is passed to deployment tasks through `DEVENV_TASK_INPUT` and resolved by the task-backed shell scripts.
 
@@ -31,22 +43,15 @@ Do not treat the shell scripts under `modules/deployment/scripts/` as the public
 
 ## Deployment behavior
 
-Install and update generate a temporary flake from the selected instance plus `modules/shared/system.nix`.
+Install and update currently generate a temporary flake from the selected instance plus `modules/shared/system.nix`.
 
 If `modules/<domain>/instances/<host>.disko.nix` exists, install includes the disk layout automatically and update mounts through `nixos-anywhere` before switching.
 
-Target SSH defaults to `root@<host>:22`. Override with:
-
-```bash
-DEPLOY_TARGET_USER=root DEPLOY_TARGET_HOST=ssdinarch-0 DEPLOY_TARGET_PORT=22 \
-  devenv tasks run deployment:install-system --input host=ssdinarch-0
-```
-
-Use the same `DEPLOY_TARGET_*` environment variables for update.
+This behavior is expected to change as the interface is brought in line with the target-oriented install flow and the in-machine update flow described above.
 
 ## Safe validation
 
-You can validate task wiring without performing a real install or update:
+You can validate the current task wiring without performing a real install or update:
 
 ```bash
 devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
@@ -79,7 +84,7 @@ devenv tasks run deployment:update-system --input host=ssdinarch-0 --input valid
 devenv test
 ```
 
-This validates task discovery, safe deployment-task input handling, and local test execution. It does not by itself validate a real deploy to a target host.
+This validates task discovery, safe deployment-task input handling, and local test execution for the current implementation. It does not by itself validate the final intended install/update model.
 
 ## Hosts
 

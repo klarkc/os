@@ -9,6 +9,22 @@ The only public interface for humans and CI is `devenv`.
 Do not expose raw `nix`, `nixos-rebuild`, `nixos-install`, `disko`, or direct script invocation as the primary repository interface.
 Do not treat shell scripts as the public UX. Domain scripts are executed behind `devenv` tasks.
 
+### Deployment model
+
+The intended deployment split is:
+
+- `install-system`: install to a target
+- `update-system`: update from inside an already installed machine
+
+`install-system` should support at least two target classes:
+
+- a remote machine reached over SSH
+- a local target such as a disk device or image file
+
+`update-system` should not be modeled as a remote deployment command. Its intended home is the installed machine itself.
+
+If current implementation details still reflect an SSH-oriented update path, treat that as migration state rather than the final architecture.
+
 ### Layout
 
 Organize the repository by explicit domain under `modules/<domain>/`.
@@ -64,7 +80,7 @@ Example task names:
 - `deployment:install-system`
 - `deployment:update-system`
 
-For safe local validation, prefer running deployment tasks with `--input validate_only=true` before attempting any real target operation.
+For safe local validation of the current migration state, prefer running deployment tasks with `--input validate_only=true` before attempting any real target operation.
 
 ### Test loading
 
@@ -100,7 +116,7 @@ Local validation has confirmed that:
 - `deployment:update-system` accepts `host` and `validate_only=true`
 - `devenv test` completes successfully on this branch
 
-Do not overstate this as a real deployment validation. A real target-host deployment still needs separate confirmation.
+Do not overstate this as final deployment validation. The implementation still needs to be aligned with the intended target-oriented install flow and the in-machine update flow.
 
 ### Commits
 

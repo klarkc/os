@@ -26,6 +26,22 @@ Migrate the repository from the previous flake-centric layout to a `devenv`-cent
 - Avoid `default.nix`, `index.*`, and root-level category folders like `hosts/` or `tasks/`.
 - Avoid unnecessary plurals in domain naming.
 
+## Target architecture correction
+
+The intended deployment architecture is:
+
+- `install-system` installs to a target
+- `update-system` runs from inside an already installed machine
+
+`install-system` should support at least:
+
+- a remote machine target over SSH
+- a local target such as a disk device or an image file
+
+`update-system` should not be modeled as a remote deployment command in the final architecture.
+
+This is an important correction to the current migration direction.
+
 ## Current layout
 
 ```text
@@ -92,7 +108,7 @@ These results confirm that:
 - `validate_only=true` prevents real install/update execution
 - local `devenv test` execution completes successfully
 
-These results do **not** yet prove that a real install/update against a target machine succeeds.
+These results describe the current implementation state only. They do **not** yet validate the corrected target-oriented install model or the in-machine update model.
 
 ## Secrets
 
@@ -133,19 +149,28 @@ The exact SecretSpec configuration syntax may still be worth checking against cu
 - `modules/recover/machine.nix`
 - `modules/recover/instances/recover-0.nix`
 
-## Open items that still need verification
+## Open items that still need verification or redesign
 
-### 1. Real deployment against a target host
+### 1. Redesign deployment interface to match target architecture
 
-What remains unverified is a real install or update against an actual machine.
+The current implementation still reflects an SSH-oriented deployment model.
+
+It needs to be brought in line with the intended architecture:
+
+- `install-system` should install to either an SSH target or a local target
+- `update-system` should become an in-machine update flow rather than a remote deployment flow
+
+### 2. Real deployment validation
+
+After the deployment interface is corrected, what remains is a real install/update validation against a real target.
 Until that happens, do not claim operational deployment has been validated end-to-end.
 
-### 2. CI status on GitHub Actions
+### 3. CI status on GitHub Actions
 
 CI configuration exists, but GitHub Actions status still has not been confirmed from this handoff alone.
 Do not claim CI is passing until the branch is actually checked on GitHub.
 
-### 3. Optional refinement of devenv conventions
+### 4. Optional refinement of devenv conventions
 
 Still worth validating against current devenv docs if desired:
 
@@ -153,18 +178,19 @@ Still worth validating against current devenv docs if desired:
 - whether the current task/input shape in `modules/deployment/devenv.nix` is the preferred contemporary syntax
 - whether `enterTest` is the intended long-term test aggregation mechanism here
 
-These are refinement questions now, not blockers for the validated local workflow above.
+These are refinement questions now, separate from the deployment-architecture correction above.
 
 ## Practical next steps in a new conversation
 
 1. Open `WIP-CONTINUE.md` first.
 2. Inspect `README.md`, `AGENTS.md`, `devenv.yaml`, and `modules/deployment/devenv.nix`.
-3. Distinguish clearly between local validation already completed and operational validation still pending.
-4. Only claim the migration is fully verified after real target-host deployment and CI confirmation.
+3. Treat the deployment architecture correction as the next major change, not as a solved problem.
+4. Distinguish clearly between local validation already completed and operational validation still pending.
+5. Only claim the migration is fully verified after the deployment interface is corrected, real target-host or local-target install is validated, and CI is confirmed.
 
 ## Explicit warnings for the next assistant
 
 - Prefer updating the existing docs over creating parallel replacements.
-- Distinguish clearly between implemented state, locally validated state, and fully operationally verified state.
+- Distinguish clearly between implemented state, locally validated state, intended architecture, and fully operationally verified state.
 - Keep the user-visible interface restricted to `devenv`.
 - Do not claim CI is passing without evidence.
