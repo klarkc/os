@@ -58,23 +58,60 @@ if [ "$VALIDATE_ONLY" = "true" ]; then
   exit 0
 fi
 
-DISKO_PATH="${INSTANCE_PATH%.nix}.disko.nix"
-if [ -f "$DISKO_PATH" ]; then
-  if ! command -v disko >/dev/null 2>&1; then
-    echo "disko not found in PATH; install disko before running install-system"
-    exit 1
-  fi
-  sudo disko --mode destroy,format,mount "$DISKO_PATH"
+if ! command -v nixos-anywhere >/dev/null 2>&1; then
+  echo "nixos-anywhere not found in PATH; ensure it is available in devenv"
+  exit 1
 fi
 
-sudo mkdir -p /mnt/etc/nixos
-sudo rsync -a --delete \
-  --exclude=.git/ \
-  --exclude=.devenv/ \
-  --exclude=.direnv/ \
-  --exclude=result \
-  --exclude=result-* \
-  --exclude=control.socket \
-  "$REPO_ROOT/" /mnt/etc/nixos/
+TARGET_USER="${DEPLOY_TARGET_USER:-root}"
+TARGET_HOST="${DEPLOY_TARGET_HOST:-$HOST}"
+TARGET_PORT="${DEPLOY_TARGET_PORT:-22}"
 
-sudo nixos-install -I nixos-config="/mnt/etc/nixos/${INSTANCE_PATH#"$REPO_ROOT/"}"
+if [ -z "$TARGET_HOST" ]; then
+  echo "missing DEPLOY_TARGET_HOST or host argument"
+  exit 1
+fi
+
+SSH_TARGET="${TARGET_USER}@${TARGET_HOST}"
+
+TMP_FLAKE_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "$TMP_FLAKE_DIR"
+}
+trap cleanup EXIT
+
+SHARED_MODULE="${REPO_ROOT}/modules/shared/system.nix"
+INSTANCE_MODULE="${INSTANCE_PATH}"
+DISKO_MODULE="${INSTANCE_PATH%.nix}.disko.nix"
+
+cat > "${TMP_FLAKE_DIR}/flake.nix" <<EOF
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs = { nixpkgs, disko, ... }:
+    let
+      system = "x86_64-linux";
+      modules =
+        [ ${SHARED_MODULE} ${INSTANCE_MODULE} ]
+        ++ (if builtins.pathExists ${DISKO_MODULE} then [
+          disko.nixosModules.disko
+          ${DISKO_MODULE}
+        ] else
+          [ ]);
+    in {
+      nixosConfigurations."${HOST}" = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = modules;
+      };
+    };
+}
+EOF
+
+echo "Installing ${HOST} to ${SSH_TARGET}:${TARGET_PORT}"
+echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
+
+nixos-anywhere --ssh-port "$TARGET_PORT" --flake "${TMP_FLAKE_DIR}#${HOST}" "$SSH_TARGET"

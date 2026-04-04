@@ -1,5 +1,5 @@
 { config, pkgs, ... }: {
-  packages = with pkgs; [ findutils jq rsync ];
+  packages = with pkgs; [ findutils jq nixos-anywhere openssh rsync ];
 
   tasks."deployment:install-system" = {
     exec =
