@@ -2,8 +2,6 @@
 {
   system.stateVersion = "24.05";
 
-  networking.hostName = "ssdinarch";
-
   users.users.user = {
     isNormalUser = true;
     extraGroups = [ "wheel" ];
