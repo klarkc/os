@@ -1,6 +1,6 @@
-{ system, pkgs, flake, ... }:
+{ pkgs, flake, ... }:
 let
-  inherit (pkgs.lib) mkDefault version;
+  inherit (pkgs.lib) mkDefault;
   inherit (flake.outputs.lib) mkSystem;
   recover-module = { config, ... }: {
     system.stateVersion = config.system.nixos.version;
@@ -29,14 +29,7 @@ let
         "console=tty1"
         "boot.shell_on_fail"
       ];
-      supportedFilesystems = [
-        "btrfs"
-        "exfat"
-        "ext2"
-        "ext4"
-        "ntfs"
-        "vfat"
-      ];
+      supportedFilesystems = [ "btrfs" "exfat" "ext2" "ext4" "ntfs" "vfat" ];
       loader = {
         timeout = 15;
         grub = {
@@ -117,8 +110,7 @@ let
       htop.enable = true;
     };
   };
-in
-rec {
+in rec {
   modules.recover = recover-module;
 
   packages = {
@@ -134,11 +126,6 @@ rec {
   };
 
   machines.recover_0 = mkSystem {
-    modules = with modules; [
-      recover
-      {
-        networking.hostName = "recover_0";
-      }
-    ];
+    modules = with modules; [ recover { networking.hostName = "recover_0"; } ];
   };
 }

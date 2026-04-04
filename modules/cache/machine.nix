@@ -4,8 +4,7 @@ let
   email = "walkerleite490@gmail.com";
   nixHeuristicGc = lib.attrByPath [ "nix-heuristic-gc" ] null pkgs;
   cacheSecretKey = "/etc/nixos/secrets/cache.key";
-in
-{
+in {
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     (modulesPath + "/installer/scan/not-detected.nix")
@@ -18,7 +17,8 @@ in
       systemd-boot.enable = true;
       efi.canTouchEfiVariables = true;
     };
-    initrd.availableKernelModules = [ "ahci" "xhci_pci" "virtio_pci" "sr_mod" "virtio_blk" ];
+    initrd.availableKernelModules =
+      [ "ahci" "xhci_pci" "virtio_pci" "sr_mod" "virtio_blk" ];
   };
 
   nix.settings = {
@@ -86,9 +86,8 @@ in
 
   services.openssh.enable = true;
 
-  users.users.root.openssh.authorizedKeys.keys = [
-    (builtins.readFile ../../secrets/klarkc.pub)
-  ];
+  users.users.root.openssh.authorizedKeys.keys =
+    [ (builtins.readFile ../../secrets/klarkc.pub) ];
 
   services.beesd.filesystems = {
     root = {
@@ -98,12 +97,8 @@ in
     };
   };
 
-  networking.firewall.allowedTCPPorts = [
-    22
-    config.services.nix-serve.port
-    80
-    443
-  ];
+  networking.firewall.allowedTCPPorts =
+    [ 22 config.services.nix-serve.port 80 443 ];
 
   services.nginx = {
     enable = true;
@@ -111,7 +106,9 @@ in
       addSSL = true;
       enableACME = true;
       locations."/".extraConfig = ''
-        proxy_pass http://localhost:${builtins.toString config.services.nix-serve.port};
+        proxy_pass http://localhost:${
+          builtins.toString config.services.nix-serve.port
+        };
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
@@ -124,9 +121,7 @@ in
     defaults = { inherit email; };
   };
 
-  environment.systemPackages = map lib.lowPrio [
-    pkgs.curl
-    pkgs.gitMinimal
-    pkgs.vim
-  ] ++ lib.optional (nixHeuristicGc != null) nixHeuristicGc;
+  environment.systemPackages =
+    map lib.lowPrio [ pkgs.curl pkgs.gitMinimal pkgs.vim ]
+    ++ lib.optional (nixHeuristicGc != null) nixHeuristicGc;
 }

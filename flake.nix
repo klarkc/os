@@ -3,7 +3,7 @@
     nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
     generators.url = "github:nix-community/nixos-generators";
     agenix.url = "github:ryantm/agenix";
-    nix-serve-ng.url = github:aristanetworks/nix-serve-ng;
+    nix-serve-ng.url = "github:aristanetworks/nix-serve-ng";
     everyday.url = "github:klarkc/nixos-everyday";
     disko.url = "github:nix-community/disko";
     nix-heuristic-gc.url = "github:risicle/nix-heuristic-gc";
@@ -11,7 +11,7 @@
     generators.inputs.nixpkgs.follows = "nixpkgs";
     agenix.inputs.nixpkgs.follows = "nixpkgs";
     nix-serve-ng.inputs.nixpkgs.follows = "nixpkgs";
-    disko.inputs.nixpkgs.follows = "nixpkgs"; 
+    disko.inputs.nixpkgs.follows = "nixpkgs";
   };
 
   outputs = { self, ... }@inputs:
@@ -29,8 +29,7 @@
             inherit (inputs.generators) nixosGenerate;
             inherit (builtins) hasAttr;
             finalOptions = options // { inherit system; };
-          in
-          if hasAttr "format" options then
+          in if hasAttr "format" options then
             nixosGenerate finalOptions
           else
             nixosSystem finalOptions;
@@ -39,8 +38,7 @@
         inherit system pkgs;
         flake = self;
       };
-    in
-    {
+    in {
       inherit lib;
 
       nixosModules = {
@@ -66,11 +64,8 @@
     # This sets the flake to use nix cache.
     # Nix should ask for permission before using it,
     # but remove it here if you do not want it to.
-    extra-substituters = [
-      "https://cache.tcp4.me"
-    ];
-    extra-trusted-public-keys = [
-      "cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew="
-    ];
+    extra-substituters = [ "https://cache.tcp4.me" ];
+    extra-trusted-public-keys =
+      [ "cache.tcp4.me:cmk2Iz81lQuX7FtTUcBgtqgI70E8p6SOamNAIcFDSew=" ];
   };
 }

@@ -1,5 +1,4 @@
-{ config, lib, pkgs, ... }:
-{
+{ config, lib, pkgs, ... }: {
   system.stateVersion = config.system.nixos.version;
 
   nix.extraOptions = ''
@@ -29,14 +28,7 @@
       "console=tty1"
       "boot.shell_on_fail"
     ];
-    supportedFilesystems = [
-      "btrfs"
-      "exfat"
-      "ext2"
-      "ext4"
-      "ntfs"
-      "vfat"
-    ];
+    supportedFilesystems = [ "btrfs" "exfat" "ext2" "ext4" "ntfs" "vfat" ];
     loader = {
       timeout = 15;
       grub = {

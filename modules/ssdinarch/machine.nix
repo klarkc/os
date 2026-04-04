@@ -1,5 +1,4 @@
-{ config, pkgs, ... }:
-{
+{ pkgs, ... }: {
   system.stateVersion = "24.05";
 
   users.users.user = {

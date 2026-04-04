@@ -1,8 +1,5 @@
-{ pkgs, ... }:
-{
-  packages = with pkgs; [
-    git
-  ];
+{ pkgs, ... }: {
+  packages = with pkgs; [ git ];
 
   languages = {
     nix.enable = true;

@@ -1,5 +1,4 @@
-{ ... }:
-{
+{ ... }: {
   disko.devices = {
     disk = {
       vdb = {
@@ -24,15 +23,9 @@
               size = "100%";
               content = {
                 type = "btrfs";
-                extraArgs = [
-                  "--label"
-                  "root"
-                  "-f"
-                ];
+                extraArgs = [ "--label" "root" "-f" ];
                 subvolumes = {
-                  "/rootfs" = {
-                    mountpoint = "/";
-                  };
+                  "/rootfs" = { mountpoint = "/"; };
                   "/nix" = {
                     mountOptions = [ "compress=zstd" "noatime" ];
                     mountpoint = "/nix";
