@@ -9,7 +9,7 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 ## Goal
 
-Migrate the repository from the current flake-centric layout to a `devenv`-centric layout with these rules:
+Migrate the repository from the previous flake-centric layout to a `devenv`-centric layout with these rules:
 
 - Humans and CI use `devenv` only.
 - Public UX must not require raw `nix`, `nixos-rebuild`, `nixos-install`, or direct script invocation.
@@ -25,10 +25,6 @@ Migrate the repository from the current flake-centric layout to a `devenv`-centr
 - SecretSpec should be enabled globally in `devenv.yaml`.
 - Avoid `default.nix`, `index.*`, and root-level category folders like `hosts/` or `tasks/`.
 - Avoid unnecessary plurals in domain naming.
-
-## Important correction from the user
-
-Tasks should use script paths from their domain `devenv.nix` as documented in `AGENTS.md`. The implementation drifted and needs correction.
 
 ## Current layout
 
@@ -67,6 +63,17 @@ modules/
       recover-0.nix
 ```
 
+## Verified current state on the branch
+
+These items are already present on `devenv-2-migration`:
+
+- `README.md` exists and documents the `devenv`-only interface.
+- `.github/workflows/test.yml` exists and runs `nix run github:cachix/devenv -- test`.
+- `devenv.yaml` imports the current domain modules and has a global `secretspec` block.
+- `modules/deployment/devenv.nix` wires deployment tasks to scripts under `modules/deployment/scripts/`.
+- `cache-vultr` has been migrated to `cache-0`.
+- `recover_0` has been migrated to `recover-0`.
+
 ## Secrets
 
 User decided that:
@@ -75,25 +82,29 @@ User decided that:
 - No `modules/<host>/secret.nix` is needed by default.
 - SecretSpec should be enabled by a global option in `devenv.yaml`.
 - Enpass is the operator's secret source.
-- README must explain how SecretSpec is enabled and how local secret injection is expected to work.
+- README should explain how SecretSpec is enabled and how local secret injection is expected to work.
 
-The exact SecretSpec configuration syntax must be verified against current devenv docs before finalizing.
+The exact SecretSpec configuration syntax should still be verified against current devenv docs before calling the migration fully finished.
 
-## What was already created on the branch
-
-These files were created or updated during the session:
+## What was already created or updated on the branch
 
 - `AGENTS.md`
+- `COMMIT_GUIDELINES.md`
+- `README.md`
+- `WIP-CONTINUE.md`
 - `devenv.yaml`
+- `.github/workflows/test.yml`
 - `modules/deployment/devenv.nix`
 - `modules/deployment/scripts/install-system.sh`
 - `modules/deployment/scripts/install-system.test.sh`
 - `modules/deployment/scripts/update-system.sh`
 - `modules/deployment/scripts/update-system.test.sh`
-- `modules/ssdinarch/devenv.nix`
-- `modules/ssdinarch/machine.nix`
 - `modules/shared/devenv.nix`
 - `modules/shared/system.nix`
+- `modules/ssdinarch/devenv.nix`
+- `modules/ssdinarch/machine.nix`
+- `modules/ssdinarch/instances/ssdinarch-0.nix`
+- `modules/ssdinarch/instances/ssdinarch-0.disko.nix`
 - `modules/cache/devenv.nix`
 - `modules/cache/machine.nix`
 - `modules/cache/instances/cache-0.nix`
@@ -102,131 +113,54 @@ These files were created or updated during the session:
 - `modules/recover/machine.nix`
 - `modules/recover/instances/recover-0.nix`
 
-These files were only partially aligned with the final conventions and likely need edits.
+## Open items that still need verification
 
-## Problems to fix
+### 1. Verify current devenv conventions
 
-### 1. AGENTS.md must be reviewed and updated
+Still worth validating against current devenv docs or local execution:
 
-The current `AGENTS.md` was written before the final refinements. It must be updated to reflect all final rules, especially:
+- whether the `secretspec` block in `devenv.yaml` matches current expected syntax
+- whether the current task/input shape in `modules/deployment/devenv.nix` is the preferred contemporary syntax
+- whether `enterTest` is the intended long-term test aggregation mechanism here
 
-- tasks must call scripts from `scripts/`
-- every `.test.sh` is loaded by a `devenv.nix`
-- `.nix` files are not tested directly
-- SecretSpec is enabled globally in `devenv.yaml`
-- domains live under `modules/<domain>/`
-- humans and CI use `devenv` only
-- avoid `default.nix`, `index.*`, root-level category folders, and unnecessary plurals
+### 2. Validate deployment flows end-to-end
 
-### 2. `devenv.yaml` likely needs edits
+`install-system.sh` and `update-system.sh` should be treated as implemented but not yet fully verified end-to-end.
 
-Expected direction:
+They already:
 
-- import `./modules/deployment`
-- import `./modules/shared`
-- import `./modules/ssdinarch`
-- import `./modules/cache`
-- import `./modules/recover`
-- enable SecretSpec globally using the correct contemporary syntax
+- validate the host argument robustly
+- use the repository layout under `modules/<domain>/instances/`
+- stay behind `devenv` tasks as the intended interface
 
-Current syntax may be incorrect and should be verified against current devenv docs.
+What remains is confirming they behave correctly under real `devenv` execution for the declared hosts.
 
-### 3. Task modules need correction
+### 3. Tighten docs wording
 
-`modules/deployment/devenv.nix` needs to be checked against real devenv task syntax.
+The main docs task left is alignment, not creation.
 
-Specific issue discovered during the session:
+Recommended focus:
 
-- argument passing was mishandled
-- tasks must call their scripts properly
-- tests should not be wired via ad-hoc misuse of `enterTest` if devenv has a more appropriate test registration mechanism
+- keep `README.md` tightly aligned with the current branch behavior
+- keep `AGENTS.md` focused on rules that are actually reflected in the repo
+- avoid describing README or CI as missing, because they already exist on this branch
 
-If `devenv test` relies on `enterTest`, then centralize that behavior cleanly in the `test` domain. Otherwise use the recommended contemporary mechanism.
+### 4. CI status is still unknown
 
-### 4. install/update scripts need hardening
+CI configuration exists, but passing status has not been verified from this handoff alone.
+Do not claim CI is passing until the branch is actually checked.
 
-`install-system.sh` and `update-system.sh` should:
-
-- validate host argument robustly
-- use only the repository layout under `modules/<domain>/instances/`
-- remain callable only through devenv tasks as the official UX
-
-### 5. `ssdinarch` host is incomplete
-
-Need to ensure the new minimal host exists and is coherent.
-
-Expected direction:
-
-- `modules/ssdinarch/devenv.nix`
-- `modules/ssdinarch/machine.nix`
-- `modules/ssdinarch/instances/ssdinarch-0.nix`
-- `modules/ssdinarch/instances/ssdinarch-0.disko.nix`
-
-The host should be minimal but installable through the shared tasks.
-
-### 6. Existing hosts were migrated
-
-- `cache-vultr` is now `cache-0` under `modules/cache/instances/`.
-- `recover_0` is now `recover-0` under `modules/recover/instances/`.
-
-### 7. README is still missing / unfinished
-
-A proper `README.md` is needed and must document:
-
-- architecture principles briefly
-- `devenv`-only UX
-- `devenv tasks run deployment:install-system --input host=<host>`
-- `devenv tasks run deployment:update-system --input host=<host>`
-- `devenv test`
-- SecretSpec note and Enpass operator workflow
-- current supported hosts
-
-A previous attempt to write `README.md` hit a connector issue saying `sha` was required, likely because the file already exists and needs an update rather than create.
-Use fetch + update flow or tree/commit flow in the next conversation.
-
-### 8. CI is not finished
-
-Need `.github/workflows/test.yml` that uses `devenv` only.
-
-Intended direction:
-
-- checkout repo
-- install devenv
-- run `devenv test`
-
-Optionally add shellcheck through `devenv test` rather than as a separate external CI step, to preserve the single interface rule.
-
-### 9. CI passing is not yet guaranteed
-
-At the end of the session, CI had not been fully created and the repo had not been validated end-to-end.
-Do not claim CI is passing until the branch is updated and checked.
-
-## Current repo facts
-
-- The repo no longer keeps a root `flake.nix` or `flake.lock`; deployments use a temporary flake generated by scripts.
-- Existing setups were removed in favor of `modules/` plus temporary flake generation in deployment scripts.
-
-These facts matter if continuing the migration of legacy hosts.
-
-## Recommended next steps in a new conversation
+## Practical next steps in a new conversation
 
 1. Open `WIP-CONTINUE.md` first.
-2. Inspect current branch contents on `devenv-2-migration`.
-3. Update `AGENTS.md` to match the final conventions exactly.
-4. Verify current devenv docs for:
-   - task syntax
-   - test integration syntax
-   - SecretSpec enablement syntax in `devenv.yaml`
-5. Fix `devenv.yaml`.
-6. Fix `modules/deployment/devenv.nix`.
-7. Update existing `README.md` instead of trying to create it.
-8. Add CI workflow and make sure it calls only `devenv`.
-9. Only then claim CI is passing.
+2. Inspect `README.md`, `AGENTS.md`, `devenv.yaml`, and `modules/deployment/devenv.nix`.
+3. Verify current devenv docs or local execution for task syntax, test integration, and SecretSpec syntax.
+4. Run or ask the user to run the smallest useful local validation commands.
+5. Only then claim the migration is fully verified.
 
 ## Explicit warnings for the next assistant
 
-- Do not deliver file contents to the user instead of editing the repository when the connector can edit the repo.
-- Use the repo branch directly.
-- Be careful with `create_file` versus updating existing files.
-- If a file already exists, fetch its current state first and use an update-capable flow.
+- Prefer updating the existing docs over creating parallel replacements.
+- Distinguish clearly between implemented state and verified state.
 - Keep the user-visible interface restricted to `devenv`.
+- Do not claim CI is passing without evidence.
