@@ -19,7 +19,7 @@ Prefer the Determinate Nix GitHub Action and `magic-nix-cache-action` for CI set
 - Do not run `devenv test` while `devenv up` is running or vice-versa.
 - Run the most local/fast relevant tests first.
 - For `devenv test`, redirect output to a file (no stdout/`tee`).
-- When given a new summary, update WIP docs (if it exists) before any other action.
+- When given a new summary, sync with `docs/wip.md` (if it exists) before taking any other action.
 
 ### Layout
 
