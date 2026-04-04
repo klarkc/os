@@ -34,15 +34,11 @@ Tasks should use script paths from their domain `devenv.nix` as documented in `A
 
 ```text
 modules/
-  install-system/
+  deployment/
     devenv.nix
     scripts/
       install-system.sh
       install-system.test.sh
-
-  update-system/
-    devenv.nix
-    scripts/
       update-system.sh
       update-system.test.sh
 
@@ -75,12 +71,11 @@ These files were created during the session:
 
 - `AGENTS.md`
 - `devenv.yaml`
-- `modules/install-system/devenv.nix`
-- `modules/install-system/scripts/install-system.sh`
-- `modules/install-system/scripts/install-system.test.sh`
-- `modules/update-system/devenv.nix`
-- `modules/update-system/scripts/update-system.sh`
-- `modules/update-system/scripts/update-system.test.sh`
+- `modules/deployment/devenv.nix`
+- `modules/deployment/scripts/install-system.sh`
+- `modules/deployment/scripts/install-system.test.sh`
+- `modules/deployment/scripts/update-system.sh`
+- `modules/deployment/scripts/update-system.test.sh`
 - `modules/test/devenv.nix`
 - `modules/test/scripts/run-tests.sh`
 - `modules/ssdinarch/devenv.nix`
@@ -107,8 +102,7 @@ The current `AGENTS.md` was written before the final refinements. It must be upd
 Expected direction:
 
 - import `./modules/test`
-- import `./modules/install-system`
-- import `./modules/update-system`
+- import `./modules/deployment`
 - import `./modules/ssdinarch`
 - enable SecretSpec globally using the correct contemporary syntax
 
@@ -116,7 +110,7 @@ Current syntax may be incorrect and should be verified against current devenv do
 
 ### 3. Task modules need correction
 
-`modules/install-system/devenv.nix` and `modules/update-system/devenv.nix` need to be checked against real devenv task syntax.
+`modules/deployment/devenv.nix` needs to be checked against real devenv task syntax.
 
 Specific issue discovered during the session:
 
@@ -212,7 +206,7 @@ These facts matter if continuing the migration of legacy hosts.
    - test integration syntax
    - SecretSpec enablement syntax in `devenv.yaml`
 5. Fix `devenv.yaml`.
-6. Fix `modules/install-system/devenv.nix` and `modules/update-system/devenv.nix`.
+6. Fix `modules/deployment/devenv.nix`.
 7. Add `modules/ssdinarch/disko.nix`.
 8. Update existing `README.md` instead of trying to create it.
 9. Add CI workflow and make sure it calls only `devenv`.

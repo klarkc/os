@@ -2,12 +2,40 @@
 
 [![Test](https://github.com/klarkc/os/actions/workflows/test.yml/badge.svg?branch=main)](https://github.com/klarkc/os/actions/workflows/test.yml?query=branch%3Amain)
 
-Personal collection of NixOS machines.
+Personal NixOS machines and operations, managed via `devenv`.
 
-## Deploying
+## Interface
 
-### Cache
+All human and CI interaction goes through `devenv`.
+
+## Tasks
+
+Install a host (optionally runs `disko` if `modules/<domain>/instances/<host>.disko.nix` exists):
 
 ```bash
-nixos-rebuild switch --flake .#cache-vultr --target-host "root@cache.tcp4.me"
+devenv tasks run install-system --input host=ssdinarch-0
 ```
+
+Update a host:
+
+```bash
+devenv tasks run update-system --input host=ssdinarch-0
+```
+
+Run repository tests:
+
+```bash
+devenv test
+```
+
+## Hosts
+
+- `ssdinarch-0`
+- `cache-vultr`
+- `recover-0`
+
+## Secrets
+
+SecretSpec is enabled globally via `devenv.yaml`. Secret material is provided out of band (Enpass for the operator) and should be injected locally. No real secrets are committed to the repo.
+
+The cache host expects a Nix cache signing key at `/etc/nixos/secrets/cache.key`.
