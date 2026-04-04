@@ -1,0 +1,8 @@
+imports:
+  - ./modules/install-system
+  - ./modules/update-system
+  - ./modules/ssdinarch
+
+# SecretSpec enabled globally (no per-module secret wiring required)
+secrets:
+  enable: true
