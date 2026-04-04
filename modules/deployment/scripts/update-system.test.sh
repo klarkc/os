@@ -13,4 +13,10 @@ if ! DEVENV_TASK_INPUT="$DEVENV_TASK_INPUT" ./modules/deployment/scripts/update-
   exit 1
 fi
 
+DEVENV_TASK_INPUT='{"host":"ssdinarch-0"}'
+if DEVENV_TASK_INPUT="$DEVENV_TASK_INPUT" ./modules/deployment/scripts/update-system.sh 2>/dev/null; then
+  echo "expected non-validate update to fail until in-machine implementation exists"
+  exit 1
+fi
+
 echo "update-system basic test passed"

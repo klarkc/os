@@ -58,69 +58,7 @@ if [ "$VALIDATE_ONLY" = "true" ]; then
   exit 0
 fi
 
-if ! command -v ssh >/dev/null 2>&1; then
-  echo "ssh not found in PATH; ensure openssh is available in devenv"
-  exit 1
-fi
-
-if ! command -v nixos-anywhere >/dev/null 2>&1; then
-  echo "nixos-anywhere not found in PATH; ensure it is available in devenv"
-  exit 1
-fi
-
-TARGET_USER="${DEPLOY_TARGET_USER:-root}"
-TARGET_HOST="${DEPLOY_TARGET_HOST:-$HOST}"
-TARGET_PORT="${DEPLOY_TARGET_PORT:-22}"
-
-if [ -z "$TARGET_HOST" ]; then
-  echo "missing DEPLOY_TARGET_HOST or host argument"
-  exit 1
-fi
-
-SSH_TARGET="${TARGET_USER}@${TARGET_HOST}"
-TMP_FLAKE_DIR="$(mktemp -d)"
-cleanup() {
-  rm -rf "$TMP_FLAKE_DIR"
-}
-trap cleanup EXIT
-
-SHARED_MODULE="${REPO_ROOT}/modules/shared/system.nix"
-INSTANCE_MODULE="${INSTANCE_PATH}"
-DISKO_MODULE="${INSTANCE_PATH%.nix}.disko.nix"
-
-cat > "${TMP_FLAKE_DIR}/flake.nix" <<EOF
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  outputs = { nixpkgs, disko, ... }:
-    let
-      system = "x86_64-linux";
-      modules =
-        [ ${SHARED_MODULE} ${INSTANCE_MODULE} ]
-        ++ (if builtins.pathExists ${DISKO_MODULE} then [
-          disko.nixosModules.disko
-          ${DISKO_MODULE}
-        ] else
-          [ ]);
-    in {
-      nixosConfigurations."${HOST}" = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = modules;
-      };
-    };
-}
-EOF
-
-DISKO_ARGS=()
-if [ -f "$DISKO_MODULE" ]; then
-  DISKO_ARGS+=(--disko-mode mount)
-fi
-
-echo "Updating ${HOST} on ${SSH_TARGET}:${TARGET_PORT}"
-echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
-
-nixos-anywhere --ssh-port "$TARGET_PORT" --phases install "${DISKO_ARGS[@]}" --flake "${TMP_FLAKE_DIR}#${HOST}" "$SSH_TARGET"
+echo "update-system must be run from inside the installed machine"
+echo "remote update via SSH is not part of the intended interface"
+echo "implementation pending"
+exit 1

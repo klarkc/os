@@ -4,13 +4,23 @@
   tasks."deployment:install-system" = {
     exec =
       "bash ${config.git.root}/modules/deployment/scripts/install-system.sh";
-    input = { host = ""; };
+    input = {
+      host = "";
+      target_ssh = "";
+      target_port = "";
+      target_disk = "";
+      target_image = "";
+      validate_only = false;
+    };
   };
 
   tasks."deployment:update-system" = {
     exec =
       "bash ${config.git.root}/modules/deployment/scripts/update-system.sh";
-    input = { host = ""; };
+    input = {
+      host = "";
+      validate_only = false;
+    };
   };
 
   enterTest = ''
