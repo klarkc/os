@@ -113,8 +113,7 @@ Include a `BREAKING CHANGE:` block with migration steps when required.
 
 ### Devenv notes
 
-- Use `devenv up -d` for services and watch `.devenv/processes.log` for readiness.
-- Prefer `ensure-ready` over manual process checks when available.
+- Use `devenv up -d` for running services in background.
 - Never invoke `devenv` from inside a devenv task; use `devenv-tasks` instead.
 - Use `config.git.root` for repo-root paths in Nix.
 
