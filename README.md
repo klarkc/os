@@ -13,13 +13,13 @@ All human and CI interaction goes through `devenv`.
 Install a host (optionally runs `disko` if `modules/<domain>/instances/<host>.disko.nix` exists):
 
 ```bash
-devenv tasks run install-system --input host=ssdinarch-0
+devenv tasks run deployment:install-system --input host=ssdinarch-0
 ```
 
 Update a host:
 
 ```bash
-devenv tasks run update-system --input host=ssdinarch-0
+devenv tasks run deployment:update-system --input host=ssdinarch-0
 ```
 
 Run repository tests:

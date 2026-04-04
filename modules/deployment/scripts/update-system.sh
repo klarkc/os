@@ -15,7 +15,7 @@ if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
 fi
 
 if [ -z "$HOST" ]; then
-  echo "usage: devenv tasks run update-system --input host=<host>"
+  echo "usage: devenv tasks run deployment:update-system --input host=<host>"
   exit 1
 fi
 

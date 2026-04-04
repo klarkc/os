@@ -98,6 +98,10 @@ Repository tests must run through `devenv test`.
 
 For install/update scripts, avoid manual Nix steps where a helper exists; check `../Solo/solosig` for the preferred helper workflow.
 
+### Task naming
+
+Tasks must use `namespace:name` format (e.g., `deployment:install-system`).
+
 ### Commits
 
 Avoid one giant commit. Commit small, feature-focused changes as you go.

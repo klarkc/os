@@ -159,8 +159,8 @@ A proper `README.md` is needed and must document:
 
 - architecture principles briefly
 - `devenv`-only UX
-- `devenv tasks run install-system <host>`
-- `devenv tasks run update-system <host>`
+- `devenv tasks run deployment:install-system --input host=<host>`
+- `devenv tasks run deployment:update-system --input host=<host>`
 - `devenv test`
 - SecretSpec note and Enpass operator workflow
 - current supported hosts

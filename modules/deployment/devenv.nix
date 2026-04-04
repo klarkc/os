@@ -2,12 +2,12 @@
 {
   packages = with pkgs; [ findutils jq rsync ];
 
-  tasks.install-system = {
+  tasks."deployment:install-system" = {
     exec = "bash ${config.git.root}/modules/deployment/scripts/install-system.sh";
     input = { host = ""; };
   };
 
-  tasks.update-system = {
+  tasks."deployment:update-system" = {
     exec = "bash ${config.git.root}/modules/deployment/scripts/update-system.sh";
     input = { host = ""; };
   };
