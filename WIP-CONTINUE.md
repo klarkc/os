@@ -6,8 +6,8 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 - Working branch: `devenv-2-migration`
 - Repository: `klarkc/os`
-- Current HEAD at handoff: (pending commit)
-- HEAD commit message: (pending commit)
+- Current HEAD at handoff: `c4a6666d17516d24259a65e1f9562aa1d70269fc`
+- HEAD commit message: `ci: switch to cache-nix-action`
 
 ## Goal
 
