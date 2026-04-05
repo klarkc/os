@@ -2,6 +2,9 @@
 /*.img
 /*.qcow2
 /.devenv/
+/.devenv.*
+/.devenv.flake.nix
+/.pre-commit-config.yaml
 /secrets/*
 !/secrets/*.nix
 !/secrets/*.age
