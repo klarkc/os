@@ -88,7 +88,7 @@ These items are already present on `devenv-2-migration`:
 
 - `README.md` documents the `devenv`-only interface and the architecture correction.
 - `AGENTS.md` was updated to describe the corrected install/update split.
-- `.github/workflows/test.yml` exists and runs `nix run github:cachix/devenv -- test`.
+- `.github/workflows/test.yml` exists and runs `nix run github:cachix/devenv/v1.11.2 -- test`.
 - `devenv.yaml` imports the current domain modules and has a global `secretspec` block.
 - `modules/deployment/devenv.nix` exists and now exposes a target-oriented install contract in progress.
 - `cache-vultr` has been migrated to `cache-0`.
@@ -99,7 +99,7 @@ These items are already present on `devenv-2-migration`:
 These commands were executed successfully during this session:
 
 ```bash
-nix --accept-flake-config run github:cachix/devenv -- test
+nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- test
 ```
 
 This validates that the current test suite passes through the `devenv` entrypoint.
@@ -113,7 +113,7 @@ The user also later reported that local tests are still OK after the refactor wo
 The important invariant to preserve is:
 
 - CI must continue to use only `devenv`
-- no extra direct `nix`/`nixos-*` command should become the public CI interface beyond `nix run github:cachix/devenv -- test` already used by the workflow bootstrap
+- no extra direct `nix`/`nixos-*` command should become the public CI interface beyond `nix run github:cachix/devenv/v1.11.2 -- test` already used by the workflow bootstrap
 
 ## Cache / CI performance diagnosis from attached logs
 
@@ -164,7 +164,7 @@ Interpretation:
 
 ### CI
 
-- `.github/workflows/test.yml` now uses `nix-community/cache-nix-action@v7` with explicit cache keys, adds minimal permissions, and runs `nix --accept-flake-config run github:cachix/devenv -- test`.
+- `.github/workflows/test.yml` now uses `nix-community/cache-nix-action@v7` with explicit cache keys, adds minimal permissions, and runs `nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- test`.
 
 ## Main remaining implementation work
 
