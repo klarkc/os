@@ -5,6 +5,7 @@ REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
 
 HOST="${1:-}"
 VALIDATE_ONLY="false"
+DETECTED_HOST=""
 
 if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
   INPUT_HOST="$(printf '%s' "$DEVENV_TASK_INPUT" | jq -r '.host // empty')"
@@ -15,7 +16,23 @@ if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
 fi
 
 if [ -z "$HOST" ]; then
-  echo "usage: devenv tasks run deployment:update-system --input host=<host>"
+  if command -v hostname >/dev/null 2>&1; then
+    DETECTED_HOST="$(hostname -s 2>/dev/null || hostname 2>/dev/null || true)"
+  fi
+  if [ -z "$DETECTED_HOST" ] && [ -f /etc/hostname ]; then
+    DETECTED_HOST="$(cat /etc/hostname)"
+  fi
+  DETECTED_HOST="${DETECTED_HOST%%.*}"
+  HOST="$DETECTED_HOST"
+fi
+
+if [ -z "$HOST" ]; then
+  echo "usage: devenv tasks run deployment:update-system [--input host=<host>]"
+  exit 1
+fi
+
+if [ -n "$DETECTED_HOST" ] && [ -n "${INPUT_HOST:-}" ] && [ "$INPUT_HOST" != "$DETECTED_HOST" ]; then
+  echo "host input ($INPUT_HOST) does not match local hostname ($DETECTED_HOST)"
   exit 1
 fi
 
@@ -58,7 +75,54 @@ if [ "$VALIDATE_ONLY" = "true" ]; then
   exit 0
 fi
 
-echo "update-system must be run from inside the installed machine"
-echo "remote update via SSH is not part of the intended interface"
-echo "implementation pending"
-exit 1
+if [ "$(id -u)" -ne 0 ]; then
+  echo "update-system must be run as root on the installed machine"
+  exit 1
+fi
+
+if ! command -v nixos-rebuild >/dev/null 2>&1; then
+  echo "nixos-rebuild not found in PATH"
+  exit 1
+fi
+
+TMP_FLAKE_DIR="$(mktemp -d)"
+cleanup() {
+  rm -rf "$TMP_FLAKE_DIR"
+}
+trap cleanup EXIT
+
+SHARED_MODULE="${REPO_ROOT}/modules/shared/system.nix"
+INSTANCE_MODULE="${INSTANCE_PATH}"
+DISKO_MODULE="${INSTANCE_PATH%.nix}.disko.nix"
+
+cat > "${TMP_FLAKE_DIR}/flake.nix" <<EOF
+{
+  inputs = {
+    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+    disko.url = "github:nix-community/disko";
+    disko.inputs.nixpkgs.follows = "nixpkgs";
+  };
+
+  outputs = { nixpkgs, disko, ... }:
+    let
+      system = "x86_64-linux";
+      modules =
+        [ ${SHARED_MODULE} ${INSTANCE_MODULE} ]
+        ++ (if builtins.pathExists ${DISKO_MODULE} then [
+          disko.nixosModules.disko
+          ${DISKO_MODULE}
+        ] else
+          [ ]);
+    in {
+      nixosConfigurations."${HOST}" = nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = modules;
+      };
+    };
+}
+EOF
+
+echo "Updating ${HOST} from ${REPO_ROOT}"
+echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
+
+nixos-rebuild switch --flake "${TMP_FLAKE_DIR}#${HOST}"

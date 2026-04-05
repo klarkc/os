@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-DEVENV_TASK_INPUT='{"host":""}'
+DEVENV_TASK_INPUT='{"host":"unknown-host","validate_only":true}'
 if DEVENV_TASK_INPUT="$DEVENV_TASK_INPUT" ./modules/deployment/scripts/update-system.sh 2>/dev/null; then
-  echo "expected failure for empty host"
+  echo "expected failure for unknown host"
   exit 1
 fi
 
@@ -15,7 +15,7 @@ fi
 
 DEVENV_TASK_INPUT='{"host":"ssdinarch-0"}'
 if DEVENV_TASK_INPUT="$DEVENV_TASK_INPUT" ./modules/deployment/scripts/update-system.sh 2>/dev/null; then
-  echo "expected non-validate update to fail until in-machine implementation exists"
+  echo "expected non-validate update to fail without root privileges"
   exit 1
 fi
 
