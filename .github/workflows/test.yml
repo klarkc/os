@@ -21,4 +21,4 @@ jobs:
           restore-prefixes-first-match: nix-${{ runner.os }}-
           gc-max-store-size-linux: 5G
       - name: Run devenv tests
-        run: nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- test
+        run: nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test

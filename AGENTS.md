@@ -123,14 +123,14 @@ Do not overstate this as final deployment validation. The implementation still n
 Use `nix run` for the repository entrypoint:
 
 ```bash
-nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- <subcommand>
+nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- <subcommand>
 ```
 
 Examples:
 
 ```bash
-nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- tasks list
-nix --accept-flake-config run github:cachix/devenv/v1.11.2 -- test
+nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- tasks list
+nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
 ```
 
 ### Commits
