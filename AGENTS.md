@@ -118,6 +118,14 @@ Local validation has confirmed that:
 
 Do not overstate this as final deployment validation. The implementation still needs to be aligned with the intended target-oriented install flow and the in-machine update flow.
 
+### Local testing before commits
+
+Run local tests before committing changes that affect behavior:
+
+```bash
+nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
+```
+
 ### Running devenv
 
 Use `nix run` for the repository entrypoint:
