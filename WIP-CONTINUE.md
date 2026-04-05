@@ -6,8 +6,8 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 - Working branch: `devenv-2-migration`
 - Repository: `klarkc/os`
-- Current HEAD at handoff: `5ca4fdb3205f7edf8af206d35c59716f0056e70c`
-- HEAD commit message: `docs: refresh WIP head`
+- Current HEAD at handoff: `c279d47850a80508c1a9bc9bc0a5aecf59dcdbeb`
+- HEAD commit message: `test(deployment): stabilize VM integration settings`
 
 ## Goal
 
@@ -102,7 +102,7 @@ These commands were executed successfully during this session:
 nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
 ```
 
-This validates that the current test suite passes through the `devenv` entrypoint.
+This validates that the current non-CI test suite passes through the `devenv` entrypoint.
 
 ## Latest local test output (CI-simulated)
 
@@ -112,7 +112,7 @@ Command:
 CI=true RUN_VM_INSTANCES=ssdinarch-0 nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test > /tmp/devenv-test-ci.log 2>&1
 ```
 
-Last log excerpt (most recent run was aborted by user while the VM build was in progress):
+Last log excerpt from the latest local CI-simulated run:
 
 ```
 Configuring shell
@@ -165,6 +165,12 @@ building '/nix/store/j3iya8abd1jsshmiwy4k98rnzpxxrh8m-closure-info.drv'...
 building '/nix/store/nyfq8hrkhysqs5gms7s9ij12vasjy6hd-run-nixos-vm.drv'...
 building '/nix/store/19p1v7anlb7zkhq4129bs5wfcrd97h6g-nixos-vm.drv'...
 ```
+
+Interpretation:
+
+- The VM integration path now gets past the earlier pure-eval `/home` access failure by using `--impure`.
+- It also gets past the earlier `repl-flake` incompatibility by forcing `nix.settings.experimental-features = [ "nix-command" "flakes" ]` inside the VM override module.
+- The latest local CI-simulated run was still manually aborted while the VM build was in progress, so there is still no completed local end-to-end VM test result recorded here.
 
 ## CI validation already performed
 
@@ -224,6 +230,10 @@ Interpretation:
 
 - New QEMU-based integration test that boots instance configs via `nixos-rebuild build-vm`, waits for SSH, syncs the repo, and runs `update-system` inside the VM.
 - Skips automatically when `/dev/kvm` is unavailable or not writable.
+- Runs only when `CI=true`.
+- Requires `RUN_VM_INSTANCES` to be non-empty; CI computes that variable from changed instances, and an empty value skips the VM integration path.
+- Uses `--impure` for the generated flake build and forces `nix.settings.experimental-features` in the VM override to avoid host-specific Nix feature incompatibilities.
+- Forces headless QEMU startup through `QEMU_OPTS` and logs the effective commands for reproducibility.
 
 ### Docs
 
@@ -234,6 +244,7 @@ Interpretation:
 
 - `.github/workflows/test.yml` now uses `nix-community/cache-nix-action@v7` with explicit cache keys, adds minimal permissions, and runs `nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test`.
 - CI passes `RUN_VM_INSTANCES` with just the changed instance(s); if `modules/shared/system.nix` or `devenv.lock` changes, it runs all instances.
+- The earlier CI failure caused by `rg` not existing on the runner was fixed by switching the instance-detection step to `grep`.
 
 ### Tooling
 
@@ -248,6 +259,10 @@ The local install path now exists but has not been exercised against a real disk
 ### 2. Confirm update-system behavior on a real installed host
 
 `update-system` now runs `nixos-rebuild switch` locally, but it has not been run on an installed machine.
+
+### 3. Complete one successful CI-simulated VM test locally
+
+The VM integration path has been debugged through multiple failures, but the latest local CI-simulated run was still interrupted before completion.
 
 ## Suggested immediate next steps for the next assistant
 
