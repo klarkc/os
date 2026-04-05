@@ -6,8 +6,8 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 - Working branch: `devenv-2-migration`
 - Repository: `klarkc/os`
-- Current HEAD at handoff: `e85d229b655539f8ac583f06f26c286fb93be3f5`
-- HEAD commit message: `refactor(deployment): separate target install from in-machine update`
+- Current HEAD at handoff: (pending commit)
+- HEAD commit message: (pending commit)
 
 ## Goal
 
@@ -99,17 +99,10 @@ These items are already present on `devenv-2-migration`:
 These commands were executed successfully during this session:
 
 ```bash
-devenv tasks list
-devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
-devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
-devenv test
+nix --accept-flake-config run github:cachix/devenv -- test
 ```
 
-This validates that:
-
-- the current tasks load correctly
-- `validate_only=true` works as a safety rail for both scripts
-- local `devenv test` passes on the branch
+This validates that the current test suite passes through the `devenv` entrypoint.
 
 ## CI validation already performed
 
@@ -140,101 +133,57 @@ Interpretation:
 - The workflow is functionally correct but operationally suboptimal.
 - A likely follow-up is to simplify or harden the cache setup in `.github/workflows/test.yml` while preserving the `devenv`-only testing interface.
 
-## What changed in the latest implementation commit
-
-Commit `e85d229b655539f8ac583f06f26c286fb93be3f5` made an intentional intermediate refactor.
-
-### `modules/deployment/devenv.nix`
-
-- `deployment:install-system` inputs now include:
-  - `host`
-  - `target_ssh`
-  - `target_port`
-  - `target_disk`
-  - `target_image`
-  - `validate_only`
-- `deployment:update-system` still includes:
-  - `host`
-  - `validate_only`
-
-### `modules/deployment/scripts/install-system.sh`
-
-- still resolves the host and shared/instance modules
-- now enforces that only one target kind may be chosen
-- still supports the SSH-oriented path
-- explicitly rejects `target_disk` and `target_image` at runtime with a clear message because local-target install is not implemented yet
+## What changed in this working tree (not yet committed)
 
 ### `modules/deployment/scripts/update-system.sh`
 
-- no longer pretends to do remote update via `nixos-anywhere`
-- in non-`validate_only` mode it now fails intentionally with a message that update must run inside the installed machine and is still pending
+- `update-system` now runs as an in-machine flow.
+- `host` is optional; it defaults to the local hostname and rejects mismatches when explicitly provided.
+- Non-validate mode runs `nixos-rebuild switch` against a generated temp flake.
 
-### tests
+### `modules/deployment/scripts/install-system.sh`
 
-- install test now checks conflicting target kinds
-- update test now checks that non-validate execution fails intentionally until the in-machine implementation exists
+- Local-target install is implemented:
+  - `target_disk` runs disko to format/mount and then `nixos-install`.
+  - `target_image` builds and runs `diskoImagesScript` and writes `.raw` output to `target_image`.
+- `target_disk` requires a matching device in the host's disko module.
+- `target_image` requires `imageSize` in the host's disko module.
 
-This commit is useful because it stops pretending that the old remote-update architecture is acceptable. It is an honest intermediate state, not the final implementation.
+### `modules/deployment/devenv.nix`
+
+- Added `disko` to the deployment task package set.
+
+### `modules/deployment/scripts/update-system.test.sh`
+
+- Updated expectations for unknown host and non-root update execution.
+
+### Docs
+
+- `README.md` updated to describe the in-machine update flow and local-target install.
+- `AGENTS.md` documents running `devenv` via `nix run`.
+
+### CI
+
+- `.github/workflows/test.yml` now uses `nix-community/cache-nix-action@v7` with explicit cache keys, adds minimal permissions, and runs `nix --accept-flake-config run github:cachix/devenv -- test`.
 
 ## Main remaining implementation work
 
-### 1. Fix `update-system` interface and implementation
+### 1. Validate local-target install flows on real hardware
 
-This is the most obviously incomplete area.
+The local install path now exists but has not been exercised against a real disk or image target.
 
-Desired direction:
+### 2. Confirm update-system behavior on a real installed host
 
-- remove `host` as a required input to `deployment:update-system`
-- make `update-system` operate as an in-machine flow
-- decide how the script discovers the correct instance/config locally
-- optionally allow a non-required `host` only as a sanity check
-
-The current script intentionally exits with `implementation pending` outside validate-only mode.
-
-### 2. Implement local-target install for `install-system`
-
-Desired direction:
-
-- support install to `target_disk`
-- optionally support install to `target_image`
-- preserve SSH install as one target mode, not the only mode
-- keep the one-target-kind-only validation
-
-The current script explicitly says local install targets are part of the intended interface but not implemented yet.
-
-### 3. Decide how local update should locate its system definition
-
-This needs an explicit design choice.
-Possible directions:
-
-- derive instance from current hostname
-- derive instance from a marker file stored at install time
-- accept an optional override argument for exceptional cases
-
-Do not continue with a model where `update-system` behaves like a remote deployment command.
-
-### 4. Revisit CI cache strategy
-
-The workflow is green but slow.
-
-Potential next steps:
-
-- inspect `.github/workflows/test.yml`
-- decide whether to keep `magic-nix-cache-action`
-- consider disabling FlakeHub integration if unused
-- investigate whether the workflow should explicitly trust or avoid flake-provided substituter settings
-- preserve the rule that tests are still invoked through `devenv` only
+`update-system` now runs `nixos-rebuild switch` locally, but it has not been run on an installed machine.
 
 ## Suggested immediate next steps for the next assistant
 
 1. Open `WIP-CONTINUE.md` first.
 2. Inspect current `README.md`, `AGENTS.md`, and `modules/deployment/*` on `devenv-2-migration`.
-3. Treat `e85d229b655539f8ac583f06f26c286fb93be3f5` as the starting point.
-4. First complete `update-system` as an in-machine flow.
-5. Then implement `install-system` for `target_disk` and optionally `target_image`.
-6. Run local `devenv test` after each step.
-7. Keep GitHub Actions using only `devenv` as the testing interface.
-8. If changing the cache strategy, keep that change separate from deployment-logic changes if possible.
+3. If deployment behavior changes again, update `AGENTS.md` and `README.md` in the same change.
+4. Validate local-target install on a real disk/image target.
+5. Validate `update-system` on a real installed host.
+6. Keep GitHub Actions using only `devenv` as the testing interface.
 
 ## Explicit warnings for the next assistant
 

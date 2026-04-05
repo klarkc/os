@@ -113,10 +113,25 @@ Local validation has confirmed that:
 
 - `devenv tasks list` loads the deployment tasks
 - `deployment:install-system` accepts `host` and `validate_only=true`
-- `deployment:update-system` accepts `host` and `validate_only=true`
+- `deployment:update-system` accepts optional `host` and `validate_only=true`
 - `devenv test` completes successfully on this branch
 
 Do not overstate this as final deployment validation. The implementation still needs to be aligned with the intended target-oriented install flow and the in-machine update flow.
+
+### Running devenv
+
+Use `nix run` for the repository entrypoint:
+
+```bash
+nix --accept-flake-config run github:cachix/devenv -- <subcommand>
+```
+
+Examples:
+
+```bash
+nix --accept-flake-config run github:cachix/devenv -- tasks list
+nix --accept-flake-config run github:cachix/devenv -- test
+```
 
 ### Commits
 

@@ -21,31 +21,35 @@ The intended long-term `install-system` interface is target-oriented:
 - local target such as a disk device or an image file
 
 The exact task inputs for the local-target flow are still being finalized.
+The current implementation uses `target_disk` for direct disk installs and `target_image` for disko image generation.
 
 `update-system` is conceptually different from install: it is intended to be run from inside an already installed machine, not as a remote deployment command.
 
 ## Current branch status
 
-The current branch still implements deployment tasks with an SSH-oriented interface.
+The current branch implements the split between target-oriented install and in-machine update.
 
 Today, the documented and locally validated commands are:
 
 ```bash
-devenv tasks run deployment:install-system --input host=ssdinarch-0
-devenv tasks run deployment:update-system --input host=ssdinarch-0
+devenv tasks run deployment:install-system --input host=ssdinarch-0 --input target_ssh=root@example
+devenv tasks run deployment:update-system
 ```
 
 This is an implementation snapshot, not the final desired interface.
 
-The `host` input is passed to deployment tasks through `DEVENV_TASK_INPUT` and resolved by the task-backed shell scripts.
+The `host` input is passed to deployment tasks through `DEVENV_TASK_INPUT` and resolved by the task-backed shell scripts. For `update-system`, `host` is optional and defaults to the local hostname.
 
 Do not treat the shell scripts under `modules/deployment/scripts/` as the public interface. The intended entrypoint is `devenv tasks`.
 
 ## Deployment behavior
 
-Install and update currently generate a temporary flake from the selected instance plus `modules/shared/system.nix`.
+Install and update generate a temporary flake from the selected instance plus `modules/shared/system.nix`.
+Update runs `nixos-rebuild switch` against that temporary flake from inside the installed machine.
 
-If `modules/<domain>/instances/<host>.disko.nix` exists, install includes the disk layout automatically and update mounts through `nixos-anywhere` before switching.
+If `modules/<domain>/instances/<host>.disko.nix` exists, install includes the disk layout automatically and update includes that module in the generated system.
+Local disk installs run disko to format/mount the target and then invoke `nixos-install` against the generated flake. Image installs build and run `diskoImagesScript` from the generated system and write the resulting `.raw` image to `target_image`.
+Image installs require `imageSize` in the host's disko module.
 
 This behavior is expected to change as the interface is brought in line with the target-oriented install flow and the in-machine update flow described above.
 
@@ -58,10 +62,10 @@ devenv tasks run deployment:install-system --input host=ssdinarch-0 --input vali
 ```
 
 ```bash
-devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
+devenv tasks run deployment:update-system --input validate_only=true
 ```
 
-With `validate_only=true`, the current deployment scripts exit before invoking `nixos-anywhere`.
+With `validate_only=true`, the current deployment scripts exit before invoking install or update operations.
 
 ## Tests
 
@@ -80,7 +84,7 @@ The following commands were executed successfully on `devenv-2-migration`:
 ```bash
 devenv tasks list
 devenv tasks run deployment:install-system --input host=ssdinarch-0 --input validate_only=true
-devenv tasks run deployment:update-system --input host=ssdinarch-0 --input validate_only=true
+devenv tasks run deployment:update-system --input validate_only=true
 devenv test
 ```
 
