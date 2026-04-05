@@ -6,8 +6,8 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 - Working branch: `devenv-2-migration`
 - Repository: `klarkc/os`
-- Current HEAD at handoff: `0ab4f62f60ffdb42c4e1d7b7c8ca73a0f0ac3c48`
-- HEAD commit message: `chore: pin devenv version`
+- Current HEAD at handoff: `fcfd3f291cf7fda76744a3874bb04f8361a025fb`
+- HEAD commit message: `chore: pin devenv to v2.0.6`
 
 ## Goal
 
