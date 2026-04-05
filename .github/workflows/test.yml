@@ -34,28 +34,28 @@ jobs:
             diff_range="${{ github.event.before }}...${{ github.sha }}"
           fi
           changed="$(git diff --name-only "$diff_range")"
-          if printf '%s\n' "$changed" | rg -q '^devenv\.lock$'; then
+          if printf '%s\n' "$changed" | grep -Eq '^devenv\.lock$'; then
             echo "vm_instances=all" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if printf '%s\n' "$changed" | rg -q '^modules/shared/system\.nix$'; then
+          if printf '%s\n' "$changed" | grep -Eq '^modules/shared/system\.nix$'; then
             echo "vm_instances=all" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           instances=""
           while IFS= read -r instance; do
             instances="${instances}${instance}"$'\n'
-          done < <(printf '%s\n' "$changed" | rg -o 'modules/[^/]+/instances/[^/]+\.nix' | sed -E 's#modules/[^/]+/instances/##; s#\.nix##')
+          done < <(printf '%s\n' "$changed" | grep -Eo 'modules/[^/]+/instances/[^/]+\.nix' | sed -E 's#modules/[^/]+/instances/##; s#\.nix##')
           while IFS= read -r instance; do
             instances="${instances}${instance}"$'\n'
-          done < <(printf '%s\n' "$changed" | rg -o 'modules/[^/]+/instances/[^/]+\.disko\.nix' | sed -E 's#modules/[^/]+/instances/##; s#\.disko\.nix##')
+          done < <(printf '%s\n' "$changed" | grep -Eo 'modules/[^/]+/instances/[^/]+\.disko\.nix' | sed -E 's#modules/[^/]+/instances/##; s#\.disko\.nix##')
           while IFS= read -r domain; do
             for path in modules/"$domain"/instances/*.nix; do
               [ -e "$path" ] || continue
               instances="${instances}$(basename "$path" .nix)"$'\n'
             done
-          done < <(printf '%s\n' "$changed" | rg -o 'modules/[^/]+/machine\.nix' | sed -E 's#modules/([^/]+)/machine\.nix#\1#')
-          instances="$(printf '%s' "$instances" | rg -v '^\s*$' | sort -u || true)"
+          done < <(printf '%s\n' "$changed" | grep -Eo 'modules/[^/]+/machine\.nix' | sed -E 's#modules/([^/]+)/machine\.nix#\1#')
+          instances="$(printf '%s' "$instances" | grep -Ev '^\s*$' | sort -u || true)"
           if [ -n "$instances" ]; then
             echo "vm_instances=$(printf '%s' "$instances" | paste -sd, -)" >> "$GITHUB_OUTPUT"
           else

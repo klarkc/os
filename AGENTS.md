@@ -126,6 +126,12 @@ Run local tests before committing changes that affect behavior:
 nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
 ```
 
+When running long tests locally, pipe stdout/stderr to a file to avoid flooding the CLI context, for example:
+
+```bash
+nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test > /tmp/devenv-test.log 2>&1
+```
+
 ### Running devenv
 
 Use `nix run` for the repository entrypoint:
