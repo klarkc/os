@@ -104,6 +104,68 @@ nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
 
 This validates that the current test suite passes through the `devenv` entrypoint.
 
+## Latest local test output (CI-simulated)
+
+Command:
+
+```bash
+CI=true RUN_VM_INSTANCES=ssdinarch-0 nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test > /tmp/devenv-test-ci.log 2>&1
+```
+
+Last log excerpt (most recent run was aborted by user while the VM build was in progress):
+
+```
+Configuring shell
+Configuring shell in 40.7ms
+Loading tasks
+Loading tasks in 784µs
+Running tasks     devenv:enterTest
+
+Running tasks
+Running           devenv:files:cleanup
+Succeeded         devenv:files:cleanup (14.52ms)
+Running           devenv:files
+Succeeded         devenv:files (11.72ms)
+Running           devenv:git-hooks:install
+Succeeded         devenv:git-hooks:install (15.22ms)
+Running           devenv:enterShell
+Running           devenv:git-hooks:run
+Succeeded         devenv:enterShell (6.34ms)
+Succeeded         devenv:git-hooks:run (466.79ms)
+Running           devenv:enterTest
+No command        devenv:enterTest
+Running tasks in 509ms
+1 Skipped, 5 Succeeded
+Building tests
+Building tests in 857µs
+Running tests
+building the system configuration...
+warning: unknown setting 'eval-cores'
+warning: unknown setting 'lazy-trees'
+warning: creating lock file "/tmp/tmp.d8L5X2do7y/ssdinarch-0/flake/flake.lock":
+• Added input 'disko':
+    'github:nix-community/disko/5ad85c82cc52264f4beddc934ba57f3789f28347?narHash=sha256-PAqwnsBSI9SVC2QugvQ3xeYCB0otOwCacB1ueQj2tgw%3D' (2026-03-19)
+• Added input 'disko/nixpkgs':
+    follows 'nixpkgs'
+• Added input 'nixpkgs':
+    'github:NixOS/nixpkgs/8d8c1fa5b412c223ffa47410867813290cdedfef?narHash=sha256-J0dZU4atgcfo4QvM9D92uQ0Oe1eLTxBVXjJzdEMQpD0%3D' (2026-04-02)
+these 7 derivations will be built:
+  /nix/store/hnzjqmhlpisrwpi511ys1lcq3a6nxf3j-root-authorized_keys.drv
+  /nix/store/zspvba6pmjrbdiamzzhif526v4plbhcv-etc.drv
+  /nix/store/0q99ykas468x15mc0mnhsbxjf71bqjx0-activate.drv
+  /nix/store/0wm8nhkx1jv6y4fivsjqcbdwy6z8ii4j-nixos-system-ssdinarch-0-26.05.20260402.8d8c1fa.drv
+  /nix/store/j3iya8abd1jsshmiwy4k98rnzpxxrh8m-closure-info.drv
+  /nix/store/nyfq8hrkhysqs5gms7s9ij12vasjy6hd-run-nixos-vm.drv
+  /nix/store/19p1v7anlb7zkhq4129bs5wfcrd97h6g-nixos-vm.drv
+building '/nix/store/hnzjqmhlpisrwpi511ys1lcq3a6nxf3j-root-authorized_keys.drv'...
+building '/nix/store/zspvba6pmjrbdiamzzhif526v4plbhcv-etc.drv'...
+building '/nix/store/0q99ykas468x15mc0mnhsbxjf71bqjx0-activate.drv'...
+building '/nix/store/0wm8nhkx1jv6y4fivsjqcbdwy6z8ii4j-nixos-system-ssdinarch-0-26.05.20260402.8d8c1fa.drv'...
+building '/nix/store/j3iya8abd1jsshmiwy4k98rnzpxxrh8m-closure-info.drv'...
+building '/nix/store/nyfq8hrkhysqs5gms7s9ij12vasjy6hd-run-nixos-vm.drv'...
+building '/nix/store/19p1v7anlb7zkhq4129bs5wfcrd97h6g-nixos-vm.drv'...
+```
+
 ## CI validation already performed
 
 GitHub Actions for commit `4e9bfae973b001c8bd210e0e265b9aed88fdd9e1` was confirmed green by the user.

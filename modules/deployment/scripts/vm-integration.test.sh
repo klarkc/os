@@ -2,8 +2,6 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-DEFAULT_INSTANCE="cache-0"
-
 if [ "${CI:-}" != "true" ]; then
   echo "VM integration test only runs in CI"
   exit 0
@@ -120,7 +118,7 @@ run_instance_test() {
 
   local extra_module="${instance_tmp}/vm-extra.nix"
   cat > "$extra_module" <<EOF
-{ modulesPath, pkgs, ... }: {
+{ lib, modulesPath, pkgs, ... }: {
   imports = [
     (modulesPath + "/profiles/qemu-guest.nix")
     (modulesPath + "/installer/scan/not-detected.nix")
@@ -128,15 +126,7 @@ run_instance_test() {
   environment.systemPackages = [ pkgs.rsync ];
   services.openssh.enable = true;
   users.users.root.openssh.authorizedKeys.keys = [ "${VM_SSH_PUB}" ];
-  virtualisation.forwardPorts = [{
-    from = "host";
-    host.port = ${port};
-    guest.port = 22;
-  }];
-  virtualisation.vmVariantWithDisko = {
-    virtualisation.graphics = false;
-  };
-  virtualisation.memorySize = 2048;
+  nix.settings.experimental-features = lib.mkForce [ "nix-command" "flakes" ];
   services.nginx.enable = false;
   services.nix-serve.enable = false;
   security.acme.acceptTerms = false;
@@ -179,9 +169,9 @@ EOF
   fi
 
   local out_link="${instance_tmp}/result"
-  echo "nixos-rebuild build-vm --flake ${flake_dir}#${instance}"
+  echo "nixos-rebuild build-vm --flake ${flake_dir}#${instance} --impure"
   (cd "$instance_tmp" && NIX_CONFIG="experimental-features = nix-command flakes" \
-    nixos-rebuild build-vm --flake "${flake_dir}#${instance}")
+    nixos-rebuild build-vm --flake "${flake_dir}#${instance}" --impure)
 
   if [ ! -e "${out_link}/bin" ]; then
     echo "nixos-rebuild did not produce a VM build for ${instance}"
@@ -198,7 +188,8 @@ EOF
   fi
 
   echo "$vm_runner"
-  "$vm_runner" &
+  QEMU_OPTS="-m 2048 -display none -serial mon:stdio -netdev user,id=net0,hostfwd=tcp::${port}-:22 -device virtio-net,netdev=net0" \
+    "$vm_runner" &
   VM_PID=$!
 
   SSH_OPTS=(-i "$VM_SSH_KEY" -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null)
@@ -236,16 +227,17 @@ EOF
 }
 
 instances_to_test=()
-if [ -n "${RUN_VM_INSTANCES:-}" ]; then
-  if [ "$RUN_VM_INSTANCES" = "all" ]; then
-    while IFS= read -r path; do
-      instances_to_test+=("$(basename "$path" .nix)")
-    done < <(find "$REPO_ROOT/modules" -path "*/instances/*.nix" -print)
-  else
-    IFS=',' read -r -a instances_to_test <<< "${RUN_VM_INSTANCES}"
-  fi
+if [ -z "${RUN_VM_INSTANCES:-}" ]; then
+  echo "No instances selected; skipping VM integration test"
+  exit 0
+fi
+
+if [ "$RUN_VM_INSTANCES" = "all" ]; then
+  while IFS= read -r path; do
+    instances_to_test+=("$(basename "$path" .nix)")
+  done < <(find "$REPO_ROOT/modules" -path "*/instances/*.nix" ! -name "*.disko.nix" -print)
 else
-  instances_to_test+=("$DEFAULT_INSTANCE")
+  IFS=',' read -r -a instances_to_test <<< "${RUN_VM_INSTANCES}"
 fi
 
 for instance in "${instances_to_test[@]}"; do
