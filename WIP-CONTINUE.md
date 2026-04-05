@@ -6,8 +6,8 @@ This file is the handoff document for continuing work on the `devenv-2-migration
 
 - Working branch: `devenv-2-migration`
 - Repository: `klarkc/os`
-- Current HEAD at handoff: `fcfd3f291cf7fda76744a3874bb04f8361a025fb`
-- HEAD commit message: `chore: pin devenv to v2.0.6`
+- Current HEAD at handoff: `5ca4fdb3205f7edf8af206d35c59716f0056e70c`
+- HEAD commit message: `docs: refresh WIP head`
 
 ## Goal
 
@@ -133,7 +133,7 @@ Interpretation:
 - The workflow is functionally correct but operationally suboptimal.
 - A likely follow-up is to simplify or harden the cache setup in `.github/workflows/test.yml` while preserving the `devenv`-only testing interface.
 
-## What changed in this working tree (not yet committed)
+## What changed recently (committed)
 
 ### `modules/deployment/scripts/update-system.sh`
 
@@ -152,10 +152,16 @@ Interpretation:
 ### `modules/deployment/devenv.nix`
 
 - Added `disko` to the deployment task package set.
+- Added `qemu` and VM integration test to `enterTest`.
 
 ### `modules/deployment/scripts/update-system.test.sh`
 
 - Updated expectations for unknown host and non-root update execution.
+
+### `modules/deployment/scripts/vm-integration.test.sh`
+
+- New QEMU-based integration test that boots instance configs via `nixos-rebuild build-vm`, waits for SSH, syncs the repo, and runs `update-system` inside the VM.
+- Skips automatically when `/dev/kvm` is unavailable or not writable.
 
 ### Docs
 
@@ -165,6 +171,11 @@ Interpretation:
 ### CI
 
 - `.github/workflows/test.yml` now uses `nix-community/cache-nix-action@v7` with explicit cache keys, adds minimal permissions, and runs `nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test`.
+- CI passes `RUN_VM_INSTANCES` with just the changed instance(s); if `modules/shared/system.nix` or `devenv.lock` changes, it runs all instances.
+
+### Tooling
+
+- All references to `devenv` in docs and CI are pinned to `github:cachix/devenv/v2.0.6`.
 
 ## Main remaining implementation work
 
@@ -183,7 +194,8 @@ The local install path now exists but has not been exercised against a real disk
 3. If deployment behavior changes again, update `AGENTS.md` and `README.md` in the same change.
 4. Validate local-target install on a real disk/image target.
 5. Validate `update-system` on a real installed host.
-6. Keep GitHub Actions using only `devenv` as the testing interface.
+6. Confirm CI passes for the pinned `devenv` version.
+7. Keep GitHub Actions using only `devenv` as the testing interface.
 
 ## Explicit warnings for the next assistant
 

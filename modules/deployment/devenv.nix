@@ -1,5 +1,14 @@
 { config, pkgs, ... }: {
-  packages = with pkgs; [ disko findutils jq nixos-anywhere openssh rsync ];
+  packages = with pkgs; [
+    disko
+    findutils
+    jq
+    nixos-anywhere
+    nixos-rebuild
+    openssh
+    qemu
+    rsync
+  ];
 
   tasks."deployment:install-system" = {
     exec =
@@ -26,5 +35,6 @@
   enterTest = ''
     bash ${config.git.root}/modules/deployment/scripts/install-system.test.sh
     bash ${config.git.root}/modules/deployment/scripts/update-system.test.sh
+    bash ${config.git.root}/modules/deployment/scripts/vm-integration.test.sh
   '';
 }
