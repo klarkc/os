@@ -4,6 +4,7 @@
 /.devenv/
 /.devenv.*
 /.devenv.flake.nix
+/.codex
 /.pre-commit-config.yaml
 /secrets/*
 !/secrets/*.nix
