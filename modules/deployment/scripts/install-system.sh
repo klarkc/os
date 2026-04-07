@@ -1,14 +1,43 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-
-HOST="${1:-}"
+REPO_ROOT=""
+HOST=""
 VALIDATE_ONLY="false"
 TARGET_SSH=""
 TARGET_PORT="22"
 TARGET_DISK=""
 TARGET_IMAGE=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo-root)
+      if [ "$#" -lt 2 ]; then
+        echo "missing value for --repo-root"
+        exit 1
+      fi
+      REPO_ROOT="$2"
+      shift 2
+      ;;
+    --help)
+      echo "usage: install-system [host] [--repo-root <path>]"
+      exit 0
+      ;;
+    -*)
+      echo "unknown argument: $1"
+      exit 1
+      ;;
+    *)
+      if [ -z "$HOST" ]; then
+        HOST="$1"
+        shift
+      else
+        echo "unexpected argument: $1"
+        exit 1
+      fi
+      ;;
+  esac
+done
 
 if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
   INPUT_HOST="$(printf '%s' "$DEVENV_TASK_INPUT" | jq -r '.host // empty')"
@@ -26,8 +55,19 @@ if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
   TARGET_IMAGE="$(printf '%s' "$DEVENV_TASK_INPUT" | jq -r '.target_image // empty')"
 fi
 
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(pwd)"
+  echo "WARN: --repo-root not provided; assuming current directory is the repo root: ${REPO_ROOT}" >&2
+fi
+
+if [ ! -d "$REPO_ROOT/modules" ]; then
+  echo "repo root does not look valid: ${REPO_ROOT}"
+  exit 1
+fi
+
 if [ -z "$HOST" ]; then
   echo "usage: devenv tasks run deployment:install-system --input host=<host> [--input target_ssh=<user@host>] [--input target_disk=<path>] [--input target_image=<path>]"
+  echo "or: install-system [host] [--repo-root <path>]"
   exit 1
 fi
 
@@ -36,33 +76,17 @@ if [[ "$HOST" == *"/"* || "$HOST" == *".."* || ! "$HOST" =~ ^[A-Za-z0-9][A-Za-z0
   exit 1
 fi
 
-find_instance_path() {
-  local host="$1"
-  local -a matches=()
-  while IFS= read -r match; do
-    matches+=("$match")
-  done < <(find "$REPO_ROOT/modules" -path "*/instances/${host}.nix" -print)
+SYSTEM_NIX="${REPO_ROOT}/modules/deployment/nixos-system.nix"
+if [ ! -f "$SYSTEM_NIX" ]; then
+  echo "missing deployment system evaluator: $SYSTEM_NIX"
+  exit 1
+fi
 
-  if [ "${#matches[@]}" -eq 0 ]; then
-    echo "unknown host: $host"
-    return 1
-  fi
-
-  if [ "${#matches[@]}" -gt 1 ]; then
-    echo "ambiguous host: $host"
-    printf '%s\n' "${matches[@]}"
-    return 1
-  fi
-
-  printf '%s\n' "${matches[0]}"
-}
-
-INSTANCE_PATH="$(find_instance_path "$HOST")"
-INSTANCE_DIR="$(dirname "$INSTANCE_PATH")"
-DOMAIN_DIR="$(dirname "$INSTANCE_DIR")"
-
-if [ ! -f "$DOMAIN_DIR/machine.nix" ]; then
-  echo "missing machine.nix for host: $HOST"
+if ! nix-instantiate --eval --strict "$SYSTEM_NIX" \
+  --argstr host "$HOST" \
+  --arg root "$REPO_ROOT" \
+  -A machineInfo.system >/dev/null 2>&1; then
+  echo "unknown host: $HOST"
   exit 1
 fi
 
@@ -93,46 +117,18 @@ if ! command -v nixos-anywhere >/dev/null 2>&1; then
   fi
 fi
 
-TMP_FLAKE_DIR="$(mktemp -d)"
 IMAGE_TMP_DIR=""
 cleanup() {
-  rm -rf "$TMP_FLAKE_DIR"
   if [ -n "$IMAGE_TMP_DIR" ]; then
     rm -rf "$IMAGE_TMP_DIR"
   fi
 }
 trap cleanup EXIT
 
-SHARED_MODULE="${REPO_ROOT}/modules/shared/system.nix"
-INSTANCE_MODULE="${INSTANCE_PATH}"
-DISKO_MODULE="${INSTANCE_PATH%.nix}.disko.nix"
-
-cat > "${TMP_FLAKE_DIR}/flake.nix" <<EOF
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  outputs = { nixpkgs, disko, ... }:
-    let
-      system = "x86_64-linux";
-      modules =
-        [ ${SHARED_MODULE} ${INSTANCE_MODULE} ]
-        ++ (if builtins.pathExists ${DISKO_MODULE} then [
-          disko.nixosModules.disko
-          ${DISKO_MODULE}
-        ] else
-          [ ]);
-    in {
-      nixosConfigurations."${HOST}" = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = modules;
-      };
-    };
-}
-EOF
+DISKO_MODULE="$(nix-instantiate --eval --strict "$SYSTEM_NIX" \
+  --argstr host "$HOST" \
+  --arg root "$REPO_ROOT" \
+  -A diskoModule 2>/dev/null | tr -d '"')"
 
 if [ -n "$TARGET_DISK" ] || [ -n "$TARGET_IMAGE" ]; then
   if [ "$(id -u)" -ne 0 ]; then
@@ -175,8 +171,8 @@ if [ -n "$TARGET_DISK" ] || [ -n "$TARGET_IMAGE" ]; then
     fi
 
     echo "Installing ${HOST} to ${TARGET_DISK}"
-    echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
-    nixos-install --root /mnt --flake "${TMP_FLAKE_DIR}#${HOST}"
+    NIXOS_SYSTEM_PATH="$(nix-build "$SYSTEM_NIX" --argstr host "$HOST" --arg root "$REPO_ROOT" -A system --no-out-link)"
+    nixos-install --root /mnt --system "$NIXOS_SYSTEM_PATH"
     exit 0
   fi
 
@@ -187,10 +183,7 @@ if [ -n "$TARGET_DISK" ] || [ -n "$TARGET_IMAGE" ]; then
     fi
 
     IMAGE_TMP_DIR="$(mktemp -d)"
-    nix --experimental-features "nix-command flakes" build \
-      "${TMP_FLAKE_DIR}#nixosConfigurations.${HOST}.config.system.build.diskoImagesScript" \
-      --out-link "${IMAGE_TMP_DIR}/disko-images-script"
-    IMAGE_SCRIPT="$(readlink -f "${IMAGE_TMP_DIR}/disko-images-script")"
+    IMAGE_SCRIPT="$(nix-build "$SYSTEM_NIX" --argstr host "$HOST" --arg root "$REPO_ROOT" -A imageScript --out-link "${IMAGE_TMP_DIR}/disko-images-script")"
     (cd "$IMAGE_TMP_DIR" && "$IMAGE_SCRIPT")
 
     IMAGE_COUNT="$(find "$IMAGE_TMP_DIR" -maxdepth 1 -name "*.raw" | wc -l | tr -d ' ')"
@@ -237,6 +230,6 @@ else
 fi
 
 echo "Installing ${HOST} to ${SSH_TARGET}:${TARGET_PORT}"
-echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
-
-nixos-anywhere --ssh-port "$TARGET_PORT" --flake "${TMP_FLAKE_DIR}#${HOST}" "$SSH_TARGET"
+DISKO_SCRIPT_PATH="$(nix-build "$SYSTEM_NIX" --argstr host "$HOST" --arg root "$REPO_ROOT" -A diskoScript --no-out-link)"
+NIXOS_SYSTEM_PATH="$(nix-build "$SYSTEM_NIX" --argstr host "$HOST" --arg root "$REPO_ROOT" -A system --no-out-link)"
+nixos-anywhere --ssh-port "$TARGET_PORT" --store-paths "$DISKO_SCRIPT_PATH" "$NIXOS_SYSTEM_PATH" "$SSH_TARGET"

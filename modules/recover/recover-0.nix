@@ -1,4 +1,5 @@
 { config, lib, pkgs, ... }: {
+  networking.hostName = "recover-0";
   system.stateVersion = config.system.nixos.version;
 
   nixpkgs.config.allowUnfree = true;

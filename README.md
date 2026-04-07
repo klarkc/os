@@ -4,12 +4,22 @@
 
 Personal NixOS machines and operations, managed through a `devenv`-only interface.
 
+## Setup
+
+Install the pinned `devenv` CLI once with:
+
+```bash
+nix profile add github:cachix/devenv/v2.0.6
+```
+
+After that, use `devenv` directly for the repository interface shown below.
+
 ## Principles
 
 - Humans and CI interact with this repository through `devenv`.
 - Deployment scripts are implementation details behind `devenv tasks`.
-- Machine definitions live under `modules/<domain>/`.
-- Instances live under `modules/<domain>/instances/<domain>-<number>.nix`.
+- Machine domains live under `modules/<domain>/`.
+- `devenv` `machines.<name>` entries should use the concrete machine name directly, such as `cache-0`.
 
 ## Intended interface
 
@@ -41,15 +51,20 @@ This is an implementation snapshot, not the final desired interface.
 The `host` input is passed to deployment tasks through `DEVENV_TASK_INPUT` and resolved by the task-backed shell scripts. For `update-system`, `host` is optional and defaults to the local hostname.
 
 Do not treat the shell scripts under `modules/deployment/scripts/` as the public interface. The intended entrypoint is `devenv tasks`.
+Internally, the deployment commands are exposed through packaged bash applications in `modules/deployment/devenv.nix`.
 
 ## Deployment behavior
 
-Install and update generate a temporary flake from the selected instance plus `modules/shared/system.nix`.
-Update runs `nixos-rebuild switch` against that temporary flake from inside the installed machine.
+Install and update are being migrated away from temporary generated flakes and toward checked-in machine evaluators plus `devenv` machine outputs.
+Update uses a built system store path from the selected machine and runs `nixos-rebuild switch --store-path` on the installed machine.
 
-If `modules/<domain>/instances/<host>.disko.nix` exists, install includes the disk layout automatically and update includes that module in the generated system.
-Local disk installs run disko to format/mount the target and then invoke `nixos-install` against the generated flake. Image installs build and run `diskoImagesScript` from the generated system and write the resulting `.raw` image to `target_image`.
-Image installs require `imageSize` in the host's disko module.
+If the selected machine includes a disk layout module, install includes that automatically.
+Local disk installs run disko to format and mount the target and then invoke `nixos-install` with the built system path.
+Image installs build and run `diskoImagesScript` from the selected machine and write the resulting `.raw` image to `target_image`.
+Image installs still require `imageSize` in the machine's disk layout module.
+
+For internal or packaged command use, `install-system` and `update-system` also accept `--repo-root <path>`.
+If `--repo-root` is omitted, they warn and assume the current working directory is the repository root.
 
 This behavior is expected to change as the interface is brought in line with the target-oriented install flow and the in-machine update flow described above.
 
@@ -94,9 +109,9 @@ This validates task discovery, safe deployment-task input handling, and local te
 
 Currently declared hosts:
 
-- `ssdinarch-0` in `modules/ssdinarch/instances/`
-- `cache-0` in `modules/cache/instances/`
-- `recover-0` in `modules/recover/instances/`
+- `ssdinarch-0` in `modules/ssdinarch/ssdinarch-0.nix`
+- `cache-0` in `modules/cache/cache-0.nix`
+- `recover-0` in `modules/recover/recover-0.nix`
 
 ## Secrets
 

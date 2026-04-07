@@ -1,4 +1,5 @@
 { pkgs, ... }: {
+  networking.hostName = "ssdinarch-0";
   system.stateVersion = "24.05";
 
   users.users.user = {

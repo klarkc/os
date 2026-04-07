@@ -32,14 +32,6 @@ Organize the repository by explicit domain under `modules/<domain>/`.
 Each domain directory must expose a `devenv.nix` entrypoint.
 The root `devenv.yaml` imports each domain directory and relies on that implicit `devenv.nix`.
 
-Current domains on this branch include:
-
-- `modules/deployment`
-- `modules/shared`
-- `modules/ssdinarch`
-- `modules/cache`
-- `modules/recover`
-
 ### Naming
 
 Prefer explicit domain names.
@@ -47,10 +39,10 @@ Prefer explicit domain names.
 Avoid implicit names such as `default.nix`, `index.*`, or catch-all repository-root folders for major responsibilities.
 Avoid unnecessary plurals for domain names.
 
-Model machines with both a definition and an instance.
-The domain name is the definition name.
-Instances should be named `<domain>-<number>` and correspond to the hostname.
-Instance configs live under `modules/<domain>/instances/<instance>.nix`, with optional `modules/<domain>/instances/<instance>.disko.nix` for disk layout.
+Treat a machine as the concrete host instance.
+Machine names should be named `<domain>-<number>` and correspond to the hostname.
+When using `devenv` machine support, `machines.<name>` should use that concrete machine name directly.
+Keep machine files explicit and domain-local, but do not require one fixed path layout.
 
 ### Nix vs shell responsibilities
 
@@ -64,31 +56,24 @@ Every `.sh` script must have a co-localized `.test.sh` script.
 
 When a domain has executable behavior, place it under `scripts/` inside the domain.
 
-Examples:
+Do not wire repository behavior by calling script files directly from module configuration with raw paths.
+Expose domain scripts through `devenv` first, and have tasks and tests call the exposed script names rather than raw script paths.
 
-- `modules/deployment/scripts/install-system.sh`
-- `modules/deployment/scripts/install-system.test.sh`
-- `modules/deployment/scripts/update-system.sh`
-- `modules/deployment/scripts/update-system.test.sh`
+Always write bash scripts with `writeShellApplication`.
+If a script needs dependencies, declare them co-localized with that script or package definition instead of hiding them in unrelated global package lists.
+In Nix, group related options into a single object when practical.
+Prefer `scripts = { ... };` over repeated top-level assignments like `scripts.a = ...; scripts.b = ...;`.
 
 ### Task wiring
 
 Tasks should call scripts from their own domain `devenv.nix`.
-
-Example task names:
-
-- `deployment:install-system`
-- `deployment:update-system`
 
 For safe local validation of the current migration state, prefer running deployment tasks with `--input validate_only=true` before attempting any real target operation.
 
 ### Test loading
 
 Every `.test.sh` must be loaded by a `devenv.nix` module.
-The external interface for test execution is always `devenv test`.
-
-On the current branch, shell-based tests are aggregated through `enterTest` in the relevant domain modules.
-Do not require users or CI to invoke `*.test.sh` directly.
+The external interface for test execution is always `devenv test`, with shell-based tests aggregated through `enterTest`.
 
 ### Shared system defaults
 
@@ -104,47 +89,43 @@ At present, operator-side secret material is handled out of band and documented 
 
 ### CI
 
-CI must call `devenv` only.
-Repository tests must run through `devenv test`.
+CI must call `devenv` only, and repository tests must run through `devenv test`.
 
 ### Validation status
-
-Local validation has confirmed that:
-
-- `devenv tasks list` loads the deployment tasks
-- `deployment:install-system` accepts `host` and `validate_only=true`
-- `deployment:update-system` accepts optional `host` and `validate_only=true`
-- `devenv test` completes successfully on this branch
 
 Do not overstate this as final deployment validation. The implementation still needs to be aligned with the intended target-oriented install flow and the in-machine update flow.
 
 ### Local testing before commits
 
+Install the pinned `devenv` CLI once:
+
+```bash
+nix profile add github:cachix/devenv/v2.0.6
+```
+
+Use `devenv` directly for the repository entrypoint:
+
+```bash
+devenv <subcommand>
+```
+
 Run local tests before committing changes that affect behavior:
 
 ```bash
-nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
-```
-
-When running long tests locally, pipe stdout/stderr to a file to avoid flooding the CLI context, for example:
-
-```bash
-nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test > /tmp/devenv-test.log 2>&1
-```
-
-### Running devenv
-
-Use `nix run` for the repository entrypoint:
-
-```bash
-nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- <subcommand>
+devenv test
 ```
 
 Examples:
 
 ```bash
-nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- tasks list
-nix --accept-flake-config run github:cachix/devenv/v2.0.6 -- test
+devenv tasks list
+devenv test
+```
+
+When running long tests locally, prefer redirecting output to a file:
+
+```bash
+devenv test > /tmp/devenv-test.log 2>&1
 ```
 
 ### Commits

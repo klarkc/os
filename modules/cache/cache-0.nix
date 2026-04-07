@@ -10,6 +10,7 @@ in {
     (modulesPath + "/installer/scan/not-detected.nix")
   ];
 
+  networking.hostName = "cache-0";
   system.stateVersion = config.system.nixos.version;
 
   boot = {

@@ -1,1 +1,1 @@
-{ ... }: { }
+{ ... }: { machines = import ./machines.nix; }

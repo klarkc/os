@@ -1,11 +1,40 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
-
-HOST="${1:-}"
+REPO_ROOT=""
+HOST=""
 VALIDATE_ONLY="false"
 DETECTED_HOST=""
+
+while [ "$#" -gt 0 ]; do
+  case "$1" in
+    --repo-root)
+      if [ "$#" -lt 2 ]; then
+        echo "missing value for --repo-root"
+        exit 1
+      fi
+      REPO_ROOT="$2"
+      shift 2
+      ;;
+    --help)
+      echo "usage: update-system [host] [--repo-root <path>]"
+      exit 0
+      ;;
+    -*)
+      echo "unknown argument: $1"
+      exit 1
+      ;;
+    *)
+      if [ -z "$HOST" ]; then
+        HOST="$1"
+        shift
+      else
+        echo "unexpected argument: $1"
+        exit 1
+      fi
+      ;;
+  esac
+done
 
 if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
   INPUT_HOST="$(printf '%s' "$DEVENV_TASK_INPUT" | jq -r '.host // empty')"
@@ -13,6 +42,16 @@ if [ -n "${DEVENV_TASK_INPUT:-}" ]; then
     HOST="$INPUT_HOST"
   fi
   VALIDATE_ONLY="$(printf '%s' "$DEVENV_TASK_INPUT" | jq -r '.validate_only // false')"
+fi
+
+if [ -z "$REPO_ROOT" ]; then
+  REPO_ROOT="$(pwd)"
+  echo "WARN: --repo-root not provided; assuming current directory is the repo root: ${REPO_ROOT}" >&2
+fi
+
+if [ ! -d "$REPO_ROOT/modules" ]; then
+  echo "repo root does not look valid: ${REPO_ROOT}"
+  exit 1
 fi
 
 if [ -z "$HOST" ]; then
@@ -28,6 +67,7 @@ fi
 
 if [ -z "$HOST" ]; then
   echo "usage: devenv tasks run deployment:update-system [--input host=<host>]"
+  echo "or: update-system [host] [--repo-root <path>]"
   exit 1
 fi
 
@@ -41,33 +81,17 @@ if [[ "$HOST" == *"/"* || "$HOST" == *".."* || ! "$HOST" =~ ^[A-Za-z0-9][A-Za-z0
   exit 1
 fi
 
-find_instance_path() {
-  local host="$1"
-  local -a matches=()
-  while IFS= read -r match; do
-    matches+=("$match")
-  done < <(find "$REPO_ROOT/modules" -path "*/instances/${host}.nix" -print)
+SYSTEM_NIX="${REPO_ROOT}/modules/deployment/nixos-system.nix"
+if [ ! -f "$SYSTEM_NIX" ]; then
+  echo "missing deployment system evaluator: $SYSTEM_NIX"
+  exit 1
+fi
 
-  if [ "${#matches[@]}" -eq 0 ]; then
-    echo "unknown host: $host"
-    return 1
-  fi
-
-  if [ "${#matches[@]}" -gt 1 ]; then
-    echo "ambiguous host: $host"
-    printf '%s\n' "${matches[@]}"
-    return 1
-  fi
-
-  printf '%s\n' "${matches[0]}"
-}
-
-INSTANCE_PATH="$(find_instance_path "$HOST")"
-INSTANCE_DIR="$(dirname "$INSTANCE_PATH")"
-DOMAIN_DIR="$(dirname "$INSTANCE_DIR")"
-
-if [ ! -f "$DOMAIN_DIR/machine.nix" ]; then
-  echo "missing machine.nix for host: $HOST"
+if ! nix-instantiate --eval --strict "$SYSTEM_NIX" \
+  --argstr host "$HOST" \
+  --arg root "$REPO_ROOT" \
+  -A machineInfo.system >/dev/null 2>&1; then
+  echo "unknown host: $HOST"
   exit 1
 fi
 
@@ -85,44 +109,6 @@ if ! command -v nixos-rebuild >/dev/null 2>&1; then
   exit 1
 fi
 
-TMP_FLAKE_DIR="$(mktemp -d)"
-cleanup() {
-  rm -rf "$TMP_FLAKE_DIR"
-}
-trap cleanup EXIT
-
-SHARED_MODULE="${REPO_ROOT}/modules/shared/system.nix"
-INSTANCE_MODULE="${INSTANCE_PATH}"
-DISKO_MODULE="${INSTANCE_PATH%.nix}.disko.nix"
-
-cat > "${TMP_FLAKE_DIR}/flake.nix" <<EOF
-{
-  inputs = {
-    nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
-    disko.url = "github:nix-community/disko";
-    disko.inputs.nixpkgs.follows = "nixpkgs";
-  };
-
-  outputs = { nixpkgs, disko, ... }:
-    let
-      system = "x86_64-linux";
-      modules =
-        [ ${SHARED_MODULE} ${INSTANCE_MODULE} ]
-        ++ (if builtins.pathExists ${DISKO_MODULE} then [
-          disko.nixosModules.disko
-          ${DISKO_MODULE}
-        ] else
-          [ ]);
-    in {
-      nixosConfigurations."${HOST}" = nixpkgs.lib.nixosSystem {
-        inherit system;
-        modules = modules;
-      };
-    };
-}
-EOF
-
 echo "Updating ${HOST} from ${REPO_ROOT}"
-echo "Using temp flake: ${TMP_FLAKE_DIR}#${HOST}"
-
-nixos-rebuild switch --flake "${TMP_FLAKE_DIR}#${HOST}"
+NIXOS_SYSTEM_PATH="$(nix-build "$SYSTEM_NIX" --argstr host "$HOST" --arg root "$REPO_ROOT" -A system --no-out-link)"
+nixos-rebuild switch --store-path "$NIXOS_SYSTEM_PATH"
