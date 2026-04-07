@@ -52,6 +52,10 @@ They are not the direct executable interface.
 Executable behavior lives in `.sh` scripts.
 Every `.sh` script must have a co-localized `.test.sh` script.
 
+**Build constraint**: Do not call `nix-build` or `devenv` from inside scripts or tasks.
+Use `devenv outputs` for build artifacts and `devenv build <output>` to build them.
+Tests consume pre-built outputs via environment variables or arguments.
+
 ### Script layout
 
 When a domain has executable behavior, place it under `scripts/` inside the domain.

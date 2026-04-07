@@ -319,12 +319,22 @@ Interpretation:
 
 ## Main remaining work
 
-1. Refactor VM integration so the outer user/CI job builds VM artifacts and the inner test only consumes built paths.
-2. Remove any remaining build orchestration from `vm-integration.test.sh`.
-3. Rerun `devenv test` after that refactor to find the next real failure, if any.
-4. Validate local-target install on real hardware or a real image target.
-5. Validate `update-system` on an actually installed machine.
-6. Reconcile `README.md` with the latest implementation details if any public-facing behavior changed during these uncommitted refactors.
+1. **VM integration test refactor** (in progress):
+   - Define VM artifact outputs in `modules/deployment/devenv.nix`
+   - Add `secretspec.toml` with SSH key declarations
+   - Update test script to consume pre-built artifacts via `--vm-artifact`
+   - Add build task for VM artifacts
+   - Test the build/test flow
+
+2. **Remove any remaining build orchestration** from `vm-integration.test.sh` (part of #1)
+
+3. **Rerun `devenv test`** after refactor to find next real failure
+
+4. **Validate local-target install** on real hardware or a real image target
+
+5. **Validate `update-system`** on an actually installed machine
+
+6. **Reconcile `README.md`** with latest implementation details if public-facing behavior changed
 
 ## Intended outputs approach
 
@@ -351,8 +361,13 @@ Interpretation:
 
 1. Open `WIP-CONTINUE.md` first.
 2. Inspect current `AGENTS.md`, `README.md`, and `modules/deployment/*`.
-3. Fix the VM test shape first so it no longer performs any build step internally.
-4. Then rerun `devenv test` and capture the next non-architecture failure.
+3. **VM test refactor** (current priority):
+   - Add `secretspec.toml` with `TEST_SSH_PUBLIC_KEY` and `TEST_SSH_PRIVATE_KEY` declarations
+   - Define VM artifact outputs in `modules/deployment/devenv.nix` using `config.secretspec.secrets.TEST_SSH_PUBLIC_KEY`
+   - Update `vm-integration.test.sh` to accept `--vm-artifact` (required) and `--ssh-private-key` (optional)
+   - Add `tasks."deployment:build-vm-artifacts"` to build all VM artifacts
+   - Test flow: `devenv build vm-ssdinarch-0 && devenv test --input vm-artifact=$(pwd)/result`
+4. Rerun `devenv test` after VM refactor and capture next failure.
 5. Run real validation for local-target install and in-machine update.
 6. Keep CI and human UX aligned with the `devenv`-only contract.
 
@@ -405,7 +420,7 @@ Concrete status as of the latest interrupted turn:
   - normalizes machine builds by always importing `modules/shared/system.nix`
   - detects `*.disko.nix` machine imports
   - imports the disko option module only when needed
-- `modules/deployment/nixos-deploy.nix` now follows the same normalization pattern when deriving `outputs` from `config.machines`.
+- `modules/deployment/nixos-deploy.nix` now follows the the same normalization pattern when deriving `outputs` from `config.machines`.
 - Direct evaluator checks succeeded:
   - `builtins.attrNames (import ./modules/deployment/machines.nix { root = ./.; })` returned `cache-0`, `recover-0`, and `ssdinarch-0`
   - `nix-instantiate --eval --strict modules/deployment/nixos-system.nix --argstr host ssdinarch-0 --arg root /home/klarkc/Sources/os -A machineInfo.system` returned `"x86_64-linux"`
@@ -425,6 +440,75 @@ Concrete status as of the latest interrupted turn:
 - Sandbox note:
   - direct builds that realize `fetchTree` inputs can still hit `cannot connect to socket at '/nix/var/nix/daemon-socket/socket': Operation not permitted` inside the sandbox
   - formatting through `devenv shell -- nixfmt ...` therefore likely needs escalation or should be run by the user directly
+
+## VM Integration Test Refactoring - Current State
+
+**Task**: Refactor `vm-integration.test.sh` to remove `nix-build` calls, as scripts invoked by devenv cannot call `nix-build` or `devenv` (nested invocation constraint).
+
+**Constraint**: Scripts invoked by devenv CANNOT call `nix-build` or `devenv`. This is documented in `AGENTS.md` under "Build constraint".
+
+**Current progress**:
+- `AGENTS.md` updated to document the build constraint
+- `vm-integration.test.sh` modified to accept `--vm-artifact` argument instead of building internally
+- Lines 136-149 (nix-build calls) removed from test script
+
+**Key issue**: VM artifacts need SSH public key embedded at build time. Original test generated SSH key at runtime and baked it into VM. Need to decouple: build VM with known key, test uses corresponding private key.
+
+**SecretSpec approach** (from https://devenv.sh/blog/2025/07/21/announcing-secretspec-declarative-secrets-management/):
+- SecretSpec separates WHAT (which secrets needed) from WHERE (where they're stored)
+- `secretspec.toml` declares secrets (committed to repo)
+- Each environment uses its own provider (keyring, env, dotenv, etc.)
+
+**Applied to SSH key problem**:
+1. Declare in `secretspec.toml`:
+   ```toml
+   [profiles.default]
+   TEST_SSH_PUBLIC_KEY = { description = "SSH public key for VM testing", required = true }
+   TEST_SSH_PRIVATE_KEY = { description = "SSH private key for VM testing", required = true }
+   ```
+2. CI uses `secretspec run --provider env --` with GitHub secrets
+3. Local dev with static key uses `secretspec run --provider dotenv --` with committed `.env`
+4. Local dev with own key: user sets their own key in keyring/dotenv, same command works
+
+**This solves user flexibility question**: Yes, users can use their own keys. VM build accepts public key from `config.secretspec.secrets.TEST_SSH_PUBLIC_KEY` at build time.
+
+## What Remains to Be Done
+
+1. **Define VM artifact outputs in `modules/deployment/devenv.nix`**:
+   ```nix
+   outputs = builtins.listToAttrs (
+     builtins.map (instance: {
+       name = "vm-${instance}";
+       value = # VM build with test SSH key from config.secretspec.secrets.TEST_SSH_PUBLIC_KEY
+     }) vmInstances
+   );
+   ```
+
+2. **Update test script to support both modes**:
+   - Accept `--vm-artifact` (pre-built, required)
+   - Accept `--ssh-private-key` (optional, defaults to test key from SecretSpec)
+
+3. **Add `secretspec.toml` with SSH key declarations**:
+   - `TEST_SSH_PUBLIC_KEY` (required)
+   - `TEST_SSH_PRIVATE_KEY` (required)
+
+4. **Add build task**:
+   ```nix
+   tasks."deployment:build-vm-artifacts" = {
+     exec = "devenv build vm-cache-0 vm-ssdinarch-0 ...";
+   };
+   ```
+
+5. **Test the flow**:
+   ```bash
+   devenv build vm-cache-0
+   devenv test --input vm-artifact=$(pwd)/result
+   ```
+
+6. **Consider static test key for CI**:
+   - Commit a test key pair in `.env` (not sensitive, just for test)
+   - CI can override with GitHub secrets
+   - Users can override with their own keys via SecretSpec provider
 
 ## Recent Test Run History (from prompt.md)
 

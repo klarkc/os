@@ -4,6 +4,17 @@ let
     (builtins.attrNames config.machines);
   vmInstancesText = builtins.concatStringsSep " " vmInstances;
 
+  # Build VM artifacts for each instance
+  vmArtifacts = builtins.listToAttrs (builtins.map (instance: {
+    name = instance;
+    value = import ./vm-system.nix {
+      inherit instance;
+      host = instance;
+      extraModulePath = null; # Will be set at test time
+      root = ./.;
+    }.${instance};
+  }) vmInstances);
+
   installSystem = pkgs.writeShellApplication {
     name = "install-system";
     runtimeInputs = with pkgs; [
@@ -38,7 +49,7 @@ let
 
   vmIntegrationTest = pkgs.writeShellApplication {
     name = "vm-integration-test";
-    runtimeInputs = with pkgs; [ findutils nix openssh qemu rsync ];
+    runtimeInputs = with pkgs; [ findutils openssh qemu rsync ];
     text = ''
       export DEVENV_VM_INSTANCES="${vmInstancesText}"
       ${builtins.readFile ./scripts/vm-integration.test.sh}
@@ -48,6 +59,8 @@ in {
   imports = [ ./nixos-deploy.nix ];
 
   packages = [ updateSystem ];
+
+  outputs = vmArtifacts;
 
   scripts = {
     install-system.exec = ''${installSystem}/bin/install-system "$@"'';

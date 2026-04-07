@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_ROOT=""
 
+VM_ARTIFACT=""
+
 while [ "$#" -gt 0 ]; do
   case "$1" in
     --repo-root)
@@ -13,8 +15,16 @@ while [ "$#" -gt 0 ]; do
       REPO_ROOT="$2"
       shift 2
       ;;
+    --vm-artifact)
+      if [ "$#" -lt 2 ]; then
+        echo "missing value for --vm-artifact"
+        exit 1
+      fi
+      VM_ARTIFACT="$2"
+      shift 2
+      ;;
     --help)
-      echo "usage: vm-integration-test [--repo-root <path>]"
+      echo "usage: vm-integration-test [--repo-root <path>] [--vm-artifact <path>]"
       exit 0
       ;;
     -*)
@@ -133,23 +143,21 @@ in {
 }
 EOF
 
-  if ! command -v nix-build >/dev/null 2>&1; then
-    echo "nix-build is required for VM integration test"
+  # Use pre-built VM artifact
+  if [ -z "$VM_ARTIFACT" ]; then
+    echo "error: --vm-artifact is required (run 'devenv build vmArtifacts' first)"
     return 1
   fi
 
-  local out_link="${instance_tmp}/result"
-  echo "nix-build ${VM_SYSTEM_NIX} -A ${instance}.config.system.build.vmWithDisko"
-  (cd "$instance_tmp" && nix-build \
-    "${VM_SYSTEM_NIX}" \
-    --out-link "$out_link" \
-    --argstr host "${instance}" \
-    --argstr extraModulePath "${extra_module}" \
-    --arg root "$REPO_ROOT" \
-    -A "${instance}.config.system.build.vmWithDisko")
+  if [ ! -d "$VM_ARTIFACT" ]; then
+    echo "error: VM artifact not found at: $VM_ARTIFACT"
+    return 1
+  fi
+
+  local out_link="$VM_ARTIFACT"
 
   if [ ! -e "${out_link}/bin" ]; then
-    echo "nix-build did not produce a VM build for ${instance}"
+    echo "error: VM artifact does not contain bin directory: ${out_link}"
     return 1
   fi
 
