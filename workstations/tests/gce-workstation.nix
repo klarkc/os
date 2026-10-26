@@ -19,25 +19,10 @@ pkgs.testers.runNixOSTest {
     server.succeed("test -d /home/klarkc")
     server.succeed("test -e /run/current-system/sw/bin/git")
     server.succeed("ss -lnt | grep ':3389'")
-    # Inspect the generated config used by the active daemon and its syntax.
-    # The upstream sshd -T returned an empty listing on this VM runner.
+    # Check the generated config actually used by sshd and verify its syntax.
     server.succeed("${pkgs.openssh}/bin/sshd -t -f /etc/ssh/sshd_config")
-    server.succeed("grep -Eqi '^[[:space:]]*PasswordAuthentication[[:space:]]+no[[:space:]]*
-    server.succeed("test -e /run/current-system/sw/bin/tailscale")
-    server.succeed("test -e /run/current-system/sw/bin/xfce4-session")
-    server.succeed("getent passwd klarkc | grep '^klarkc:'")
-    server.succeed("test ! -e /home/klarkc/.git")
-  '';
-}
- /etc/ssh/sshd_config")
-    server.succeed("grep -Eqi '^[[:space:]]*PermitRootLogin[[:space:]]+prohibit-password[[:space:]]*
-    server.succeed("test -e /run/current-system/sw/bin/tailscale")
-    server.succeed("test -e /run/current-system/sw/bin/xfce4-session")
-    server.succeed("getent passwd klarkc | grep '^klarkc:'")
-    server.succeed("test ! -e /home/klarkc/.git")
-  '';
-}
- /etc/ssh/sshd_config")
+    server.succeed("grep -Eqi '^[[:space:]]*PasswordAuthentication[[:space:]]+no[[:space:]]*$' /etc/ssh/sshd_config")
+    server.succeed("grep -Eqi '^[[:space:]]*PermitRootLogin[[:space:]]+prohibit-password[[:space:]]*$' /etc/ssh/sshd_config")
     server.succeed("test -e /run/current-system/sw/bin/tailscale")
     server.succeed("test -e /run/current-system/sw/bin/xfce4-session")
     server.succeed("getent passwd klarkc | grep '^klarkc:'")
