@@ -27,6 +27,8 @@
       checks.${system} = {
         # Boots BOTH client and server in disposable QEMU VMs, not merely
         # evaluating a Nix expression. No credentials or cloud resources.
+        ventoy-usb-persistence-vm = import ./tests/ventoy-persistence.nix { inherit pkgs; };
+
         boot-and-network-vm = pkgs.testers.runNixOSTest {
           name = "solo-thin-client-and-workstation";
           nodes = {
@@ -60,7 +62,7 @@
             server.wait_for_unit("multi-user.target")
             client.succeed("systemctl is-active NetworkManager.service")
             client.succeed("systemctl is-active tailscaled.service")
-            client.succeed("systemctl is-active solo-ventoy-state.service")
+            client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
             client.succeed("test -e /run/current-system/sw/bin/solo-client-state")
             client.succeed("test -e /run/current-system/sw/bin/xfreerdp3")
             client.succeed("! mountpoint -q /run/solo-client/ventoy")
