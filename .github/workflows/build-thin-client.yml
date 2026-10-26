@@ -1,8 +1,10 @@
-name: Build disposable NixOS thin client
+name: NixOS thin client + workstation CI
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - feat/ephemeral-thin-client-gcp-20261026
+      - main
     paths:
       - "workstations/**"
       - ".github/workflows/build-thin-client.yml"
@@ -11,7 +13,28 @@ permissions:
   contents: read
 
 jobs:
-  iso:
+  evaluate:
+    name: Evaluate NixOS configurations
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+      - name: Evaluate flake and all NixOS configurations
+        run: |
+          set -euo pipefail
+          cd workstations
+          nix flake check --no-build --show-trace
+          nix eval --raw .#nixosConfigurations.thin-client.config.networking.hostName
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
+
+  boot-vm:
+    name: Boot two NixOS VMs and test services
+    needs: evaluate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
@@ -21,11 +44,35 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
-      - name: Build ISO
+      - name: Verify client and GCE server in QEMU VMs
         run: |
           set -euo pipefail
           cd workstations
-          nix build --print-build-logs --no-link .#thin-client-iso --out-link /tmp/solo-iso
+          nix build -L .#checks.x86_64-linux.boot-and-network-vm
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: nixos-vm-failure-logs
+          path: workstations/result/
+          if-no-files-found: ignore
+
+  iso:
+    name: Build Ventoy ISO
+    needs: evaluate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+      - name: Build NixOS ISO
+        run: |
+          set -euo pipefail
+          cd workstations
+          nix build -L .#thin-client-iso --out-link /tmp/solo-iso
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp /tmp/solo-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.iso > SHA256SUMS)
