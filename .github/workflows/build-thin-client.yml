@@ -57,6 +57,7 @@ jobs:
           nix build -L --max-jobs 1 \
             .#checks.x86_64-linux.boot-and-network-vm \
             .#checks.x86_64-linux.ventoy-usb-persistence-vm \
+            .#checks.x86_64-linux.gce-workstation-security-vm \
             2>&1 | tee ../vm-logs/nixos-vm-tests.log
       - name: Upload VM logs on failure
         if: failure()
@@ -91,5 +92,34 @@ jobs:
         with:
           name: solo-thin-client-iso
           path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  gce-image:
+    name: Build NixOS GCE raw image
+    needs: [evaluate, boot-vm]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v31
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+            accept-flake-config = false
+      - name: Build and checksum NixOS GCE image
+        run: |
+          set -euo pipefail
+          cd workstations
+          nix build -L .#gce-image --out-link /tmp/solo-gce-image
+          mkdir -p "$GITHUB_WORKSPACE/gce-dist"
+          find /tmp/solo-gce-image -maxdepth 1 -type f -name '*.raw.tar.gz' -exec cp {} "$GITHUB_WORKSPACE/gce-dist/" \;
+          test "$(find "$GITHUB_WORKSPACE/gce-dist" -type f -name '*.raw.tar.gz' | wc -l)" -eq 1
+          (cd "$GITHUB_WORKSPACE/gce-dist" && sha256sum *.raw.tar.gz > SHA256SUMS)
+      - name: Upload versioned image (no cloud import)
+        uses: actions/upload-artifact@v4
+        with:
+          name: solo-gce-image-${{ github.sha }}
+          path: gce-dist/
           if-no-files-found: error
           retention-days: 7
