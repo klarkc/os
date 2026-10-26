@@ -2,9 +2,21 @@
 
 let
   stateTool = pkgs.writeShellScriptBin "solo-client-state" ''
+    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.wireguard-tools ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/ventoy-state.sh} "$@"
   '';
+  gceTool = pkgs.writeShellScriptBin "solo-gce-endpoint" ''
+    export PATH=${lib.makeBinPath [ pkgs.google-cloud-sdk pkgs.curl pkgs.jq pkgs.coreutils pkgs.sudo ]}:$PATH
+    exec ${pkgs.bash}/bin/bash ${./scripts/gce-endpoint.sh} "$@"
+  '';
+  wgTool = pkgs.writeShellScriptBin "solo-client-wg" ''
+    export PATH=${lib.makeBinPath [ pkgs.iproute2 pkgs.wireguard-tools pkgs.coreutils pkgs.util-linux pkgs.kmod ]}:$PATH
+    exec ${pkgs.bash}/bin/bash ${./scripts/client-wg.sh} "$@"
+  '';
   thinClient = pkgs.writeShellScriptBin "solo-thin-client" ''
+    export SOLO_STATE_TOOL=/run/current-system/sw/bin/solo-client-state
+    export SOLO_GCE_TOOL=/run/current-system/sw/bin/solo-gce-endpoint
+    export SOLO_WG_TOOL=/run/current-system/sw/bin/solo-client-wg
     exec ${pkgs.xterm}/bin/xterm \
       -T "Solo Workstation - connection" \
       -fa "DejaVu Sans Mono" -fs 12 \
@@ -18,23 +30,34 @@ in
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
   services.openssh.enable = lib.mkForce false;
-  services.tailscale.enable = true;
+  # Tailscale requires managed coordination and is replaced with a WireGuard
+  # route to the GCE endpoint discovered through the owner's Google OAuth.
+  services.tailscale.enable = lib.mkForce false;
 
-  # Restore USB state before NetworkManager and Tailscale start.
+  # Only these fixed helpers are allowed without sudo password. Google OAuth
+  # itself always runs as the unprivileged nixos user, NEVER as root.
+  security.sudo.extraRules = [{
+    users = [ "nixos" ];
+    commands = [
+      { command = "/run/current-system/sw/bin/solo-client-state"; options = [ "NOPASSWD" ]; }
+      { command = "/run/current-system/sw/bin/solo-client-wg"; options = [ "NOPASSWD" ]; }
+    ];
+  }];
+
+  # Restore USB state before NetworkManager starts or graphical autologin.
+  # No disk format, internal HDD mount, swap creation or copytoram.
   systemd.services.solo-ventoy-state = {
-    description = "Restore trusted Ventoy USB connection state";
+    description = "Restore trusted Ventoy USB credentials and connection state";
     wantedBy = [ "multi-user.target" ];
-    before = [ "NetworkManager.service" "tailscaled.service" ];
+    before = [ "NetworkManager.service" ];
     after = [ "systemd-udev-settle.service" ];
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils ];
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.wireguard-tools ];
     script = "${stateTool}/bin/solo-client-state restore";
   };
   systemd.services.NetworkManager.requires = [ "solo-ventoy-state.service" ];
-  systemd.services.tailscaled.requires = [ "solo-ventoy-state.service" ];
 
-  # Periodic best-effort copies also capture newly configured Wi-Fi and
-  # the rotating Tailscale state before an unexpected reboot.
+  # Best-effort copies capture any newly saved Wi-Fi or OAuth state.
   systemd.services.solo-save-state = {
     description = "Save thin-client runtime state to Ventoy";
     serviceConfig.Type = "oneshot";
@@ -69,8 +92,9 @@ in
   '';
 
   environment.systemPackages = with pkgs; [
-    stateTool thinClient freerdp networkmanager tailscale
-    jq xterm xorg.xsetroot openssh
+    stateTool gceTool wgTool thinClient freerdp networkmanager
+    google-cloud-sdk curl jq iproute2 wireguard-tools
+    xterm xorg.xsetroot openssh
   ];
   fonts.packages = [ pkgs.dejavu_fonts ];
   console.keyMap = "br-abnt2";
