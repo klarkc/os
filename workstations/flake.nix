@@ -25,8 +25,8 @@
       };
 
       checks.${system} = {
-        # Boots BOTH client and server in disposable QEMU VMs, not merely
-        # evaluating a Nix expression. No credentials or cloud resources.
+        # Disposable QEMU boot tests (including persistent-state reboot).
+        # No production credentials or billable cloud resources.
         ventoy-usb-persistence-vm = import ./tests/ventoy-persistence.nix { inherit pkgs; };
         gce-workstation-security-vm = import ./tests/gce-workstation.nix { inherit pkgs; };
 
@@ -71,7 +71,9 @@
             client.succeed("systemctl start solo-save-state.service")
             server.succeed("systemctl is-active xrdp.service")
             server.succeed("systemctl is-active xrdp-sesman.service")
-            server.succeed("systemctl is-active tailscaled.service")
+            server.succeed("test ! -e /run/current-system/sw/bin/tailscale")
+            server.succeed("systemctl is-active nftables.service")
+            server.succeed("nft list chain inet nixos-fw input-allow | grep -F \"35.235.240.0/20\"")
             server.succeed("id klarkc")
             server.succeed("test -d /home/klarkc")
             server.succeed("ss -lnt | grep ':3389'")
