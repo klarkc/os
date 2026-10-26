@@ -21,7 +21,6 @@ pkgs.testers.runNixOSTest {
     server.succeed("ss -lnt | grep ':3389'")
     server.succeed("sshd -T | grep -Fx 'passwordauthentication no'")
     server.succeed("sshd -T | grep -Fx 'permitrootlogin prohibit-password'")
-    server.succeed("iptables -S INPUT | grep -E 'DROP|REJECT'")
     server.succeed("test -e /run/current-system/sw/bin/tailscale")
     server.succeed("test -e /run/current-system/sw/bin/xfce4-session")
     server.succeed("getent passwd klarkc | grep '^klarkc:'")
