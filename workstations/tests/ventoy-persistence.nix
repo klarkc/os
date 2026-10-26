@@ -4,10 +4,16 @@ let
   # overlay of a tiny exFAT volume carrying the same Ventoy label.
   # Never presents a writable copy of any physical /dev disk to a VM.
   usbImage = pkgs.runCommand "solo-ventoy-test-usb.img" {
-    nativeBuildInputs = [ pkgs.coreutils pkgs.exfatprogs ];
+    nativeBuildInputs = [ pkgs.coreutils pkgs.exfatprogs pkgs.parted ];
   } ''
-    truncate -s 64M "$out"
-    mkfs.exfat -n Ventoy "$out"
+    # Like real Ventoy media, the *partition* is labelled Ventoy, not the
+    # entire USB disk. This exercises the parent-device USB transport check.
+    truncate -s 68M "$out"
+    truncate -s 64M partition.img
+    mkfs.exfat -n Ventoy partition.img
+    parted -s "$out" mklabel msdos
+    parted -s "$out" unit MiB mkpart primary 1 65
+    dd if=partition.img of="$out" bs=1M seek=1 conv=notrunc status=none
   '';
 in
 pkgs.testers.runNixOSTest {
