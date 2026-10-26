@@ -1,69 +1,198 @@
-# NixOS GCE workstation: import and operations
+# BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
 
-This is a **runbook, not an authorization** to provision billable resources.
+Canonical contract: https://github.com/klarkc/os/issues/21.
+The previous Tailscale/WireGuard integration is obsolete. This server branch
+MUST NOT depend on a VPN daemon, external VPN keys, UDP/51820 or metadata
+containing peer public keys. The Dell integration is owned by BuildClient.
 
-## Build gates
+## Scope and state
 
-The `gce-image` GitHub Actions job runs only after Nix evaluation and the
-QEMU VM tests. It uploads a `*.raw.tar.gz` with SHA256SUMS, retained for
-seven days; the CI job does **not** import the image or create an instance.
-Confirm the completed run and download the artifact before proceeding.
-A QEMU VM test verifies host services; it does **not** prove GCE metadata,
-OS Login, IAP or a real XRDP desktop session.
+- Project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
+- Planned VM: `solo-workstation`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
+- Persistent boot disk candidate: 150 GiB `pd-balanced`, retained on stop.
+- Local account `klarkc`, HOME `/home/klarkc` for direct Git checkout
+  `https://github.com/klarkc/dotfiles` (no `/home/klarkc/dotfiles`).
+- Display: XRDP on TCP 3389 with Xorg, XMonad when its HOME wrapper exists,
+  otherwise XFCE. Account starts locked until password bootstrap.
+- Both OS firewall and GCE VPC firewall restrict admin ports to the IPv4
+  Google IAP source `35.235.240.0/20`. SSH 22 is for OS Login admin only,
+  not the Dell graphical user workflow.
+- This document does not authorize billable GCE operations. **No VM, firewall,
+  NAT, public IP, image, disk, bucket or IAM policy is created by CI.**
 
-## One-time import (requires explicit budget approval)
+## CI gates
 
-- Project: `argon-surf-472319-b0`; candidate zone: `southamerica-east1-b`.
-- Candidate shape: `e2-highmem-4` (4 vCPU / 32 GiB), CPU only.
-- Candidate boot disk: 150 GiB `pd-balanced`, **persistent and retained on VM stop**.
-- Compute billed while running (including idle); disk billed while stopped.
-  Network egress, image storage, snapshots and public/static IPv4 may cost extra.
-  Obtain a fresh Google Cloud Pricing Calculator estimate for 172 h/month,
-  storage for 730 h/month, quota and billing alerts before approval.
+Run `nix flake check` from `workstations/`, then
+`nix build .#checks.x86_64-linux.gce-workstation-security-vm` and
+`nix build .#gce-image`.
+The GitHub Actions `gce-image` job depends on the dedicated GCE QEMU VM
+test. It builds the NixOS `*.raw.tar.gz` custom-image import archive and
+uploads SHA256 checksums. Do not import the Dell Ventoy ISO as a server image.
 
-After approval, upload the verified `*.raw.tar.gz` image to a private
-Cloud Storage bucket. Create a custom Compute Engine image from that
-object using `gcloud compute images create NAME --source-uri=gs://BUCKET/IMAGE.raw.tar.gz`.
-Use the raw disk archive, **not** an ISO or Debian source image.
-Provision with the custom image and a persistent boot disk; set
-`enable-oslogin=TRUE` on instance metadata. Prefer `--no-address` on
-the VM NIC. Do not open public TCP 3389. For SSH bootstrap without a
-public IP, arrange IAM OS Login and IAP TCP forwarding (source range
-`35.235.240.0/20` to TCP 22) with least-privilege permissions.
-The OS Login account can differ from `klarkc`; check this explicitly.
+Gates include SSH key-only config, nftables/IAP restrictions, absence of VPN,
+XRDP/Xorg session configuration, no empty XRDP password, and writable HOME
+surviving guest reboot. QEMU checks cannot validate IAM, the real Cloud VPC
+firewall, IAP tunnel, Google OS Login, GUI authentication, GCE disk retention
+or Dell credentials. Those remain real-world acceptance gates.
 
-## First login and access
+## IAM prerequisites (verify in GCP)
 
-1. Verify GCE serial boot/agent and SSH via OS Login/IAP. Do not claim it
-   works solely because `security.googleOsLogin.enable` evaluates.
-2. Connect Tailscale interactively (`sudo tailscale up`) in the VM.
-   Keep tailnet credentials out of image, metadata and CI logs.
-3. Via the authenticated SSH shell, set `klarkc`'s password securely
-   using `sudo passwd klarkc` in a real interactive terminal. Do not
-   pass a password via arguments or store a hash in the repository.
-   This enables XRDP; SSH remains key-only. Review whether `klarkc`
-   should have interactive sudo access before use.
-4. From the Dell in the tailnet, connect to `solo-workstation:3389`.
-   Check Xorg/XRDP login, XMonad fallback to XFCE, keyboard layout,
-   clipboard, display resize and reconnection. Tailscale is the sole
-   permitted RDP ingress interface on the guest firewall. Also check
-   the GCE VPC rules do not expose 3389.
-5. Run `bash workstations/scripts/bootstrap-dotfiles.sh` as `klarkc`
-   from a separate checkout of `klarkc/os`. It aborts on collisions.
-   `/home/klarkc/.git` must become the dotfiles checkout; **do not**
-   install `klarkc/dotfiles#default` as-is: it includes GPU/vLLM
-   and machine-specific assumptions. Review a CPU-only profile first.
+Enable `compute.googleapis.com` and `iap.googleapis.com`. Ensure the
+authenticated Dell principal can query `compute.instances.get` and
+`compute.instances.list` and has `iap.tunnelInstances.accessViaIAP`.
+Prefer `roles/iap.tunnelResourceAccessor` directly on the IAP resource for
+this VM, with IAM condition `destination.port == 3389` for daily desktop
+use. Do not give Instance Admin just to run RDP. For instance discovery,
+use a narrowly scoped custom viewer role if feasible.
 
-## Stop/start and persistence validation
+For one-time administration over port 22, use a distinct IAP binding
+condition `destination.port == 22`, Google OS Login with
+`roles/compute.osAdminLogin` for the admin principal, and project
+`compute.projects.get` for `gcloud compute ssh`. A VM service account may
+add `roles/iam.serviceAccountUser` requirements for SSH. Narrow the
+permissions and remove the SSH/22 IAP grant after initial setup if no
+longer needed. Do not persist credentials or tokens in versioned files.
 
-Write a uniquely named file inside `/home/klarkc`; stop the VM with
-`gcloud compute instances stop NAME --zone=southamerica-east1-b`
-(or Compute Engine API), and verify status `TERMINATED`. Check the
-persistent disk still exists. Start it, reconnect through OS Login and
-Tailscale, and verify the file, `/home/klarkc/.git`, passwords and
-graphical profile survive. Capture operation `DONE`, logs and evidence.
+Check whether the IAP instance IAM policy inherits broader project-level
+access, particularly Owner permissions. Instance-scoped condition does
+not override a broader inherited binding. Always verify the *effective*
+principal authorization for both ports.
 
-Stopping a VM does not automatically delete disk, snapshots or images.
-Do not configure automatic start/stop schedules without permission.
-If a provision operation fails, preserve the boot disk and diagnostic
-logs; avoid deleting the disk as a cleanup shortcut.
+Sources:
+https://docs.cloud.google.com/iap/docs/using-tcp-forwarding
+https://docs.cloud.google.com/compute/docs/oslogin/set-up-oslogin
+
+## VPC firewall: only proxy ingress
+
+First inspect the actual VM network; do not assume it uses `default`.
+The `solo-workstation-iap` network tag must be attached only to the
+intended workstation. After approval, add two INGRESS allow rules on
+that network, targeting only that tag:
+
+```bash
+# Set NETWORK to the VM's verified network name.
+gcloud compute firewall-rules create solo-workstation-iap-rdp \
+  --project=argon-surf-472319-b0 --network="$NETWORK" \
+  --direction=INGRESS --priority=900 --action=ALLOW \
+  --target-tags=solo-workstation-iap --source-ranges=35.235.240.0/20 \
+  --rules=tcp:3389
+
+gcloud compute firewall-rules create solo-workstation-iap-ssh \
+  --project=argon-surf-472319-b0 --network="$NETWORK" \
+  --direction=INGRESS --priority=900 --action=ALLOW \
+  --target-tags=solo-workstation-iap --source-ranges=35.235.240.0/20 \
+  --rules=tcp:22
+```
+
+Review `default-allow-ssh`, `default-allow-rdp`, global/hierarchical
+policies, target tags and effective ingress. A public `0.0.0.0/0`
+allow on 22 or 3389 applying to this VM is a **NO-GO** even if the
+NixOS firewall also restricts it. Port 51820/UDP must not be opened.
+
+```bash
+gcloud compute instances network-interfaces get-effective-firewalls \
+  solo-workstation --project=argon-surf-472319-b0 \
+  --zone=southamerica-east1-b --format=json
+bash workstations/scripts/gce-iap-preflight.sh
+```
+
+The read-only preflight checks IAP API, image metadata, VM shape and
+explicit firewall/IAM bindings. Independently review effective policy
+output; the script does not establish an end-to-end tunnel.
+
+## Network egress: compare before approval
+
+IAP TCP never requires a VM public IP. For outbound access to GitHub, Nix
+binary caches and SoloSIG, however, a VM without a public IP needs NAT or
+another existing approved egress path.
+
+- **Recommended for intermittent ~172 hours/month:** ephemeral external
+  IPv4 on the VM for outbound use only, with *no* public ingress to
+  TCP 3389/22, enforced by VPC *and* NixOS nftables. It is released
+  when the instance stops. The IP is not used for client connectivity.
+- **More isolated but costlier:** no VM external IP + Cloud NAT. Public NAT
+  has a per-VM gateway hourly fee, NAT IP hourly charge (including while
+  the NAT IP remains allocated), $0.045/GiB processed and normal egress.
+  A NAT gateway/IP is not an extra assurance of IAP authentication.
+
+Public IPv4 standard VM usage is published at US$0.005/hour; at 172h
+roughly US$0.86/month. For one NAT-assigned VM, the NAT service fee is
+US$0.0014/VM-hour plus a NAT IP at US$0.005/hour, plus $0.045/GiB
+processed (in addition to egress). If the NAT address remains allocated
+730h, the address alone costs about US$3.65. These are illustrative
+network components, not a complete invoice. Quote E2 São Paulo,
+150GiB pd-balanced for the *full* month, egress, image storage, taxes
+and all quotas before approving VM provisioning.
+
+Sources: https://cloud.google.com/vpc/pricing
+https://cloud.google.com/nat/pricing
+https://cloud.google.com/products/compute/pricing/general-purpose
+https://cloud.google.com/compute/disks-image-pricing
+
+## Image and provisioning (approval required)
+
+1. Verify completed CI for the exact commit, SHA256, `disk.raw` inside
+   `*.raw.tar.gz`, with no credential material baked into the image.
+2. Copy the archive into a private Cloud Storage bucket in an approved
+   location. Import with `gcloud compute images create ... --source-uri=gs://...`.
+   Do not use Debian/Ubuntu instead of the NixOS custom image.
+3. Confirm free quota in `southamerica-east1-b`, disk size and budget
+   alerts. Create the VM from that image with boot disk `pd-balanced`
+   persistent and `autoDelete=false`; assign the dedicated network tag
+   and metadata `enable-oslogin=TRUE`. Never add VPN keys or passwords.
+4. Choose ephemeral public egress IPv4 (preferred cost) or an explicitly
+   approved preexisting Cloud NAT path. No static IP required.
+5. Install the restrictive VPC firewall rules before attempting IAP.
+   Never expose public administrative/RDP ports as a workaround.
+
+## Interactive administration and XRDP login
+
+Only after authorized provisioning and IAM + firewall verification:
+
+```bash
+gcloud compute ssh solo-workstation \
+  --project=argon-surf-472319-b0 \
+  --zone=southamerica-east1-b --tunnel-through-iap
+# From inside the authenticated admin SSH tty:
+sudo solo-xrdp-set-password
+```
+
+This delegates to `passwd klarkc` and refuses non-interactive input.
+No password, hash or secret passes through shell arguments, metadata,
+Git, image store or CI. XRDP login remains locked until this succeeds.
+The OS Login account can be different from `klarkc`; verify it explicitly.
+
+Use a separate `klarkc/os` checkout to launch the guarded
+`workstations/scripts/bootstrap-dotfiles.sh` as `klarkc`. It creates
+the dotfiles Git checkout **directly at HOME**, only if there are no
+conflicting tracked paths. The existing `klarkc/dotfiles#default` profile
+still includes GPU/Arch-specific pieces; do not silently install them on
+the CPU-only workstation. SoloSIG environment/toolchain compatibility
+must be verified separately before claiming full parity.
+
+## Real Dell IAP/RDP acceptance, owned jointly with BuildClient
+
+The Dell's gcloud auth is BuildClient's responsibility; no auth state,
+tokens or secrets are baked into the ISO, server image or public Git.
+
+```bash
+gcloud compute start-iap-tunnel solo-workstation 3389 \
+  --project=argon-surf-472319-b0 \
+  --zone=southamerica-east1-b \
+  --local-host-port=localhost:13389
+# Keep the tunnel process running in another terminal.
+xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls
+```
+
+Record: authenticated tunnel establishment, actual remote TCP 3389,
+interactive graphical login as `klarkc`, Xorg/XMonad or XFCE,
+fullscreen/resizing, reconnect after IAP interruption, and post-stop/start
+return. The VM must retain `/home/klarkc/.git` and a real writable marker
+after a GCE stop/start, not just a QEMU reboot. Verify the boot disk remains
+attached and persistent. Do not claim E2E complete from green CI alone.
+
+**Cross-team dependency:** the BuildClient branch still contains obsolete
+VPN code per issue #21; BuildGCE does not modify that branch. The
+BuildClient must switch to IAP tunnel on localhost:13389, persist the
+client's Google authentication on the trusted Ventoy USB and implement
+readiness/reconnect/failure handling before real Dell acceptance.
