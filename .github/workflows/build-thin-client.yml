@@ -2,9 +2,10 @@ name: NixOS thin client + workstation CI
 on:
   workflow_dispatch:
   push:
-    branches:
-      - feat/ephemeral-thin-client-gcp-20261026
-      - main
+    paths:
+      - "workstations/**"
+      - ".github/workflows/build-thin-client.yml"
+  pull_request:
     paths:
       - "workstations/**"
       - ".github/workflows/build-thin-client.yml"
@@ -33,7 +34,7 @@ jobs:
           nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
 
   boot-vm:
-    name: Boot two NixOS VMs and test services
+    name: Boot VMs and verify Ventoy USB state after reboot
     needs: evaluate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -44,17 +45,23 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
-      - name: Verify client and GCE server in QEMU VMs
+      - name: Test client/server and USB persistence in QEMU
         run: |
           set -euo pipefail
+          mkdir -p vm-logs
           cd workstations
-          nix build -L .#checks.x86_64-linux.boot-and-network-vm
-      - uses: actions/upload-artifact@v4
+          nix build -L --max-jobs 1 \
+            .#checks.x86_64-linux.boot-and-network-vm \
+            .#checks.x86_64-linux.ventoy-usb-persistence-vm \
+            2>&1 | tee ../vm-logs/nixos-vm-tests.log
+      - name: Upload VM logs on failure
         if: failure()
+        uses: actions/upload-artifact@v4
         with:
           name: nixos-vm-failure-logs
-          path: workstations/result/
-          if-no-files-found: ignore
+          path: vm-logs/
+          if-no-files-found: error
+          retention-days: 7
 
   iso:
     name: Build Ventoy ISO
