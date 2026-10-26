@@ -69,7 +69,8 @@ jobs:
 
   iso:
     name: Build Ventoy ISO
-    needs: evaluate
+    # Do not publish an untested ISO. VM boot + USB reboot must pass first.
+    needs: [evaluate, boot-vm]
     runs-on: ubuntu-24.04
     timeout-minutes: 120
     steps:
