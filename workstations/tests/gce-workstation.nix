@@ -19,8 +19,11 @@ pkgs.testers.runNixOSTest {
     server.succeed("test -d /home/klarkc")
     server.succeed("test -e /run/current-system/sw/bin/git")
     server.succeed("ss -lnt | grep ':3389'")
-    server.succeed("sshd -T | grep -Fx 'passwordauthentication no'")
-    server.succeed("sshd -T | grep -Fx 'permitrootlogin prohibit-password'")
+    status, effective_ssh = server.execute("${pkgs.openssh}/bin/sshd -T -f /etc/ssh/sshd_config 2>&1")
+    print("sshd effective policy:", [line for line in effective_ssh.splitlines() if line.startswith(("passwordauthentication ", "permitrootlogin "))])
+    assert status == 0, f"sshd -T could not inspect generated configuration: {effective_ssh}"
+    assert "passwordauthentication no" in effective_ssh.splitlines(), "SSH password authentication must be disabled"
+    assert "permitrootlogin prohibit-password" in effective_ssh.splitlines(), "Root SSH must require key authentication"
     server.succeed("test -e /run/current-system/sw/bin/tailscale")
     server.succeed("test -e /run/current-system/sw/bin/xfce4-session")
     server.succeed("getent passwd klarkc | grep '^klarkc:'")
