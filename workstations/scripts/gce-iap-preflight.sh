@@ -64,9 +64,38 @@ for port in 3389 22; do
 done
 
 # Effective policies are more important than the two intended allow rules.
-# Keep this output private because it might describe unrelated firewall rules.
+# Fail closed for broad admin allows or unfamiliar hierarchical policies.
+# Keep the raw JSON private: it can describe other project resources.
 if gcloud compute instances network-interfaces get-effective-firewalls "$instance" --project="$project" --zone="$zone" --format=json >"$tmp/effective.json" 2>"$tmp/effective.err"; then
-  echo "CHECK: effective VPC/hierarchical firewall inventory obtained (review all allow rules for 22/3389)"
+  label="effective VPC rules have no public/global admin ingress"
+  check jq -e --arg cidr "$iap_cidr" '
+    def port_covers($wanted):
+      (split("-") | map(tonumber)) as $v |
+      if ($v | length) == 1 then $v[0] == $wanted
+      else $v[0] <= $wanted and $v[1] >= $wanted end;
+    def allows_admin:
+      any(.allowed[]?;
+        (.IPProtocol == "all") or
+        (.IPProtocol == "tcp" and
+          ((.ports // []) as $ports |
+            ($ports | length) == 0 or
+            any($ports[]; port_covers(22) or port_covers(3389))
+          )
+        )
+      );
+    type == "object"
+    and ((.firewalls // []) | all(.[];
+      (.disabled == true) or (.direction != "INGRESS") or (allows_admin | not)
+      or (
+        (.sourceRanges // []) == [$cidr]
+        and ((.sourceTags // []) | length == 0)
+        and ((.sourceServiceAccounts // []) | length == 0)
+      )
+    ))
+    and ((.firewallPolicys // []) | length == 0)
+  ' "$tmp/effective.json"
+  # Unknown hierarchical/global rules require explicit operator review;
+  # they MUST NOT silently satisfy the audit.
 else
   echo "FAIL: effective VPC firewall cannot be inspected" >&2
   status=1
@@ -86,7 +115,7 @@ if gcloud services list --enabled --project="$project" --format="value(config.na
       label="instance-scoped, port-3389 IAP tunnel IAM binding"
       check jq -e 'any(.bindings[]?;
         .role == "roles/iap.tunnelResourceAccessor"
-        and ((.condition.expression // "") | contains("destination.port == 3389"))
+        and ((.condition.expression // "" | gsub("[[:space:]]"; "")) == "destination.port==3389")
       )' "$tmp/iap-policy.json"
     else
       unset token
