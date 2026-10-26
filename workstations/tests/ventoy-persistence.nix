@@ -66,7 +66,7 @@ pkgs.testers.runNixOSTest {
 
     # gcloud auth login (NOT application-default login) uses the CLI SQLite
     # database and config_default. No real Google account or secret in CI.
-    client.succeed("install -d -m 700 -o nixos -g users /home/nixos/.config/solo-gcloud/configurations")
+    client.succeed("install -d -m 700 -o nixos -g users /home/nixos/.config /home/nixos/.config/solo-gcloud /home/nixos/.config/solo-gcloud/configurations")
     client.succeed("runuser -u nixos -- sqlite3 /home/nixos/.config/solo-gcloud/credentials.db 'CREATE TABLE ci_fixture (token TEXT NOT NULL)'")
     client.succeed("runuser -u nixos -- sqlite3 /home/nixos/.config/solo-gcloud/credentials.db \"INSERT INTO ci_fixture VALUES ('ci-synthetic-only')\"")
     client.succeed("printf '%s\\n' '[core]' 'account = ci@example.invalid' > /home/nixos/.config/solo-gcloud/configurations/config_default")
