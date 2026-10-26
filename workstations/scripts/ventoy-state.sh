@@ -80,7 +80,9 @@ restore_state() {
       echo "Refusing to restore Google credentials through symlinks." >&2
       return 1
     fi
-    install -d -m 0700 -o nixos -g users "$GCLOUD_CONFIG" "$GCLOUD_CONFIG/configurations"
+    # The intermediate ~/.config directory must also be user-owned; otherwise
+    # gcloud and sqlite cannot traverse it after a root boot-time restore.
+    install -d -m 0700 -o nixos -g users /home/nixos/.config "$GCLOUD_CONFIG" "$GCLOUD_CONFIG/configurations"
     install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/credentials.db" "$GCLOUD_DB"
     install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/config_default" "$GCLOUD_DEFAULT"
   fi
