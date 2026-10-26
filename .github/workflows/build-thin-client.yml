@@ -36,6 +36,10 @@ jobs:
           nix flake check --no-build --show-trace
           nix eval --raw .#nixosConfigurations.thin-client.config.networking.hostName
           nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.security.googleOsLogin.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PasswordAuthentication)" = false
+          test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PermitRootLogin)" = prohibit-password
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.firewall.interfaces.tailscale0.allowedTCPPorts)" = '[3389]'
 
   boot-vm:
     name: Boot VMs and verify Ventoy USB state after reboot
