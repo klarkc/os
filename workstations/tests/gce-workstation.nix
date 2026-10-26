@@ -10,7 +10,9 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    start_all()
+    # QEMU's default -no-reboot option makes a guest reboot terminate the VM.
+    # Keep this SAME QEMU process and its writable disk across the restart.
+    server.start(allow_reboot=True)
     server.wait_for_unit("multi-user.target")
     server.wait_for_unit("xrdp.service")
     server.wait_for_unit("xrdp-sesman.service")
@@ -58,8 +60,16 @@ pkgs.testers.runNixOSTest {
     server.succeed("install -d -m 0700 -o klarkc -g users /home/klarkc/.local/state")
     server.succeed("printf 'gce-iap-ci-marker\n' > /home/klarkc/.local/state/gce-iap-ci-marker")
     server.succeed("chown klarkc:users /home/klarkc/.local/state/gce-iap-ci-marker")
-    server.reboot()
+    old_boot_id = server.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+    # Unlike QEMU's Ctrl+Alt+Delete key, systemd reboot cannot be intercepted
+    # by a graphical display manager. Schedule it so the test-driver root shell
+    # can return cleanly before systemd tears down the guest.
+    server.succeed("systemd-run --unit=ci-graceful-reboot --on-active=2s /run/current-system/sw/bin/systemctl reboot")
+    server.connected = False
     server.wait_for_unit("multi-user.target")
+    assert server.succeed("cat /proc/sys/kernel/random/boot_id").strip() != old_boot_id, (
+        "QEMU did not perform a real guest reboot"
+    )
     server.wait_for_unit("xrdp.service")
     server.wait_for_unit("xrdp-sesman.service")
     server.succeed("grep -Fx 'gce-iap-ci-marker' /home/klarkc/.local/state/gce-iap-ci-marker")

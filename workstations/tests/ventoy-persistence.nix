@@ -39,7 +39,9 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    start_all()
+    # Keep the exact same QEMU process across guest reboot. The emulated USB
+    # uses snapshot=on (COW), and its state would vanish if QEMU were replaced.
+    client.start(allow_reboot=True)
     client.wait_for_unit("multi-user.target")
     client.wait_for_unit("NetworkManager.service")
 
@@ -72,8 +74,15 @@ pkgs.testers.runNixOSTest {
     client.succeed("rm /var/lib/tailscale/tailscaled.state")
 
     client.succeed("rm /etc/NetworkManager/system-connections/solo-ci.nmconnection")
-    client.reboot()
+    old_boot_id = client.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+    # A display manager can swallow Ctrl+Alt+Delete; schedule a real systemd
+    # reboot, preserving the QEMU USB snapshot through the same process.
+    client.succeed("systemd-run --unit=ci-graceful-reboot --on-active=2s /run/current-system/sw/bin/systemctl reboot")
+    client.connected = False
     client.wait_for_unit("multi-user.target")
+    assert client.succeed("cat /proc/sys/kernel/random/boot_id").strip() != old_boot_id, (
+        "QEMU did not perform a real guest reboot"
+    )
     client.wait_for_unit("NetworkManager.service")
 
     # The USB COW overlay persists across guest reboot in the SAME QEMU VM.
