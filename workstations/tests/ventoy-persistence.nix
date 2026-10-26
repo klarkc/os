@@ -26,7 +26,8 @@ pkgs.testers.runNixOSTest {
       extraGroups = [ "wheel" "networkmanager" "video" ];
       initialPassword = "test-only";
     };
-    security.sudo.wheelNeedsPassword = false;
+    # Ensure tests exercise the explicit NOPASSWD helper allowlist.
+    security.sudo.wheelNeedsPassword = true;
 
     virtualisation.memorySize = 2048;
     virtualisation.graphics = true;
@@ -61,21 +62,41 @@ pkgs.testers.runNixOSTest {
     client.succeed("solo-client-state set-host solo-ci-server")
     client.succeed("solo-client-state save")
     # The live-image user must be able to persist state without a password.
-    client.succeed("runuser -u nixos -- sudo -n solo-client-state save")
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state save")
     client.succeed("grep -Fx 'psk=ci-test-password' /run/solo-client/ventoy/solo-client/wifi/solo-ci.nmconnection")
     client.succeed("test \"$(solo-client-state get-host)\" = solo-ci-server")
 
-    # Verify state restore for Tailscale without contacting the coordination
-    # service or requiring a real authentication token.
-    client.succeed("systemctl stop tailscaled.service")
-    client.succeed("printf 'ci-synthetic-tailscale-state\\n' > /var/lib/tailscale/tailscaled.state")
-    client.succeed("solo-client-state save")
-    client.succeed("rm /var/lib/tailscale/tailscaled.state")
-    client.succeed("solo-client-state restore")
-    client.succeed("grep -Fx 'ci-synthetic-tailscale-state' /var/lib/tailscale/tailscaled.state")
-    # Do not pass a deliberately invalid fixture to a real tailscaled at boot.
-    client.succeed("rm /run/solo-client/ventoy/solo-client/tailscaled.state")
-    client.succeed("rm /var/lib/tailscale/tailscaled.state")
+    # A harmless fixture in place of a real Google OAuth refresh token.
+    # The whole Google config directory is NOT saved to the Ventoy drive.
+    client.succeed("install -d -m 700 -o nixos -g users /home/nixos/.config/gcloud")
+    client.succeed("printf '%s\n' '{\"type\":\"authorized_user\",\"client_id\":\"ci-synthetic-only\"}' > /home/nixos/.config/gcloud/application_default_credentials.json")
+    client.succeed("chown nixos:users /home/nixos/.config/gcloud/application_default_credentials.json")
+    client.succeed("chmod 600 /home/nixos/.config/gcloud/application_default_credentials.json")
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state save")
+    client.succeed("grep -F 'ci-synthetic-only' /run/solo-client/ventoy/solo-client/google-adc.json")
+    client.succeed("! test -e /run/solo-client/ventoy/solo-client/credentials.db")
+
+    # The WireGuard private key is generated ONCE, exclusively on the USB.
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state init-wg")
+    client.succeed("test -s /run/solo-client/ventoy/solo-client/wireguard/client.key")
+    first_wg_public = client.succeed("sudo -n /run/current-system/sw/bin/solo-client-state wg-public").strip()
+    assert len(first_wg_public) == 44
+
+    # Validate offline GCE API response parsing before any real Google login.
+    client.succeed("printf '{\"status\":\"RUNNING\",\"networkInterfaces\":[{\"accessConfigs\":[{\"natIP\":\"203.0.113.17\"}]}],\"metadata\":{\"items\":[{\"key\":\"solo-wg-server-public-key\",\"value\":\"%s\"}]}}' \"$(sudo -n /run/current-system/sw/bin/solo-client-state wg-public)\" | runuser -u nixos -- /run/current-system/sw/bin/solo-gce-endpoint parse | cut -f1 | grep -Fx 203.0.113.17")
+    client.succeed("! printf '{\"status\":\"TERMINATED\"}' | /run/current-system/sw/bin/solo-gce-endpoint parse")
+    client.succeed("! printf '{\"status\":\"RUNNING\",\"networkInterfaces\":[{\"accessConfigs\":[{\"natIP\":\"999.999.999.999\"}]}]}' | /run/current-system/sw/bin/solo-gce-endpoint parse")
+
+    # The helper accepts a peer public key but installs only a private route,
+    # never a default route or an externally reachable RDP listener.
+    peer_public = client.succeed("wg genkey | wg pubkey").strip()
+    client.succeed(f"runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-wg connect 203.0.113.17 {peer_public}")
+    client.succeed("ip -4 route get 10.77.0.1 | grep -F solo-wg")
+    client.succeed("wg show solo-wg endpoints | grep -F '203.0.113.17:51820'")
+    client.succeed("! ip -4 route show default | grep -F solo-wg")
+
+    # Simulate RAM being discarded at power-off; keep the USB overlay intact.
+    client.succeed("rm /home/nixos/.config/gcloud/application_default_credentials.json")
 
     client.succeed("rm /etc/NetworkManager/system-connections/solo-ci.nmconnection")
 
@@ -100,6 +121,11 @@ pkgs.testers.runNixOSTest {
     client.succeed("grep -Fx 'psk=ci-test-password' /etc/NetworkManager/system-connections/solo-ci.nmconnection")
     client.succeed("test \"$(solo-client-state get-host)\" = solo-ci-server")
     client.succeed("nmcli -t -f NAME con show | grep -Fx 'solo-ci-wifi'")
+    client.succeed("grep -F 'ci-synthetic-only' /home/nixos/.config/gcloud/application_default_credentials.json")
+    client.succeed("test \"$(stat -c %a /home/nixos/.config/gcloud/application_default_credentials.json)\" = 600")
+    client.succeed("test \"$(stat -c %U /home/nixos/.config/gcloud/application_default_credentials.json)\" = nixos")
+    second_wg_public = client.succeed("sudo -n /run/current-system/sw/bin/solo-client-state wg-public").strip()
+    assert second_wg_public == first_wg_public, "USB WireGuard private key rotated after reboot"
     client.succeed("test \"$(stat -c %a /etc/NetworkManager/system-connections/solo-ci.nmconnection)\" = 600")
   '';
 }
