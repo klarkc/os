@@ -25,7 +25,7 @@ while true; do
   host="$(sudo solo-client-state get-host 2>/dev/null || echo solo-workstation)"
   echo "Connecting to workstation: $host"
   echo "RDP will ask for your SERVER credentials, not a local login."
-  xfreerdp3 /v:"$host" /f /dynamic-resolution /cert:tofu \
+  xfreerdp /v:"$host" /f /dynamic-resolution /cert:tofu \
     /clipboard /network:auto /sec:tls || true
   echo "Disconnected. Retrying; Ctrl+C returns to client recovery."
   sleep 3
