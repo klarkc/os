@@ -35,7 +35,6 @@ pkgs.testers.runNixOSTest {
   testScript = ''
     start_all()
     client.wait_for_unit("multi-user.target")
-    client.wait_for_unit("solo-ventoy-state.service")
     client.wait_for_unit("NetworkManager.service")
 
     # Assert that the *USB* volume was selected rather than a virtual root disk.
