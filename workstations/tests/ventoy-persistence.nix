@@ -74,12 +74,20 @@ pkgs.testers.runNixOSTest {
     client.succeed("chmod 600 /home/nixos/.config/solo-gcloud/configurations/config_default")
     client.succeed("runuser -u nixos -- /run/current-system/sw/bin/solo-gce-iap has-credentials")
 
+    # A TLS pin must survive power loss so FreeRDP /cert:tofu does not
+    # silently accept a different XRDP server certificate next boot.
+    client.succeed("install -d -m 700 -o nixos -g users /home/nixos/.config/freerdp /home/nixos/.config/freerdp/server")
+    client.succeed("printf '%s\\n' 'ci-xrdp-certificate' > /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+    client.succeed("chown nixos:users /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+    client.succeed("chmod 600 /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+
     # Only the exact save command has passwordless sudo. In particular the
     # unprivileged user cannot call the boot-time root restore helper.
     client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state save")
     client.succeed("runuser -u nixos -- sh -c '! sudo -n /run/current-system/sw/bin/solo-client-state restore'")
     client.succeed("sqlite3 /run/solo-client/ventoy/solo-client/gcloud-cli/credentials.db 'SELECT token FROM ci_fixture' | grep -Fx ci-synthetic-only")
     client.succeed("grep -Fx 'account = ci@example.invalid' /run/solo-client/ventoy/solo-client/gcloud-cli/config_default")
+    client.succeed("grep -Fx 'ci-xrdp-certificate' /run/solo-client/ventoy/solo-client/freerdp/server/127.0.0.1_13389.pem")
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/gcloud-cli/access_tokens.db")
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/gcloud-cli/logs")
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/google-adc.json")
@@ -106,6 +114,7 @@ pkgs.testers.runNixOSTest {
     # Simulate removal of volatile RAM state while the USB overlay persists.
     client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")
     client.succeed("rm /home/nixos/.config/solo-gcloud/configurations/config_default")
+    client.succeed("rm /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
     client.succeed("rm /etc/NetworkManager/system-connections/solo-ci.nmconnection")
 
     first_boot_id = client.succeed("cat /proc/sys/kernel/random/boot_id").strip()
@@ -130,6 +139,8 @@ pkgs.testers.runNixOSTest {
     client.succeed("nmcli -t -f NAME con show | grep -Fx 'solo-ci-wifi'")
     client.succeed("sqlite3 /home/nixos/.config/solo-gcloud/credentials.db 'SELECT token FROM ci_fixture' | grep -Fx ci-synthetic-only")
     client.succeed("grep -Fx 'account = ci@example.invalid' /home/nixos/.config/solo-gcloud/configurations/config_default")
+    client.succeed("grep -Fx 'ci-xrdp-certificate' /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+    client.succeed("test \"$(stat -c %U /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem)\" = nixos")
     client.succeed("runuser -u nixos -- /run/current-system/sw/bin/solo-gce-iap has-credentials")
     client.succeed("test \"$(stat -c %a /home/nixos/.config/solo-gcloud/credentials.db)\" = 600")
     client.succeed("test \"$(stat -c %U /home/nixos/.config/solo-gcloud/credentials.db)\" = nixos")

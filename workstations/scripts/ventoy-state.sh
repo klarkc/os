@@ -12,6 +12,8 @@ GCLOUD_CONFIG=/home/nixos/.config/solo-gcloud
 GCLOUD_STORE="$DATA/gcloud-cli"
 GCLOUD_DB="$GCLOUD_CONFIG/credentials.db"
 GCLOUD_DEFAULT="$GCLOUD_CONFIG/configurations/config_default"
+FREERDP_DIR=/home/nixos/.config/freerdp
+FREERDP_STORE="$DATA/freerdp"
 
 is_ready() {
   mountpoint -q "$MOUNT"
@@ -86,6 +88,21 @@ restore_state() {
     install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/credentials.db" "$GCLOUD_DB"
     install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/config_default" "$GCLOUD_DEFAULT"
   fi
+
+  # FreeRDP 3 pins the server certificate under ~/.config/freerdp/server.
+  # Reuse the pin after reboot; never weaken TLS to /cert:ignore.
+  if [[ -d "$FREERDP_STORE/server" && ! -L "$FREERDP_STORE/server" ]]; then
+    install -d -m 0700 -o nixos -g users /home/nixos/.config "$FREERDP_DIR" "$FREERDP_DIR/server"
+    local cert
+    for cert in "$FREERDP_STORE/server/"*.pem; do
+      [[ -f "$cert" && ! -L "$cert" ]] || continue
+      install -m 0600 -o nixos -g users -- "$cert" "$FREERDP_DIR/server/$(basename "$cert")"
+    done
+  fi
+  if [[ -s "$FREERDP_STORE/known_hosts2" && ! -L "$FREERDP_STORE/known_hosts2" ]]; then
+    install -d -m 0700 -o nixos -g users /home/nixos/.config "$FREERDP_DIR"
+    install -m 0600 -o nixos -g users -- "$FREERDP_STORE/known_hosts2" "$FREERDP_DIR/known_hosts2"
+  fi
 }
 
 save_state() {
@@ -119,6 +136,26 @@ save_state() {
     cp -- "$GCLOUD_DEFAULT" "$temp"
     chmod 0600 "$temp"
     mv -f -- "$temp" "$GCLOUD_STORE/config_default"
+  fi
+
+  # Keep TOFU certificate pins across disposable live reboots.
+  if [[ -d "$FREERDP_DIR/server" && ! -L "$FREERDP_DIR/server" ]]; then
+    mkdir -p "$FREERDP_STORE/server"
+    local cert
+    for cert in "$FREERDP_DIR/server/"*.pem; do
+      [[ -f "$cert" && ! -L "$cert" ]] || continue
+      temp="$(mktemp "$FREERDP_STORE/server/.cert.XXXXXXXX")"
+      cp -- "$cert" "$temp"
+      chmod 0600 "$temp"
+      mv -f -- "$temp" "$FREERDP_STORE/server/$(basename "$cert")"
+    done
+  fi
+  if [[ -s "$FREERDP_DIR/known_hosts2" && ! -L "$FREERDP_DIR/known_hosts2" ]]; then
+    mkdir -p "$FREERDP_STORE"
+    temp="$(mktemp "$FREERDP_STORE/.known-hosts.XXXXXXXX")"
+    cp -- "$FREERDP_DIR/known_hosts2" "$temp"
+    chmod 0600 "$temp"
+    mv -f -- "$temp" "$FREERDP_STORE/known_hosts2"
   fi
 
   sync -f "$MOUNT" || sync

@@ -16,7 +16,9 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
   `credentials.db` and `configurations/config_default` are backed up to
   the **unencrypted, trusted Ventoy** USB as root-only exFAT files.
   `sqlite3 .backup` ensures a consistent copy during any credential refresh.
-  No logs, CLI caches or ADC tokens are persisted.
+  No logs, CLI caches or ADC tokens are persisted. FreeRDP's TLS TOFU
+  certificate pins are also saved and restored (FreeRDP 3 server/*.pem;
+  legacy known_hosts2), preventing silent certificate acceptance each boot.
 - Boot restore runs before NetworkManager; Wi-Fi profiles restore from USB.
 - No configuration or secrets are written to internal Dell HDD.
 - Credentials restored on subsequent boots avoid repeated login unless
