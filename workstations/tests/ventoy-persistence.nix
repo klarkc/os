@@ -84,7 +84,11 @@ pkgs.testers.runNixOSTest {
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/gcloud-cli/logs")
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/google-adc.json")
     client.succeed("! test -e /run/solo-client/ventoy/solo-client/wireguard")
-    client.succeed("test \"$(stat -c %a /run/solo-client/ventoy/solo-client/gcloud-cli/credentials.db)\" = 600")
+    # exFAT represents regular files with 0700 under umask=077: unlike
+    # POSIX home state, chmod 0600 is not a per-file property on exFAT.
+    # Assert only root can access the USB credential (no group/other bits).
+    client.succeed("test -z \"$(find /run/solo-client/ventoy/solo-client/gcloud-cli/credentials.db -perm /077 -print)\"")
+    client.succeed("test \"$(stat -c %U /run/solo-client/ventoy/solo-client/gcloud-cli/credentials.db)\" = root")
 
     # Offline fake gcloud validates IAP CLI arguments; it never logs in,
     # contacts Google or uses a public endpoint. The real IAP is BuildGCE E2E.
