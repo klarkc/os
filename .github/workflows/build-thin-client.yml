@@ -10,6 +10,10 @@ on:
       - "workstations/**"
       - ".github/workflows/build-thin-client.yml"
 
+concurrency:
+  group: nixos-workstations-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
