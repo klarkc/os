@@ -64,7 +64,7 @@
             client.succeed("systemctl is-active tailscaled.service")
             client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
             client.succeed("test -e /run/current-system/sw/bin/solo-client-state")
-            client.succeed("test -e /run/current-system/sw/bin/xfreerdp3")
+            client.succeed("test -e /run/current-system/sw/bin/xfreerdp")
             client.succeed("! mountpoint -q /run/solo-client/ventoy")
             client.succeed("test ! -d /run/solo-client/ventoy/solo-client")
             client.succeed("systemctl start solo-save-state.service")
