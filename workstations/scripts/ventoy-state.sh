@@ -8,6 +8,9 @@ MOUNT=/run/solo-client/ventoy
 DATA="$MOUNT/solo-client"
 NM_DIR=/etc/NetworkManager/system-connections
 TS_STATE=/var/lib/tailscale/tailscaled.state
+ADC=/home/nixos/.config/gcloud/application_default_credentials.json
+WG_DIR="$DATA/wireguard"
+umask 077
 
 is_ready() {
   mountpoint -q "$MOUNT"
@@ -73,6 +76,14 @@ restore_state() {
     cp -- "$DATA/tailscaled.state" "$TS_STATE"
     chmod 0600 "$TS_STATE"
   fi
+  # Only the restricted Compute Engine ADC credential is persisted. Never
+  # copy the rest of ~/.config/gcloud, token caches or application logs.
+  if [[ -s "$DATA/google-adc.json" && ! -L "$DATA/google-adc.json" ]]; then
+    mkdir -p /home/nixos/.config/gcloud
+    chown nixos:users /home/nixos/.config /home/nixos/.config/gcloud
+    chmod 0700 /home/nixos/.config /home/nixos/.config/gcloud
+    install -o nixos -g users -m 0600 -- "$DATA/google-adc.json" "$ADC"
+  fi
 }
 
 save_state() {
@@ -93,8 +104,35 @@ save_state() {
     cp -- "$TS_STATE" "$temp"
     mv -f -- "$temp" "$DATA/tailscaled.state"
   fi
+  if [[ -s "$ADC" && ! -L "$ADC" ]]; then
+    # The Ventoy mount is root-owned (umask=077). USB encryption is
+    # intentionally NOT used; losing the drive exposes this OAuth grant.
+    temp="$(mktemp "$DATA/.google-adc.XXXXXXXX")"
+    cp -- "$ADC" "$temp"
+    mv -f -- "$temp" "$DATA/google-adc.json"
+  fi
   sync -f "$MOUNT" || sync
   echo "State saved on Ventoy USB."
+}
+
+init_wg() {
+  prepare_usb || { echo "USB Ventoy is required for WireGuard keys." >&2; return 1; }
+  mkdir -p "$WG_DIR"
+  local temp
+  if [[ ! -s "$WG_DIR/client.key" ]]; then
+    temp="$(mktemp "$WG_DIR/.client-key.XXXXXXXX")"
+    wg genkey > "$temp"
+    # Do not overwrite a previously provisioned peer identity.
+    if [[ ! -s "$WG_DIR/client.key" ]]; then
+      mv -f -- "$temp" "$WG_DIR/client.key"
+    else
+      rm -f -- "$temp"
+    fi
+  fi
+  temp="$(mktemp "$WG_DIR/.client-pub.XXXXXXXX")"
+  wg pubkey < "$WG_DIR/client.key" > "$temp"
+  mv -f -- "$temp" "$WG_DIR/client.pub"
+  sync -f "$WG_DIR/client.key"
 }
 
 set_host() {
@@ -119,7 +157,13 @@ get_host() {
 case "${1:-}" in
   restore) restore_state ;;
   save) save_state ;;
+  is-ready) is_ready ;;
+  init-wg) init_wg ;;
+  wg-public)
+    init_wg
+    cat "$WG_DIR/client.pub"
+    ;;
   set-host) set_host "${2:-}" ;;
   get-host) get_host ;;
-  *) echo "Usage: solo-client-state {restore|save|get-host|set-host HOST}" >&2; exit 2 ;;
+  *) echo "Usage: solo-client-state {restore|save|is-ready|init-wg|wg-public|get-host|set-host HOST}" >&2; exit 2 ;;
 esac
