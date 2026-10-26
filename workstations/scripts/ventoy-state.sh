@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-# Persistent state on the *existing* Ventoy data partition.
-# No format, partition, filesystem creation, or access to internal disks.
-# USB is trusted by the owner. Contents are NOT encrypted.
+# Persist Wi-Fi and the dedicated gcloud CLI identity on an EXISTING,
+# trusted Ventoy USB. Never format or access the Dell's internal disk.
+# The USB is intentionally NOT encrypted: possession exposes its secrets.
 set -euo pipefail
+umask 077
 
 MOUNT=/run/solo-client/ventoy
 DATA="$MOUNT/solo-client"
 NM_DIR=/etc/NetworkManager/system-connections
-TS_STATE=/var/lib/tailscale/tailscaled.state
-ADC=/home/nixos/.config/gcloud/application_default_credentials.json
-WG_DIR="$DATA/wireguard"
-umask 077
+GCLOUD_CONFIG=/home/nixos/.config/solo-gcloud
+GCLOUD_STORE="$DATA/gcloud-cli"
+GCLOUD_DB="$GCLOUD_CONFIG/credentials.db"
+GCLOUD_DEFAULT="$GCLOUD_CONFIG/configurations/config_default"
 
 is_ready() {
   mountpoint -q "$MOUNT"
@@ -26,32 +27,29 @@ prepare_usb() {
     sleep 0.5
   done
   if [[ ! -e /dev/disk/by-label/Ventoy ]]; then
-    echo "Ventoy data partition (label: Ventoy) not found: using volatile configuration." >&2
+    echo "Ventoy data partition not found. Refusing persistent Google login." >&2
     return 1
   fi
 
   device="$(readlink -f /dev/disk/by-label/Ventoy)"
   parent="$(lsblk -no PKNAME "$device" | head -n 1)"
   if [[ -z "$parent" ]]; then
-    echo "Refusing to mount Ventoy label: parent disk not determined." >&2
+    echo "Refusing Ventoy mount: parent disk not determined." >&2
     return 1
   fi
   transport="$(lsblk -dno TRAN "/dev/$parent" | head -n 1)"
   if [[ "$transport" != "usb" ]]; then
-    echo "Refusing to mount Ventoy label: parent transport is not USB." >&2
+    echo "Refusing Ventoy mount: parent disk is not USB." >&2
     return 1
   fi
 
   fs="$(lsblk -no FSTYPE "$device" | head -n 1)"
   options="rw,nosuid,nodev,noexec"
   case "$fs" in
-    exfat|vfat|ntfs|ntfs3)
-      options="$options,uid=0,gid=0,umask=077"
-      ;;
+    exfat|vfat|ntfs|ntfs3) options="$options,uid=0,gid=0,umask=077" ;;
   esac
-
   if ! mount -o "$options" "$device" "$MOUNT"; then
-    echo "Cannot mount Ventoy data partition read/write; no state persisted." >&2
+    echo "Ventoy partition is not writable; nothing will be persisted." >&2
     return 1
   fi
   if ! (touch "$MOUNT/.solo-client-write-test" && rm "$MOUNT/.solo-client-write-test"); then
@@ -59,111 +57,78 @@ prepare_usb() {
     umount "$MOUNT" || true
     return 1
   fi
-  mkdir -p "$DATA/wifi"
-  echo "Using Ventoy USB for persistent Wi-Fi and Tailscale state."
+  mkdir -p "$DATA/wifi" "$GCLOUD_STORE"
+  echo "Using trusted Ventoy USB for persistent Wi-Fi and gcloud CLI login."
 }
 
 restore_state() {
   prepare_usb || return 0
-  mkdir -p "$NM_DIR" /var/lib/tailscale
+  mkdir -p "$NM_DIR"
   local profile
   for profile in "$DATA/wifi/"*.nmconnection; do
     [[ -f "$profile" && ! -L "$profile" ]] || continue
-    cp -- "$profile" "$NM_DIR/$(basename "$profile")"
-    chmod 0600 "$NM_DIR/$(basename "$profile")"
+    install -m 0600 -- "$profile" "$NM_DIR/$(basename "$profile")"
   done
-  if [[ -s "$DATA/tailscaled.state" && ! -L "$DATA/tailscaled.state" ]]; then
-    cp -- "$DATA/tailscaled.state" "$TS_STATE"
-    chmod 0600 "$TS_STATE"
-  fi
-  # Only the restricted Compute Engine ADC credential is persisted. Never
-  # copy the rest of ~/.config/gcloud, token caches or application logs.
-  if [[ -s "$DATA/google-adc.json" && ! -L "$DATA/google-adc.json" ]]; then
-    mkdir -p /home/nixos/.config/gcloud
-    chown nixos:users /home/nixos/.config /home/nixos/.config/gcloud
-    chmod 0700 /home/nixos/.config /home/nixos/.config/gcloud
-    install -o nixos -g users -m 0600 -- "$DATA/google-adc.json" "$ADC"
+
+  # gcloud auth login stores CLI credentials in credentials.db, NOT in
+  # application_default_credentials.json (ADC). Copy only the CLI database
+  # and default account config; exclude access token caches and logs.
+  if [[ -s "$GCLOUD_STORE/credentials.db" && -s "$GCLOUD_STORE/config_default" &&
+        ! -L "$GCLOUD_STORE/credentials.db" && ! -L "$GCLOUD_STORE/config_default" ]]; then
+    if [[ -L "$GCLOUD_CONFIG" || -L "$GCLOUD_CONFIG/configurations" ||
+          -L "$GCLOUD_DB" || -L "$GCLOUD_DEFAULT" ]]; then
+      echo "Refusing to restore Google credentials through symlinks." >&2
+      return 1
+    fi
+    install -d -m 0700 -o nixos -g users "$GCLOUD_CONFIG" "$GCLOUD_CONFIG/configurations"
+    install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/credentials.db" "$GCLOUD_DB"
+    install -m 0600 -o nixos -g users -- "$GCLOUD_STORE/config_default" "$GCLOUD_DEFAULT"
   fi
 }
 
 save_state() {
   if ! is_ready; then
-    echo "Ventoy persistence unavailable; skipping save." >&2
+    echo "Ventoy persistence unavailable. Refusing to save secrets to any disk." >&2
     return 1
   fi
-  mkdir -p "$DATA/wifi"
+  mkdir -p "$DATA/wifi" "$GCLOUD_STORE"
   local profile temp
   for profile in "$NM_DIR/"*.nmconnection; do
     [[ -f "$profile" && ! -L "$profile" ]] || continue
     temp="$(mktemp "$DATA/wifi/.wifi.XXXXXXXX")"
     cp -- "$profile" "$temp"
+    chmod 0600 "$temp"
     mv -f -- "$temp" "$DATA/wifi/$(basename "$profile")"
   done
-  if [[ -s "$TS_STATE" ]]; then
-    temp="$(mktemp "$DATA/.tailscale.XXXXXXXX")"
-    cp -- "$TS_STATE" "$temp"
-    mv -f -- "$temp" "$DATA/tailscaled.state"
+
+  if [[ -s "$GCLOUD_DB" && -s "$GCLOUD_DEFAULT" &&
+        ! -L "$GCLOUD_DB" && ! -L "$GCLOUD_DEFAULT" ]]; then
+    # sqlite's online backup is consistent even while gcloud holds open
+    # its source database. A plain cp during OAuth token refresh is not.
+    temp="$(mktemp "$GCLOUD_STORE/.credentials.XXXXXXXX")"
+    if ! sqlite3 "$GCLOUD_DB" ".backup '$temp'"; then
+      rm -f -- "$temp"
+      echo "Google credentials backup failed; previous USB copy retained." >&2
+      return 1
+    fi
+    chmod 0600 "$temp"
+    mv -f -- "$temp" "$GCLOUD_STORE/credentials.db"
+    temp="$(mktemp "$GCLOUD_STORE/.config.XXXXXXXX")"
+    cp -- "$GCLOUD_DEFAULT" "$temp"
+    chmod 0600 "$temp"
+    mv -f -- "$temp" "$GCLOUD_STORE/config_default"
   fi
-  if [[ -s "$ADC" && ! -L "$ADC" ]]; then
-    # The Ventoy mount is root-owned (umask=077). USB encryption is
-    # intentionally NOT used; losing the drive exposes this OAuth grant.
-    temp="$(mktemp "$DATA/.google-adc.XXXXXXXX")"
-    cp -- "$ADC" "$temp"
-    mv -f -- "$temp" "$DATA/google-adc.json"
-  fi
+
   sync -f "$MOUNT" || sync
   echo "State saved on Ventoy USB."
-}
-
-init_wg() {
-  prepare_usb || { echo "USB Ventoy is required for WireGuard keys." >&2; return 1; }
-  mkdir -p "$WG_DIR"
-  local temp
-  if [[ ! -s "$WG_DIR/client.key" ]]; then
-    temp="$(mktemp "$WG_DIR/.client-key.XXXXXXXX")"
-    wg genkey > "$temp"
-    # Do not overwrite a previously provisioned peer identity.
-    if [[ ! -s "$WG_DIR/client.key" ]]; then
-      mv -f -- "$temp" "$WG_DIR/client.key"
-    else
-      rm -f -- "$temp"
-    fi
-  fi
-  temp="$(mktemp "$WG_DIR/.client-pub.XXXXXXXX")"
-  wg pubkey < "$WG_DIR/client.key" > "$temp"
-  mv -f -- "$temp" "$WG_DIR/client.pub"
-  sync -f "$WG_DIR/client.key"
-}
-
-set_host() {
-  local hostname="${1:-}"
-  if [[ ! "$hostname" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-    echo "Invalid Tailscale hostname or IP." >&2
-    exit 2
-  fi
-  is_ready || { echo "Ventoy is not mounted." >&2; exit 1; }
-  printf '%s\n' "$hostname" > "$DATA/rdp-host"
-  sync -f "$DATA/rdp-host"
-}
-
-get_host() {
-  if is_ready && [[ -s "$DATA/rdp-host" ]]; then
-    head -n 1 "$DATA/rdp-host"
-  else
-    printf 'solo-workstation\n'
-  fi
 }
 
 case "${1:-}" in
   restore) restore_state ;;
   save) save_state ;;
   is-ready) is_ready ;;
-  init-wg) init_wg ;;
-  wg-public)
-    init_wg
-    cat "$WG_DIR/client.pub"
+  *)
+    echo "Usage: solo-client-state {restore|save|is-ready}" >&2
+    exit 2
     ;;
-  set-host) set_host "${2:-}" ;;
-  get-host) get_host ;;
-  *) echo "Usage: solo-client-state {restore|save|is-ready|init-wg|wg-public|get-host|set-host HOST}" >&2; exit 2 ;;
 esac

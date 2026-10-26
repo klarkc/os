@@ -2,23 +2,16 @@
 
 let
   stateTool = pkgs.writeShellScriptBin "solo-client-state" ''
-    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.wireguard-tools ]}:$PATH
+    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/ventoy-state.sh} "$@"
   '';
-  gceTool = pkgs.writeShellScriptBin "solo-gce-endpoint" ''
-    export PATH=${lib.makeBinPath [ pkgs.google-cloud-sdk pkgs.curl pkgs.jq pkgs.coreutils pkgs.sudo ]}:$PATH
-    exec ${pkgs.bash}/bin/bash ${./scripts/gce-endpoint.sh} "$@"
-  '';
-  wgTool = pkgs.writeShellScriptBin "solo-client-wg" ''
-    export PATH=${lib.makeBinPath [ pkgs.iproute2 pkgs.wireguard-tools pkgs.coreutils pkgs.util-linux pkgs.kmod ]}:$PATH
-    exec ${pkgs.bash}/bin/bash ${./scripts/client-wg.sh} "$@"
+  iapTool = pkgs.writeShellScriptBin "solo-gce-iap" ''
+    export PATH=${lib.makeBinPath [ pkgs.google-cloud-sdk pkgs.coreutils pkgs.sudo ]}:$PATH
+    exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
   thinClient = pkgs.writeShellScriptBin "solo-thin-client" ''
-    export SOLO_STATE_TOOL=/run/current-system/sw/bin/solo-client-state
-    export SOLO_GCE_TOOL=/run/current-system/sw/bin/solo-gce-endpoint
-    export SOLO_WG_TOOL=/run/current-system/sw/bin/solo-client-wg
     exec ${pkgs.xterm}/bin/xterm \
-      -T "Solo Workstation - connection" \
+      -T "Solo Workstation - Google IAP / RDP" \
       -fa "DejaVu Sans Mono" -fs 12 \
       -bg "#101820" -fg "#eeeeee" \
       -geometry 100x28 \
@@ -30,38 +23,36 @@ in
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
   services.openssh.enable = lib.mkForce false;
-  # Tailscale requires managed coordination and is replaced with a WireGuard
-  # route to the GCE endpoint discovered through the owner's Google OAuth.
   services.tailscale.enable = lib.mkForce false;
 
-  # Only these fixed helpers are allowed without sudo password. Google OAuth
-  # itself always runs as the unprivileged nixos user, NEVER as root.
+  # Only saving Ventoy state requires privilege from the GUI account.
+  # Restore is reserved for the boot-time systemd service; there is no
+  # passwordless access to arbitrary network, disk or WireGuard helpers.
   security.sudo.extraRules = [{
     users = [ "nixos" ];
     commands = [
-      { command = "/run/current-system/sw/bin/solo-client-state"; options = [ "NOPASSWD" ]; }
-      { command = "/run/current-system/sw/bin/solo-client-wg"; options = [ "NOPASSWD" ]; }
+      { command = "/run/current-system/sw/bin/solo-client-state save"; options = [ "NOPASSWD" ]; }
     ];
   }];
 
-  # Restore USB state before NetworkManager starts or graphical autologin.
-  # No disk format, internal HDD mount, swap creation or copytoram.
+  # Restore USB credentials before NetworkManager and graphical autologin.
+  # The USB and Wi-Fi profiles are the only persistence; never write the HDD.
   systemd.services.solo-ventoy-state = {
-    description = "Restore trusted Ventoy USB credentials and connection state";
+    description = "Restore trusted Ventoy USB Wi-Fi and Google CLI state";
     wantedBy = [ "multi-user.target" ];
     before = [ "NetworkManager.service" ];
     after = [ "systemd-udev-settle.service" ];
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.wireguard-tools ];
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite ];
     script = "${stateTool}/bin/solo-client-state restore";
   };
   systemd.services.NetworkManager.requires = [ "solo-ventoy-state.service" ];
 
-  # Best-effort copies capture any newly saved Wi-Fi or OAuth state.
+  # Periodic sqlite online backup captures Google refresh-token updates.
   systemd.services.solo-save-state = {
-    description = "Save thin-client runtime state to Ventoy";
+    description = "Save Wi-Fi and Google CLI credentials to trusted Ventoy USB";
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils ];
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils pkgs.sqlite ];
     script = "${stateTool}/bin/solo-client-state save || true";
   };
   systemd.timers.solo-save-state = {
@@ -72,8 +63,13 @@ in
     description = "Save thin-client state on shutdown";
     wantedBy = [ "multi-user.target" ];
     after = [ "solo-ventoy-state.service" ];
-    serviceConfig = { Type = "oneshot"; RemainAfterExit = true; ExecStart = "${pkgs.coreutils}/bin/true"; ExecStop = "${stateTool}/bin/solo-client-state save"; };
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils ];
+    serviceConfig = {
+      Type = "oneshot";
+      RemainAfterExit = true;
+      ExecStart = "${pkgs.coreutils}/bin/true";
+      ExecStop = "${stateTool}/bin/solo-client-state save";
+    };
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils pkgs.sqlite ];
   };
 
   services.xserver.enable = true;
@@ -92,8 +88,8 @@ in
   '';
 
   environment.systemPackages = with pkgs; [
-    stateTool gceTool wgTool thinClient freerdp networkmanager
-    google-cloud-sdk curl jq iproute2 wireguard-tools
+    stateTool iapTool thinClient freerdp networkmanager
+    google-cloud-sdk sqlite netcat-openbsd
     xterm xorg.xsetroot openssh
   ];
   fonts.packages = [ pkgs.dejavu_fonts ];
