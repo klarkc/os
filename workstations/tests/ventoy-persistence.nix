@@ -39,7 +39,11 @@ pkgs.testers.runNixOSTest {
   };
 
   testScript = ''
-    start_all()
+    import datetime as dt
+
+    # QEMU defaults to -no-reboot. Keep the SAME process/USB COW overlay
+    # running across a real guest reboot, then verify the kernel boot ID.
+    client.start(allow_reboot=True)
     client.wait_for_unit("multi-user.target")
     client.wait_for_unit("NetworkManager.service")
 
@@ -56,6 +60,8 @@ pkgs.testers.runNixOSTest {
     client.succeed("chmod 600 /etc/NetworkManager/system-connections/solo-ci.nmconnection")
     client.succeed("solo-client-state set-host solo-ci-server")
     client.succeed("solo-client-state save")
+    # The live-image user must be able to persist state without a password.
+    client.succeed("runuser -u nixos -- sudo -n solo-client-state save")
     client.succeed("grep -Fx 'psk=ci-test-password' /run/solo-client/ventoy/solo-client/wifi/solo-ci.nmconnection")
     client.succeed("test \"$(solo-client-state get-host)\" = solo-ci-server")
 
@@ -72,8 +78,21 @@ pkgs.testers.runNixOSTest {
     client.succeed("rm /var/lib/tailscale/tailscaled.state")
 
     client.succeed("rm /etc/NetworkManager/system-connections/solo-ci.nmconnection")
-    client.reboot()
+
+    first_boot_id = client.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+    # Ctrl+Alt+Delete from the test driver can be intercepted by the running
+    # graphical session. Schedule a real systemd reboot instead, so a command
+    # return is not confused with a reboot (or a lost test-driver backdoor).
+    client.succeed("systemd-run --on-active=2s --unit=solo-ci-reboot -- systemctl reboot")
+    client.connected = False
+    client.wait_for_qmp_event(
+      lambda event: event.get("event") == "RESET",
+      timeout=dt.timedelta(minutes=3),
+    )
     client.wait_for_unit("multi-user.target")
+    second_boot_id = client.succeed("cat /proc/sys/kernel/random/boot_id").strip()
+    assert first_boot_id and second_boot_id and first_boot_id != second_boot_id, "QEMU guest did not reboot"
+    print(f"Guest reboot verified: {first_boot_id} -> {second_boot_id}")
     client.wait_for_unit("NetworkManager.service")
 
     # The USB COW overlay persists across guest reboot in the SAME QEMU VM.
@@ -81,5 +100,6 @@ pkgs.testers.runNixOSTest {
     client.succeed("grep -Fx 'psk=ci-test-password' /etc/NetworkManager/system-connections/solo-ci.nmconnection")
     client.succeed("test \"$(solo-client-state get-host)\" = solo-ci-server")
     client.succeed("nmcli -t -f NAME con show | grep -Fx 'solo-ci-wifi'")
+    client.succeed("test \"$(stat -c %a /etc/NetworkManager/system-connections/solo-ci.nmconnection)\" = 600")
   '';
 }
