@@ -39,7 +39,16 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.security.googleOsLogin.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PasswordAuthentication)" = false
           test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PermitRootLogin)" = prohibit-password
-          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.firewall.interfaces.tailscale0.allowedTCPPorts)" = '[3389]'
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.nftables.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.tailscale.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xrdp.openFirewall)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.openssh.openFirewall)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.firewall.allowedTCPPorts)" = '[]'
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.wireguard.interfaces)" = '{}'
+          test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.users.users.klarkc.initialHashedPassword)" = '!'
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.security.pam.services.xrdp-sesman.allowNullPassword)" = false
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.firewall.extraInputRules | grep -F 'ip saddr 35.235.240.0/20 tcp dport 3389 accept'
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.firewall.extraInputRules | grep -F 'ip saddr 35.235.240.0/20 tcp dport 22 accept'
 
   boot-vm:
     name: Boot VMs and verify Ventoy USB state after reboot
@@ -100,7 +109,7 @@ jobs:
 
 
   gce-vm:
-    name: Test NixOS workstation services in QEMU
+    name: Test NixOS IAP workstation and persistence in QEMU
     needs: evaluate
     runs-on: ubuntu-24.04
     timeout-minutes: 120
@@ -111,7 +120,7 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
-      - name: Boot workstation VM and verify access services
+      - name: Boot and reboot workstation VM; verify firewall and XRDP
         run: |
           set -euo pipefail
           mkdir -p vm-logs
@@ -128,7 +137,7 @@ jobs:
           retention-days: 7
 
   gce-image:
-    name: Build NixOS GCE raw image
+    name: Build NixOS GCE IAP raw image
     needs: [evaluate, gce-vm]
     runs-on: ubuntu-24.04
     timeout-minutes: 180
@@ -148,6 +157,7 @@ jobs:
           mapfile -t images < <(find -L /tmp/solo-gce-image -maxdepth 1 -type f -name '*.raw.tar.gz' -print)
           test "${#images[@]}" -eq 1
           cp -- "${images[0]}" "$GITHUB_WORKSPACE/gce-dist/"
+          tar -tzf "${images[0]}" | grep -Fx disk.raw
           (cd "$GITHUB_WORKSPACE/gce-dist" && sha256sum *.raw.tar.gz > SHA256SUMS)
       - name: Upload versioned image (no cloud import)
         uses: actions/upload-artifact@v4
