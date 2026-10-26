@@ -28,6 +28,7 @@
         # Boots BOTH client and server in disposable QEMU VMs, not merely
         # evaluating a Nix expression. No credentials or cloud resources.
         ventoy-usb-persistence-vm = import ./tests/ventoy-persistence.nix { inherit pkgs; };
+        gce-workstation-security-vm = import ./tests/gce-workstation.nix { inherit pkgs; };
 
         boot-and-network-vm = pkgs.testers.runNixOSTest {
           name = "solo-thin-client-and-workstation";
