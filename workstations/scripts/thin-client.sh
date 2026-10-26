@@ -1,35 +1,32 @@
 #!/usr/bin/env bash
 set -uo pipefail
+echo "SOLO thin client - NixOS running from Ventoy"
+echo "Only network recovery is local. Workstation login belongs to the server."
 
-echo "SOLO Thin Client (session only; no local disk installation)"
-echo "Network status: "
-nmcli -t -f STATE general status || true
 while ! nm-online -q -t 8; do
-  echo "Configure Wi-Fi in NetworkManager (this stays in volatile RAM)."
+  echo "Wi-Fi unavailable; connect once using NetworkManager."
   nmtui || true
-  sleep 1
+  sudo solo-client-state save || true
+  sleep 2
 done
-echo "Network connected. Authenticating private tailnet..."
-while ! tailscale status >/dev/null 2>&1; do
-  echo "Use the sign-in URL shown below on your phone; no secret is preinstalled."
-  sudo tailscale up --accept-dns=false || true
-  tailscale status || true
-  sleep 5
+sudo solo-client-state save || true
+
+# tailscale status exit code is not sufficient to assert that an identity is
+# authenticated. Require a usable IPv4 tailnet address.
+while ! tailscale ip -4 2>/dev/null | grep -Eq '^100[.]'; do
+  echo "Private network needs pairing. Follow the authentication URL below:"
+  sudo tailscale up --accept-dns=true || true
+  sudo solo-client-state save || true
+  sleep 3
 done
+sudo solo-client-state save || true
+
 while true; do
-  echo
-  echo "Enter the Tailscale hostname/IP of your WORKSTATION (not its public IP)."
-  read -rp "Workstation [solo-workstation]: " host
-  host="${host:-solo-workstation}"
-  if [[ ! "$host" =~ ^[a-zA-Z0-9._-]+$ ]]; then
-    echo "Invalid destination"
-    continue
-  fi
-  # Request the server's login at the RDP endpoint. No password in process
-  # arguments, public Git, Nix store, or the client startup script.
-  echo "Connecting to $host. Log in using the SERVER's XRDP screen."
-  xfreerdp /v:"$host" /f /dynamic-resolution /cert:tofu /network:auto /sec:tls \
-    /clipboard /audio-mode:0 || true
-  echo "Remote session disconnected. Press Ctrl+C here to configure again."
+  host="$(sudo solo-client-state get-host 2>/dev/null || echo solo-workstation)"
+  echo "Connecting to workstation: $host"
+  echo "RDP will ask for your SERVER credentials, not a local login."
+  xfreerdp3 /v:"$host" /f /dynamic-resolution /cert:tofu \
+    /clipboard /network:auto /sec:tls || true
+  echo "Disconnected. Retrying; Ctrl+C returns to client recovery."
   sleep 3
 done
