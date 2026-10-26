@@ -75,6 +75,5 @@ in
   fonts.packages = [ pkgs.dejavu_fonts ];
   console.keyMap = "br-abnt2";
   time.timeZone = "America/Bahia";
-  isoImage.isoName = "solo-thin-client-x86_64.iso";
   system.stateVersion = "26.05";
 }
