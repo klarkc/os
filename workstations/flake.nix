@@ -39,7 +39,7 @@
                 extraGroups = [ "wheel" "networkmanager" "video" ];
                 initialPassword = "test-only";
               };
-              security.sudo.wheelNeedsPassword = false;
+              security.sudo.wheelNeedsPassword = true;
               # Real USB devices are intentionally absent; persistence must
               # fail closed instead of touching an internal VM disk.
               virtualisation.memorySize = 2048;
@@ -61,12 +61,16 @@
             client.wait_for_unit("multi-user.target")
             server.wait_for_unit("multi-user.target")
             client.succeed("systemctl is-active NetworkManager.service")
-            client.succeed("systemctl is-active tailscaled.service")
+            client.succeed("test -e /run/current-system/sw/bin/solo-gce-endpoint")
+            client.succeed("test -e /run/current-system/sw/bin/solo-client-wg")
+            client.succeed("test -e /run/current-system/sw/bin/wg")
+            client.succeed("! systemctl is-active --quiet tailscaled.service")
             client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
             client.succeed("test -e /run/current-system/sw/bin/solo-client-state")
             client.succeed("test -e /run/current-system/sw/bin/xfreerdp")
             client.succeed("! mountpoint -q /run/solo-client/ventoy")
             client.succeed("test ! -d /run/solo-client/ventoy/solo-client")
+            client.succeed("! test -e /home/nixos/.config/gcloud/application_default_credentials.json")
             client.succeed("systemctl start solo-save-state.service")
             server.succeed("systemctl is-active xrdp.service")
             server.succeed("systemctl is-active xrdp-sesman.service")
