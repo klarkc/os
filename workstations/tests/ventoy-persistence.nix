@@ -1,19 +1,23 @@
 { pkgs }:
 let
   # A real USB mass-storage controller in QEMU, backed by a *temporary* COW
-  # overlay of a tiny exFAT volume carrying the same Ventoy label.
+  # overlay of Ventoy's two-partition data + VTOYEFI layout.
   # Never presents a writable copy of any physical /dev disk to a VM.
   usbImage = pkgs.runCommand "solo-ventoy-test-usb.img" {
-    nativeBuildInputs = [ pkgs.coreutils pkgs.exfatprogs pkgs.parted ];
+    nativeBuildInputs = [ pkgs.coreutils pkgs.exfatprogs pkgs.parted pkgs.dosfstools ];
   } ''
     # Like real Ventoy media, the *partition* is labelled Ventoy, not the
     # entire USB disk. This exercises the parent-device USB transport check.
-    truncate -s 68M "$out"
+    truncate -s 100M "$out"
     truncate -s 64M partition.img
+    truncate -s 32M efi.img
     mkfs.exfat -n Ventoy partition.img
+    mkfs.vfat -F 32 -n VTOYEFI efi.img
     parted -s "$out" mklabel msdos
     parted -s "$out" unit MiB mkpart primary 1 65
+    parted -s "$out" unit MiB mkpart primary 65 97
     dd if=partition.img of="$out" bs=1M seek=1 conv=notrunc status=none
+    dd if=efi.img of="$out" bs=1M seek=65 conv=notrunc status=none
   '';
 in
 pkgs.testers.runNixOSTest {
@@ -36,6 +40,8 @@ pkgs.testers.runNixOSTest {
       "-drive if=none,id=solo-ventoy-disk,file=${usbImage},format=raw,snapshot=on"
       "-device usb-storage,drive=solo-ventoy-disk"
     ];
+    # Only the VM includes tools for simulated Ventoy partition relabel/dm.
+    environment.systemPackages = [ pkgs.exfatprogs pkgs.lvm2 ];
     system.stateVersion = "26.05";
   };
 
@@ -53,6 +59,9 @@ pkgs.testers.runNixOSTest {
     client.succeed("test \"$(lsblk -dno TRAN /dev/$(lsblk -no PKNAME $(readlink -f /dev/disk/by-label/Ventoy)))\" = usb")
     client.succeed("mountpoint -q /run/solo-client/ventoy")
     client.succeed("test \"$(findmnt -no FSTYPE /run/solo-client/ventoy)\" = exfat")
+    # nm-online may time out after manually activating a valid Wi-Fi link.
+    # Test the fallback while NetworkManager and its default route are up.
+    client.succeed("runuser -u nixos -- env SOLO_NM_ONLINE_BIN=/bin/false /run/current-system/sw/bin/solo-thin-client --check-network")
     client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
     # REGRESSION: photo from the real Dell (2026-10-27) showed an ISO
     # booted from Ventoy but state missing. A later USB mount must recover,
@@ -121,6 +130,30 @@ pkgs.testers.runNixOSTest {
     client.succeed("grep -Fx -- '--local-host-port=127.0.0.1:13389' /tmp/ci-iap-argv")
     client.succeed("grep -Fx '3389' /tmp/ci-iap-argv")
     client.succeed("! grep -E 'natIP|WireGuard|51820|gce-endpoint' /tmp/ci-iap-argv")
+
+    # Reproduce Ventoy installations whose data partition was relabelled.
+    # VTOYEFI is still on the same USB disk and the helper must find part 1.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("exfatlabel \"$(readlink -f /dev/disk/by-label/Ventoy)\" SOLODATA")
+    client.succeed("udevadm trigger --subsystem-match=block --action=change")
+    client.succeed("udevadm settle")
+    client.succeed("test -e /dev/disk/by-label/VTOYEFI")
+    client.succeed("! test -e /dev/disk/by-label/Ventoy")
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state ensure")
+    client.succeed("mountpoint -q /run/solo-client/ventoy")
+
+    # Ventoy 1.1.18 may expose the data partition through a device mapper
+    # when the raw ISO-containing partition is busy. Simulate its DM path.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("modprobe dm_mod")
+    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/SOLODATA); printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create VentoyPart")
+    client.succeed("test -b /dev/mapper/VentoyPart")
+    client.succeed("solo-client-state ensure")
+    client.succeed("mountpoint -q /run/solo-client/ventoy")
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("dmsetup remove VentoyPart")
+    client.succeed("solo-client-state ensure")
+    client.succeed("mountpoint -q /run/solo-client/ventoy")
 
     # Simulate removal of volatile RAM state while the USB overlay persists.
     client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")
