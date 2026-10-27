@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Boot console: Wi-Fi -> trusted Ventoy state -> Google IAP -> FreeRDP.
-# Only Wi-Fi recovery and Google authorization require local interaction.
+# Solo Workstation kiosk. Wi-Fi -> trusted USB -> Google IAP -> RDP.
+# A full desktop is not installed; Ctrl+Alt+F2 remains for recovery.
 set -uo pipefail
 
 STATE="${SOLO_STATE_TOOL:-/run/current-system/sw/bin/solo-client-state}"
 IAP="${SOLO_IAP_TOOL:-/run/current-system/sw/bin/solo-gce-iap}"
+NM_ONLINE="${SOLO_NM_ONLINE_BIN:-nm-online}"
 RDP_ADDRESS="127.0.0.1:13389"
 TUNNEL_PID=""
 TUNNEL_LOG=""
@@ -20,37 +21,59 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-echo "Solo thin client - NixOS Live from Ventoy"
-echo "Google Cloud IAP provides the private connection to your workstation."
+# A Wi-Fi connection manually activated using nmtui can already have a valid
+# route while nm-online is still timing out. Verify NM link and IPv4 route.
+network_ready() {
+  "$NM_ONLINE" -q -t 6 && return 0
+  nmcli -t -f TYPE,STATE device status 2>/dev/null |
+    grep -Eq '^(wifi|ethernet):connected$' || return 1
+  ip -4 route show default | grep -q '^default'
+}
+
+# Regression-test entrypoint; no credentials or remote service required.
+if [[ "${1:-}" == "--check-network" ]]; then
+  network_ready
+  exit $?
+fi
+
+printf '\033[2J\033[H'
+printf '\n  ========================================\n'
+printf '              SOLO WORKSTATION\n'
+printf '  ========================================\n\n'
+printf '  Iniciando seu ambiente de trabalho remoto.\n\n'
 
 while true; do
-  while ! nm-online -q -t 8; do
-    echo "Wi-Fi not connected. Configure with nmtui."
+  while ! network_ready; do
+    printf '\n  Conecte-se a uma rede Wi-Fi.\n'
+    printf '  O configurador sera aberto agora.\n\n'
     nmtui || true
-    sudo -n "$STATE" save || true
     sleep 2
   done
 
-  while ! "$STATE" is-ready; do
-    echo "Ventoy USB missing. Authentication will not run without it."
-    sleep 10
+  # A boot-time Ventoy mount failure must be recoverable after live boot.
+  # 'ensure' re-discovers the USB and/or VentoyPart on every retry.
+  while ! sudo -n "$STATE" ensure >/dev/null 2>&1; do
+    printf '\n  Unidade USB de configuracao indisponivel.\n'
+    printf '  Mantenha o pendrive conectado. Tentando novamente.\n'
+    printf '  Diagnostico avancado: Ctrl+Alt+F2\n'
+    sleep 6
   done
-  sudo -n "$STATE" save || true
+  sudo -n "$STATE" save >/dev/null 2>&1 || true
 
   if ! "$IAP" has-credentials; then
+    printf '\n  Autorizacao inicial da conta Google necessaria.\n'
+    printf '  Siga as instrucoes exibidas a seguir.\n\n'
     until "$IAP" login; do
-      echo "Google authorization incomplete. Retry after checking Wi-Fi."
-      sleep 10
+      printf '\n  Autorizacao incompleta. Verifique sua rede.\n'
+      sleep 8
     done
   fi
 
-  echo "Opening IAP tunnel to solo-workstation:3389..."
+  printf '\n  Conectando ao seu computador remoto...\n'
   TUNNEL_LOG="$(mktemp)"
   "$IAP" tunnel >"$TUNNEL_LOG" 2>&1 &
   TUNNEL_PID=$!
 
-  # The gcloud process must remain alive and confirm its own listener.
-  # Merely connecting to an arbitrary local port is not sufficient proof.
   ready=false
   for ((attempt = 0; attempt < 65; attempt++)); do
     if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then break; fi
@@ -63,18 +86,15 @@ while true; do
   done
 
   if [[ "$ready" == true ]]; then
-    echo "IAP connected locally. Opening fullscreen RDP."
-    echo "The XRDP login is the SERVER account, not your Google password."
+    printf '  Conexao pronta. Abrindo area de trabalho...\n'
     xfreerdp /v:"$RDP_ADDRESS" /f /dynamic-resolution \
       /cert:tofu /clipboard /network:auto /sec:tls || true
-    echo "RDP disconnected. Reconnecting via IAP..."
+    printf '\n  Sessao encerrada. Reconectando...\n'
   else
-    echo "Unable to establish IAP tunnel. Check that the GCE VM is running,"
-    echo "IAM permits IAP TCP port 3389, and server firewall allows IAP."
-    # Reauthorization after an expired/revoked login. Internet disruption
-    # is not automatically interpreted as revoked credentials.
-    if nm-online -q -t 3 && ! "$IAP" check; then
-      echo "Google login could not be refreshed; reauthorization required."
+    printf '\n  Nao foi possivel conectar ao servidor.\n'
+    printf '  Confira se a workstation esta ligada e o IAP foi liberado.\n'
+    if network_ready && ! "$IAP" check; then
+      printf '  Sessao Google expirada; autorizacao necessaria.\n'
       "$IAP" login || true
     fi
   fi
