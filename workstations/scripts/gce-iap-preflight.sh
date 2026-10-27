@@ -38,6 +38,26 @@ fi
 
 label="CPU-only e2-highmem-4 configuration"
 check jq -e '.machineType | endswith("/e2-highmem-4")' "$tmp/instance.json"
+
+# Boot disk must be 512 GiB pd-balanced and survive VM deletion.
+# A stopped VM still incurs provisioned disk charges.
+label="exactly one persistent boot disk with autoDelete=false"
+check jq -e '([.disks[]? | select(.boot == true)] | length == 1)
+  and ([.disks[]? | select(.boot == true)][0].autoDelete == false)' "$tmp/instance.json"
+boot_disk_uri="$(jq -r '[.disks[]? | select(.boot == true)][0].source // empty' "$tmp/instance.json")"
+if [[ "$boot_disk_uri" == */disks/* ]]; then
+  boot_disk_name="${boot_disk_uri##*/}"
+  if gcloud compute disks describe "$boot_disk_name" --project="$project" --zone="$zone" --format=json >"$tmp/boot-disk.json" 2>"$tmp/boot-disk.err"; then
+    label="boot disk size=512 GiB and type=pd-balanced"
+    check jq -e '(.sizeGb | tonumber) == 512 and (.type | endswith("/pd-balanced"))' "$tmp/boot-disk.json"
+  else
+    echo "FAIL: boot disk metadata unavailable for size/type verification" >&2
+    status=1
+  fi
+else
+  echo "FAIL: VM has no inspectable boot disk source" >&2
+  status=1
+fi
 label="OS Login metadata enabled on instance"
 check jq -e 'any(.metadata.items[]?; .key=="enable-oslogin" and (.value|ascii_downcase)=="true")' "$tmp/instance.json"
 label="isolated IAP firewall target tag"
