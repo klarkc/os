@@ -61,7 +61,11 @@ pkgs.testers.runNixOSTest {
     client.succeed("test \"$(findmnt -no FSTYPE /run/solo-client/ventoy)\" = exfat")
     # nm-online may time out after manually activating a valid Wi-Fi link.
     # Test the fallback while NetworkManager and its default route are up.
-    client.succeed("runuser -u nixos -- env SOLO_NM_ONLINE_BIN=/bin/false /run/current-system/sw/bin/solo-thin-client --check-network")
+    client.succeed("printf '%s\\n' '#!/bin/sh' 'echo wifi:connected' > /tmp/ci-mock-nmcli")
+    client.succeed("printf '%s\\n' '#!/bin/sh' 'echo \"default via 192.0.2.1 dev wlan0\"' > /tmp/ci-mock-ip")
+    client.succeed("chmod 755 /tmp/ci-mock-nmcli /tmp/ci-mock-ip")
+    client.succeed("runuser -u nixos -- env SOLO_NM_ONLINE_BIN=/bin/false SOLO_NMCLI_BIN=/tmp/ci-mock-nmcli SOLO_IP_BIN=/tmp/ci-mock-ip /run/current-system/sw/bin/solo-thin-client --check-network")
+    client.succeed("! runuser -u nixos -- env SOLO_NM_ONLINE_BIN=/bin/false SOLO_NMCLI_BIN=/bin/false SOLO_IP_BIN=/tmp/ci-mock-ip /run/current-system/sw/bin/solo-thin-client --check-network")
     client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
     # REGRESSION: photo from the real Dell (2026-10-27) showed an ISO
     # booted from Ventoy but state missing. A later USB mount must recover,

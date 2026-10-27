@@ -6,6 +6,8 @@ set -uo pipefail
 STATE="${SOLO_STATE_TOOL:-/run/current-system/sw/bin/solo-client-state}"
 IAP="${SOLO_IAP_TOOL:-/run/current-system/sw/bin/solo-gce-iap}"
 NM_ONLINE="${SOLO_NM_ONLINE_BIN:-nm-online}"
+NMCLI="${SOLO_NMCLI_BIN:-nmcli}"
+IP_CMD="${SOLO_IP_BIN:-ip}"
 RDP_ADDRESS="127.0.0.1:13389"
 TUNNEL_PID=""
 TUNNEL_LOG=""
@@ -25,9 +27,9 @@ trap 'exit 143' TERM
 # route while nm-online is still timing out. Verify NM link and IPv4 route.
 network_ready() {
   "$NM_ONLINE" -q -t 6 && return 0
-  nmcli -t -f TYPE,STATE device status 2>/dev/null |
+  "$NMCLI" -t -f TYPE,STATE device status 2>/dev/null |
     grep -Eq '^(wifi|ethernet):connected$' || return 1
-  ip -4 route show default | grep -q '^default'
+  "$IP_CMD" -4 route show default | grep -q '^default'
 }
 
 # Regression-test entrypoint; no credentials or remote service required.
