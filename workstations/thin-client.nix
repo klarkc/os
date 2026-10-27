@@ -26,8 +26,8 @@ in
   services.tailscale.enable = lib.mkForce false;
 
   # Quiet boot, kiosk-like interface, diagnostic console still available.
-  boot.consoleLogLevel = 3;
-  boot.initrd.verbose = false;
+  boot.consoleLogLevel = lib.mkDefault 3;
+  boot.initrd.verbose = lib.mkDefault false;
   boot.kernelParams = [
     "quiet" "loglevel=3" "systemd.show_status=0"
     "udev.log_level=3" "rd.udev.log_level=3"
