@@ -191,8 +191,41 @@ return. The VM must retain `/home/klarkc/.git` and a real writable marker
 after a GCE stop/start, not just a QEMU reboot. Verify the boot disk remains
 attached and persistent. Do not claim E2E complete from green CI alone.
 
-**Cross-team dependency:** the BuildClient branch still contains obsolete
-VPN code per issue #21; BuildGCE does not modify that branch. The
-BuildClient must switch to IAP tunnel on localhost:13389, persist the
-client's Google authentication on the trusted Ventoy USB and implement
-readiness/reconnect/failure handling before real Dell acceptance.
+**BuildClient handoff confirmed (2026-10-27):** the independent client branch
+`feat/solo-thin-client-ci-20261026`, commit
+`94ea18bf8bdef3bcfe1ff68ef9c363bcc71c72bb`, implements IAP TCP
+at `127.0.0.1:13389`, USB persistence for gcloud CLI credentials and
+FreeRDP TLS trust pins, and reconnect/error handling. Its GitHub Actions
+run https://github.com/klarkc/os/actions/runs/40400809864 passed its
+NixOS evaluation, QEMU reboot/persistence, and ISO gates. It did **not**
+authenticate against Google or reach this workstation over real IAP.
+BuildGCE must not edit the client's branch. The physical Dell Wi-Fi and
+authenticated graphical integration remain E2E acceptance gates.
+
+**BuildGCE CI evidence (2026-10-27):** HEAD
+`248df1ff088119a51a7c9b7fe3a23bd172ffe346`; run
+https://github.com/klarkc/os/actions/runs/40402732649 passed NixOS
+evaluation, combined/USB QEMU checks, dedicated IAP server QEMU reboot
+test, client ISO build, and GCE raw image build. The CI GCE artifact is
+`solo-gce-image-248df1ff088119a51a7c9b7fe3a23bd172ffe346`,
+artifact ID `12690415833`. This is a build artifact, **not** an imported
+Compute Engine image and not real IAP/RDP validation.
+
+**Live cloud read-only verification (2026-10-27):** Compute Engine
+lists **zero VM instances, zero zonal disks, zero custom images, and zero
+snapshots** in `argon-surf-472319-b0` (zone
+`southamerica-east1-b` for zonal resources). Consequently the intended
+instance's IAM bindings, VPC effective rules, IAP tunnel, XRDP login,
+persisted HOME and stop/start could not be validated. The connected
+Compute Engine integration does not expose the Service Usage, IAM,
+IAP or VPC firewall APIs. Their existence or configuration must not be
+inferred from a green NixOS CI.
+
+**Provisioning gate:** before importing images or creating VM, disk,
+bucket, firewall, IAM policy, NAT or paid IP resources, obtain explicit
+cost authorization, check quota and regional prices, audit existing VPC
+rules and IAM using an authenticated tool with appropriate permissions,
+and prove that the intended VM will not have globally exposed
+administrative ports. The standalone `gce-iap-preflight.sh` can audit
+these controls **after** the instance exists, from an authenticated
+`gcloud` environment. It never provisions resources.
