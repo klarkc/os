@@ -9,7 +9,13 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 
 - Project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
 - Planned VM: `solo-workstation`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
-- Persistent boot disk candidate: 150 GiB `pd-balanced`, retained on stop.
+- Persistent boot disk candidate: 512 GiB `pd-balanced`, retained on stop.
+  The disk is provisioned at 512 GiB even when the VM is stopped; plan for
+  full-month block-storage charges and set `autoDelete=false` explicitly.
+  The legacy solo098 used a physical 512-GB NVMe with Btrfs subvolumes;
+  this is **capacity parity**, not physical NVMe or filesystem parity.
+  The standard Google Compute Engine NixOS image filesystem must be checked
+  before claiming Btrfs, partition layout or swap equivalence.
 - Local account `klarkc`, HOME `/home/klarkc` for direct Git checkout
   `https://github.com/klarkc/dotfiles` (no `/home/klarkc/dotfiles`).
 - Display: XRDP on TCP 3389 with Xorg, XMonad when its HOME wrapper exists,
@@ -121,7 +127,7 @@ US$0.0014/VM-hour plus a NAT IP at US$0.005/hour, plus $0.045/GiB
 processed (in addition to egress). If the NAT address remains allocated
 730h, the address alone costs about US$3.65. These are illustrative
 network components, not a complete invoice. Quote E2 São Paulo,
-150GiB pd-balanced for the *full* month, egress, image storage, taxes
+512GiB pd-balanced for the *full* month, egress, image storage, taxes
 and all quotas before approving VM provisioning.
 
 Sources: https://cloud.google.com/vpc/pricing
