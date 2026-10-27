@@ -2,7 +2,7 @@
 
 let
   stateTool = pkgs.writeShellScriptBin "solo-client-state" ''
-    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite ]}:$PATH
+    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/ventoy-state.sh} "$@"
   '';
   iapTool = pkgs.writeShellScriptBin "solo-gce-iap" ''
@@ -11,10 +11,10 @@ let
   '';
   thinClient = pkgs.writeShellScriptBin "solo-thin-client" ''
     exec ${pkgs.xterm}/bin/xterm \
-      -T "Solo Workstation - Google IAP / RDP" \
-      -fa "DejaVu Sans Mono" -fs 12 \
-      -bg "#101820" -fg "#eeeeee" \
-      -geometry 100x28 \
+      -fullscreen -b 18 \
+      -T "Solo Workstation" \
+      -fa "DejaVu Sans Mono" -fs 15 \
+      -bg "#101820" -fg "#ecf2fa" -cr "#61ddc2" \
       -e ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh}
   '';
 in
@@ -25,13 +25,21 @@ in
   services.openssh.enable = lib.mkForce false;
   services.tailscale.enable = lib.mkForce false;
 
-  # Only saving Ventoy state requires privilege from the GUI account.
-  # Restore is reserved for the boot-time systemd service; there is no
-  # passwordless access to arbitrary network, disk or WireGuard helpers.
+  # Quiet boot, kiosk-like interface, diagnostic console still available.
+  boot.consoleLogLevel = 3;
+  boot.initrd.verbose = false;
+  boot.kernelParams = [
+    "quiet" "loglevel=3" "systemd.show_status=0"
+    "udev.log_level=3" "rd.udev.log_level=3"
+  ];
+
+  # The kiosk can only save state or attempt to mount a validated USB.
+  # Restore, arbitrary mount operations and shells remain restricted.
   security.sudo.extraRules = [{
     users = [ "nixos" ];
     commands = [
       { command = "/run/current-system/sw/bin/solo-client-state save"; options = [ "NOPASSWD" ]; }
+      { command = "/run/current-system/sw/bin/solo-client-state ensure"; options = [ "NOPASSWD" ]; }
     ];
   }];
 
@@ -43,7 +51,7 @@ in
     before = [ "NetworkManager.service" ];
     after = [ "systemd-udev-settle.service" ];
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite ];
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd ];
     script = "${stateTool}/bin/solo-client-state restore";
   };
   systemd.services.NetworkManager.requires = [ "solo-ventoy-state.service" ];
