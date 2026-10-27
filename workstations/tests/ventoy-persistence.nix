@@ -54,6 +54,17 @@ pkgs.testers.runNixOSTest {
     client.succeed("mountpoint -q /run/solo-client/ventoy")
     client.succeed("test \"$(findmnt -no FSTYPE /run/solo-client/ventoy)\" = exfat")
     client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
+    # REGRESSION: photo from the real Dell (2026-10-27) showed an ISO
+    # booted from Ventoy but state missing. A later USB mount must recover,
+    # without rebooting and without broad sudo privileges.
+    # Baseline (old build) fails: "ensure" is not implemented, and the
+    # kiosk never retries after the one boot-time restore attempt.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("! mountpoint -q /run/solo-client/ventoy")
+    client.succeed("solo-client-state ensure")
+    client.succeed("mountpoint -q /run/solo-client/ventoy")
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state ensure")
+
 
     # Mimic one user-entered Wi-Fi profile, NOT a real secret. It must survive
     # reboot of the guest with an actual (emulated) USB disk.
