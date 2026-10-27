@@ -10,6 +10,10 @@ let
     exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
   thinClient = pkgs.writeShellScriptBin "solo-thin-client" ''
+    # CLI diagnostic mode without X11; used by deterministic CI regressions.
+    if [ "$1" = "--check-network" ]; then
+      exec ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh} --check-network
+    fi
     exec ${pkgs.xterm}/bin/xterm \
       -fullscreen -b 18 \
       -T "Solo Workstation" \
