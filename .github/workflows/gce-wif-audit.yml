@@ -1,0 +1,52 @@
+name: BuildGCE — GCP WIF read-only audit
+
+# No pull_request trigger: never grant Google OIDC to untrusted PR code.
+# Cloud provider additionally enforces immutable GitHub repo/owner IDs and branch.
+on:
+  push:
+    branches:
+      - "feat/solo-gce-workstation-20261026"
+    paths:
+      - ".github/workflows/gce-wif-audit.yml"
+      - "workstations/scripts/gce-wif-readonly-audit.sh"
+      - "workstations/GCE-OPERATIONS.md"
+      - ".gitignore"
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    name: Authenticate WIF and inspect GCE (read-only)
+    if: github.ref == 'refs/heads/feat/solo-gce-workstation-20261026'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Validate read-only audit script
+        run: bash -n workstations/scripts/gce-wif-readonly-audit.sh
+
+      - name: Authenticate using short-lived GitHub OIDC (no JSON key)
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-buildgce/providers/github-actions
+          service_account: buildgce-auditor@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+
+      - name: Audit project IAM, APIs, VPC and instance inventory
+        shell: bash
+        env:
+          CLOUDSDK_CORE_DISABLE_PROMPTS: "1"
+        run: bash workstations/scripts/gce-wif-readonly-audit.sh

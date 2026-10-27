@@ -31,6 +31,8 @@ jobs:
             accept-flake-config = false
       - name: Validate IAP audit script syntax (no cloud credentials)
         run: bash -n workstations/scripts/gce-iap-preflight.sh
+      - name: Validate WIF read-only audit script syntax
+        run: bash -n workstations/scripts/gce-wif-readonly-audit.sh
       - name: Evaluate flake and all NixOS configurations
         run: |
           set -euo pipefail

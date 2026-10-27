@@ -239,3 +239,42 @@ and prove that the intended VM will not have globally exposed
 administrative ports. The standalone `gce-iap-preflight.sh` can audit
 these controls **after** the instance exists, from an authenticated
 `gcloud` environment. It never provisions resources.
+
+## GitHub Actions read-only Workload Identity Federation (2026-10-27)
+
+Cloud Shell confirmation (owner): GitHub OIDC provider is **ACTIVE** at
+`projects/1009769829445/locations/global/workloadIdentityPools/github-buildgce/providers/github-actions`.
+Provider CEL condition requires immutable GitHub repository ID `639154288`,
+owner ID `724959` and the exact branch
+`refs/heads/feat/solo-gce-workstation-20261026`.
+The operator then created `buildgce-auditor@argon-surf-472319-b0.iam.gserviceaccount.com`,
+granted `roles/iam.workloadIdentityUser` **on that service account only**
+to the repository-ID principalSet and assigned these project-scoped
+read-only roles: `roles/compute.viewer`,
+`roles/iam.securityReviewer`, `roles/serviceusage.serviceUsageViewer`.
+No JSON key, owner/admin permission or deployment permission was added.
+
+The dedicated workflow `.github/workflows/gce-wif-audit.yml` is triggered
+by pushes of its own configuration/audit scripts on the BuildGCE branch
+ONLY; it grants `id-token: write` to its own job, uses short-lived
+`google-github-actions/auth@v3` credentials, installs Cloud SDK and
+runs `workstations/scripts/gce-wif-readonly-audit.sh`. No manual
+GitHub Secrets/variables needed. GitHub OIDC credentials are excluded
+from Git by `.gitignore`. Do not add `pull_request` or expand the
+branch-specific provider CEL condition. The Google identities used by
+the physical Dell for IAP are separate from the GitHub auditor identity.
+
+A **successful** WIF audit means identity exchange plus selected
+read-only API checks succeeded. It does **not** mean IAP API is enabled,
+the VM exists, VPC effective firewall is safe, XRDP can authenticate or
+the user's 512 GiB disk has been provisioned. The audit reports
+`PENDING` for incomplete deployment prerequisites and
+`REVIEW` for potentially broad classic ingress; hierarchical/global
+policies and actual effective per-instance firewalls remain a separate
+gate. Do not publish raw project IAM policies or authentication tokens
+in public GitHub Actions logs or artifacts.
+
+Official references:
+https://github.com/google-github-actions/auth
+https://github.com/google-github-actions/setup-gcloud
+https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines

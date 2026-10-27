@@ -5,3 +5,6 @@
 !/secrets/*.nix
 !/secrets/*.age
 !/secrets/*.pub
+
+# Short-lived Google GitHub Actions WIF credential files (never commit)
+gha-creds-*.json
