@@ -7,10 +7,26 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
-      isoModule = { modulesPath, ... }: {
-        imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
-        isoImage.isoName = "solo-thin-client-x86_64.iso";
-      };
+      isoModule = { modulesPath, lib, ... }:
+        let
+          # Only a build dependency. No splash daemon or image editor is
+          # installed on the thin client itself.
+          splash = pkgs.runCommand "solo-boot-splash.png"
+            { nativeBuildInputs = [ pkgs.imagemagick ]; } ''
+              magick -size 1024x768 xc:'#101820' "$out"
+            '';
+        in {
+          imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
+          isoImage.isoName = "solo-thin-client-x86_64.iso";
+          isoImage.grubTheme = null;
+          isoImage.splashImage = splash;
+          isoImage.efiSplashImage = splash;
+          isoImage.appendToMenuLabel = "";
+          system.nixos.distroName = lib.mkForce "Solo Workstation";
+          # BIOS syslinux TIMEOUT 0 means *no* timeout; use 1 second for
+          # reliable automatic boot on both legacy BIOS and UEFI machines.
+          boot.loader.timeout = lib.mkForce 1;
+        };
       gceModule = { modulesPath, ... }: {
         imports = [ (modulesPath + "/virtualisation/google-compute-image.nix") ];
       };
