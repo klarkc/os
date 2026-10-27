@@ -43,11 +43,16 @@ pkgs.testers.runNixOSTest {
     server.succeed("grep -Eqi '^[[:space:]]*PasswordAuthentication[[:space:]]+no[[:space:]]*$' /etc/ssh/sshd_config")
     server.succeed("grep -Eqi '^[[:space:]]*PermitRootLogin[[:space:]]+prohibit-password[[:space:]]*$' /etc/ssh/sshd_config")
 
-    # Verify Xorg plus a real, installed XFCE fallback when user XMonad
-    # session has not yet been installed from the HOME dotfiles checkout.
-    server.succeed("test -x ${pkgs.xfce4-session}/bin/xfce4-session")
+    # XMonad must be usable in the pre-dotfiles bootstrap state.
+    # Fail if any XFCE session or Lemurs launcher was installed.
+    server.succeed("test -x /run/current-system/sw/bin/xmonad")
+    server.succeed("test -x /run/current-system/sw/bin/xterm")
     server.succeed("grep -F 'xmonad-session' /etc/xrdp/startwm.sh")
-    server.succeed("grep -F 'xfce4-session' /etc/xrdp/startwm.sh")
+    server.succeed("grep -F 'dbus-run-session -- xmonad' /etc/xrdp/startwm.sh")
+    server.succeed("grep -F 'exec xmonad' /etc/xrdp/startwm.sh")
+    server.fail("grep -Eiq 'xfce|startxfce' /etc/xrdp/startwm.sh")
+    server.succeed("test ! -e /run/current-system/sw/bin/xfce4-session")
+    server.succeed("test ! -e /run/current-system/sw/bin/lemurs")
 
     # The GCE workstation has NO third-party VPN dependency.
     server.succeed("test ! -e /run/current-system/sw/bin/tailscale")

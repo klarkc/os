@@ -7,7 +7,7 @@ Client branch: `feat/solo-thin-client-ci-20261026` (NOT modified here).
 ## Confirmed server-side design
 
 The `gcp-workstation.nix` image includes XRDP on TCP 3389,
-Xorg/XMonad and XFCE fallback. NixOS nftables allows new TCP 3389
+Xorg/XMonad only, without XFCE or local Lemurs. NixOS nftables allows new TCP 3389
 from `35.235.240.0/20` only; optional SSH/OS Login admin TCP 22
 also requires the IAP CIDR. No Tailscale, WireGuard or VPN pairing.
 The local graphical account is `klarkc`, and its initial password
@@ -56,7 +56,7 @@ addresses as the client endpoint.
 ## Evidence checklist for joint closure
 
 - Server GitHub Actions: evaluation, QEMU boot+reboot, source-restricted
-  nftables rules, XRDP/sesman, Xorg/XMonad-or-XFCE config, VPN absence,
+  nftables rules, XRDP/sesman, Xorg/XMonad-only config, VPN absence,
   locked initial account, raw GCE image archive+SHA256
 - Google Cloud: IAP API enabled, scoped IAM role conditioned for 3389,
   authenticated principal can locate VM, port-22 admin role separately,

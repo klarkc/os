@@ -35,12 +35,17 @@ in
   services.xrdp = {
     enable = true;
     openFirewall = false;
+    # XRDP authenticates remotely and creates its own Xorg session;
+    # neither XFCE nor the local TTY greeter Lemurs is required.
     defaultWindowManager = ''
-      if [ -x "$HOME/.local/bin/xmonad-session" ] &&
-         command -v xmonad >/dev/null 2>&1; then
+      if [ -x "$HOME/.local/bin/xmonad-session" ]; then
         exec "$HOME/.local/bin/xmonad-session"
       fi
-      exec ${pkgs.xfce4-session}/bin/xfce4-session
+      # Before HOME bootstrap, launch the NixOS XMonad with D-Bus.
+      if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
+        exec ${pkgs.dbus}/bin/dbus-run-session -- xmonad
+      fi
+      exec xmonad
     '';
   };
   # The initial account password is locked; null-password PAM login is forbidden.
@@ -49,10 +54,12 @@ in
   services.xserver = {
     enable = true;
     xkb.layout = "br";
-    windowManager.xmonad.enable = true;
-    desktopManager.xfce.enable = true;
+    windowManager.xmonad = {
+      enable = true;
+      # HOME xmonad.hs imports xmonad-contrib: preserve its Haskell deps.
+      enableContribAndExtras = true;
+    };
   };
-  services.displayManager.defaultSession = "xfce";
 
   users.users.klarkc = {
     isNormalUser = true;
@@ -76,7 +83,7 @@ in
 
   environment.systemPackages = with pkgs; [
     git curl wget openssh tmux direnv bashInteractive
-    xterm alacritty xfce4-terminal
+    xterm alacritty
     xorg.xauth xorg.xsetroot xorg.xmodmap
     xclip dbus dunst
     nix-output-monitor

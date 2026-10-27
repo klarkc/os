@@ -43,6 +43,14 @@ jobs:
           test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PermitRootLogin)" = prohibit-password
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.nftables.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.tailscale.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.windowManager.xmonad.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.windowManager.xmonad.enableContribAndExtras)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.desktopManager.xfce.enable)" = false
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -F 'exec xmonad'
+          if nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -Eiq 'xfce|startxfce'; then
+            echo 'Unexpected XFCE session in XRDP config' >&2
+            exit 1
+          fi
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xrdp.openFirewall)" = false
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.openssh.openFirewall)" = false
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.networking.firewall.allowedTCPPorts)" = '[]'

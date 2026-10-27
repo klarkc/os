@@ -18,8 +18,11 @@ containing peer public keys. The Dell integration is owned by BuildClient.
   before claiming Btrfs, partition layout or swap equivalence.
 - Local account `klarkc`, HOME `/home/klarkc` for direct Git checkout
   `https://github.com/klarkc/dotfiles` (no `/home/klarkc/dotfiles`).
-- Display: XRDP on TCP 3389 with Xorg, XMonad when its HOME wrapper exists,
-  otherwise XFCE. Account starts locked until password bootstrap.
+- Display: XRDP on TCP 3389 with **XOrg/XMonad only**. When the
+  HOME wrapper exists, XRDP launches it; before restoring dotfiles
+  the NixOS XMonad starts directly under D-Bus. **No XFCE**, which
+  was unused on solo098, and **no Lemurs**, a local TTY login manager
+  that does not handle XRDP authentication. Password initially locked.
 - Both OS firewall and GCE VPC firewall restrict admin ports to the IPv4
   Google IAP source `35.235.240.0/20`. SSH 22 is for OS Login admin only,
   not the Dell graphical user workflow.
@@ -36,7 +39,8 @@ test. It builds the NixOS `*.raw.tar.gz` custom-image import archive and
 uploads SHA256 checksums. Do not import the Dell Ventoy ISO as a server image.
 
 Gates include SSH key-only config, nftables/IAP restrictions, absence of VPN,
-XRDP/Xorg session configuration, no empty XRDP password, and writable HOME
+XRDP/Xorg/XMonad-only session, no XFCE/Lemurs, no empty XRDP password,
+and writable HOME
 surviving guest reboot. QEMU checks cannot validate IAM, the real Cloud VPC
 firewall, IAP tunnel, Google OS Login, GUI authentication, GCE disk retention
 or Dell credentials. Those remain real-world acceptance gates.
@@ -191,7 +195,7 @@ xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls
 ```
 
 Record: authenticated tunnel establishment, actual remote TCP 3389,
-interactive graphical login as `klarkc`, Xorg/XMonad or XFCE,
+interactive graphical login as `klarkc`, Xorg/XMonad only,
 fullscreen/resizing, reconnect after IAP interruption, and post-stop/start
 return. The VM must retain `/home/klarkc/.git` and a real writable marker
 after a GCE stop/start, not just a QEMU reboot. Verify the boot disk remains
