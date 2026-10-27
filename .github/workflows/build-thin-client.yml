@@ -36,6 +36,12 @@ jobs:
           nix flake check --no-build --show-trace
           nix eval --raw .#nixosConfigurations.thin-client.config.networking.hostName
           nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
+          test "$(nix eval --raw .#nixosConfigurations.thin-client.config.system.nixos.distroName)" = "Solo Workstation"
+          test "$(nix eval --json .#nixosConfigurations.thin-client.config.boot.loader.timeout)" = 1
+          nix eval --json .#nixosConfigurations.thin-client.config.boot.kernelParams | jq -e 'index("quiet") != null'
+          jq -e '.control | any(.VTOY_LINUX_REMOUNT == "1")' ventoy/ventoy.json
+          jq -e '.control | any(.VTOY_SECONDARY_BOOT_MENU == "0")' ventoy/ventoy.json
+          test "$(jq -r '.control[] | .VTOY_DEFAULT_IMAGE // empty' ventoy/ventoy.json)" = "/solo-thin-client-x86_64.iso"
 
   boot-vm:
     name: Boot VMs and verify Ventoy USB state after reboot
@@ -87,6 +93,7 @@ jobs:
           nix build -L .#thin-client-iso --out-link /tmp/solo-iso
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp /tmp/solo-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
+          cp ventoy/ventoy.json "$GITHUB_WORKSPACE/dist/ventoy.json"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.iso > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
