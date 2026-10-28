@@ -300,9 +300,14 @@ creates an isolated custom VPC (no default allow rules), regional
 subnet, two IAP-only firewall rules for TCP 22 and 3389, imports the
 image through a **temporary private** Cloud Storage bucket, and
 creates exactly one CPU-only `solo-workstation` with a retained
-512 GiB `pd-balanced` disk. The VM uses a non-static ephemeral
-public IPv4 **for outgoing internet traffic**, not direct RDP.
-It does not provision Cloud NAT, external reserved IPs, GPU or vLLM.
+512 GiB `pd-balanced` disk. For defense in depth the VM is **initially provisioned WITHOUT a public
+IP**. After confirming the effective per-instance and hierarchical VPC
+firewall policies are safe, the operator may add a non-static ephemeral
+public IPv4 for outgoing internet traffic via
+`gcloud compute instances add-access-config solo-workstation --project=argon-surf-472319-b0 --zone=southamerica-east1-b --network-interface=nic0`.
+This is not an RDP endpoint. No Cloud NAT, external reserved IPs, GPU or vLLM
+is provisioned. Until that step, Private Google Access works for Google
+APIs but arbitrary external package downloads may not.
 
 In authorized Cloud Shell after checking `gh auth status`:
 ```bash
