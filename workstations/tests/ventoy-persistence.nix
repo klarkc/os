@@ -159,6 +159,37 @@ pkgs.testers.runNixOSTest {
     client.succeed("solo-client-state ensure")
     client.succeed("mountpoint -q /run/solo-client/ventoy")
 
+    # Dell regression (2026-10-28): Ventoy bootable, direct raw USB
+    # mount returns EBUSY; older Ventoy used /dev/mapper/sdX1.
+    # Mock mount only in CI via bash exported function, not in production.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/SOLODATA); legacy=$(basename \"$usb_data\"); printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
+    client.succeed("test -b /dev/mapper/$(basename \"$(readlink -f /dev/disk/by-label/SOLODATA)\")")
+    client.succeed("""bash -c 'mount() {
+      for arg in "$@"; do
+        case "$arg" in
+          /dev/disk/by-label/SOLODATA|/dev/sd?1) return 32 ;;
+        esac
+      done
+      command mount "$@"
+    }; export -f mount; solo-client-state ensure'""")
+    client.succeed("findmnt -no SOURCE /run/solo-client/ventoy | grep -E '/dev/(mapper/|dm-)'")
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("dmsetup remove \"$(basename \"$(readlink -f /dev/disk/by-label/SOLODATA)\")\"")
+
+    # Older Ventoy may expose no alias at all. Ensure must create a
+    # USB-validated linear mapping, without touching the internal HDD.
+    client.succeed("""bash -c 'mount() {
+      for arg in "$@"; do
+        case "$arg" in
+          /dev/disk/by-label/SOLODATA|/dev/sd?1) return 32 ;;
+        esac
+      done
+      command mount "$@"
+    }; export -f mount; solo-client-state ensure'""")
+    client.succeed("findmnt -no SOURCE /run/solo-client/ventoy | grep -E '/dev/(mapper/|dm-)'")
+    client.succeed("grep -Fx 'psk=ci-test-password' /run/solo-client/ventoy/solo-client/wifi/solo-ci.nmconnection")
+
     # Simulate removal of volatile RAM state while the USB overlay persists.
     client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")
     client.succeed("rm /home/nixos/.config/solo-gcloud/configurations/config_default")
