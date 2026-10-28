@@ -164,7 +164,7 @@ pkgs.testers.runNixOSTest {
     # Mock mount only in CI via bash exported function, not in production.
     client.succeed("umount /run/solo-client/ventoy")
     client.succeed("usb_data=$(readlink -f /dev/disk/by-label/SOLODATA); legacy=$(basename \"$usb_data\"); printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
-    client.succeed("test -b /dev/mapper/$(basename \"$(readlink -f /dev/disk/by-label/SOLODATA)\")")
+    client.succeed('test -b /dev/mapper/$(basename "$(readlink -f /dev/disk/by-label/SOLODATA)")')
     client.succeed("""bash -c 'mount() {
       for arg in "$@"; do
         case "$arg" in
