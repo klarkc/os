@@ -191,6 +191,19 @@ pkgs.testers.runNixOSTest {
     client.succeed("findmnt -no SOURCE /run/solo-client/ventoy | grep -E '/dev/(mapper/|dm-)'")
     client.succeed("grep -Fx 'psk=ci-test-password' /run/solo-client/ventoy/solo-client/wifi/solo-ci.nmconnection")
 
+    # REGRESSION: If boot-time USB mounting fails, the kiosk later calls
+    # 'ensure'. That action must restore the previous Google CLI identity,
+    # Wi-Fi profile and TLS certificate, not merely mount the USB.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")
+    client.succeed("rm /home/nixos/.config/solo-gcloud/configurations/config_default")
+    client.succeed("rm /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+    client.succeed("rm /etc/NetworkManager/system-connections/solo-ci.nmconnection")
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state ensure")
+    client.succeed("sqlite3 /home/nixos/.config/solo-gcloud/credentials.db 'SELECT token FROM ci_fixture' | grep -Fx ci-synthetic-only")
+    client.succeed("grep -Fx 'psk=ci-test-password' /etc/NetworkManager/system-connections/solo-ci.nmconnection")
+    client.succeed("grep -Fx 'ci-xrdp-certificate' /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+
     # Simulate removal of volatile RAM state while the USB overlay persists.
     client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")
     client.succeed("rm /home/nixos/.config/solo-gcloud/configurations/config_default")
