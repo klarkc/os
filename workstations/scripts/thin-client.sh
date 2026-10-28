@@ -54,10 +54,16 @@ while true; do
 
   # A boot-time Ventoy mount failure must be recoverable after live boot.
   # 'ensure' re-discovers the USB and/or VentoyPart on every retry.
-  while ! sudo -n "$STATE" ensure >/dev/null 2>&1; do
-    printf '\n  Unidade USB de configuracao indisponivel.\n'
-    printf '  Mantenha o pendrive conectado. Tentando novamente.\n'
-    printf '  Diagnostico avancado: Ctrl+Alt+F2\n'
+  usb_retries=0
+  while ! usb_error="$(sudo -n "$STATE" ensure 2>&1)"; do
+    usb_retries=$((usb_retries + 1))
+    if (( usb_retries == 1 || usb_retries % 4 == 0 )); then
+      printf '\n  Unidade USB de configuracao indisponivel.\n'
+      printf '  Tentando recuperar acesso ao pendrive, sem alterar o disco interno.\n'
+      printf '  Diagnostico: Ctrl+Alt+F2 e execute solo-client-state diagnose\n'
+      # Present the last precise error instead of an endless generic loop.
+      printf '  %s\n' "$(printf '%s\n' "$usb_error" | tail -n1)"
+    fi
     sleep 6
   done
   sudo -n "$STATE" save >/dev/null 2>&1 || true

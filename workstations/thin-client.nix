@@ -2,7 +2,7 @@
 
 let
   stateTool = pkgs.writeShellScriptBin "solo-client-state" ''
-    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd ]}:$PATH
+    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd pkgs.lvm2 ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/ventoy-state.sh} "$@"
   '';
   iapTool = pkgs.writeShellScriptBin "solo-gce-iap" ''
@@ -55,7 +55,7 @@ in
     before = [ "NetworkManager.service" ];
     after = [ "systemd-udev-settle.service" ];
     serviceConfig.Type = "oneshot";
-    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd ];
+    path = [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd pkgs.lvm2 ];
     script = "${stateTool}/bin/solo-client-state restore";
   };
   systemd.services.NetworkManager.requires = [ "solo-ventoy-state.service" ];

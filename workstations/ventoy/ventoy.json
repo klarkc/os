@@ -11,9 +11,6 @@
     },
     {
       "VTOY_DEFAULT_KBD_LAYOUT": "PORTU_BRAZIL"
-    },
-    {
-      "VTOY_LINUX_REMOUNT": "1"
     }
   ],
   "menu_alias": [

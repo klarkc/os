@@ -20,10 +20,14 @@ O Ventoy aguarda somente 2 segundos no menu principal e seleciona a ISO.
 O segundo menu Ventoy é desativado; a ISO tem timeout de 1 segundo.
 Ventoy ainda mantém opções de recuperação pelo menu/funções de teclado.
 
-O item `VTOY_LINUX_REMOUNT=1` ativa a compatibilidade para tornar
-acessível a partição que contém a ISO após o boot. O cliente também pode usar
-`/dev/mapper/VentoyPart` (Ventoy recente) ou localizar a partição de dados
-pela partição-irmã `VTOYEFI`, verificando que o dispositivo é realmente USB.
+A opção `VTOY_LINUX_REMOUNT` foi **removida pelo Ventoy em 1.1.01**;
+não deve ser usada como garantia de montagem. Se a partição de dados estiver
+ocupada, o cliente tenta os mapeamentos existentes de todas as versões:
+`/dev/mapper/VentoyPart` (1.1.18), `/dev/mapper/sdX1` (legado) e
+`/dev/dm-N`. Quando nenhum mapeamento válido existir, cria sob demanda
+`/dev/mapper/solo-client-ventoy-data` como vista linear do dispositivo USB.
+A origem deve ser uma partição de dados vinculada ao Ventoy por `Ventoy`
+ou `VTOYEFI`; nunca um disco interno. Não sobrescreve mapeamentos alheios.
 
 **Importante:** Ventoy permite nome e localização diferentes para a ISO.
 Nesse caso, modifique os caminhos `VTOY_DEFAULT_IMAGE` e `menu_alias.image`
@@ -39,7 +43,7 @@ A tela de entrada exibe apenas "Solo Workstation". Se não conectar:
 - USB: o cliente tenta remontar novamente com regras que **não permitem
   montar um disco interno** como persistência.
 - Suporte avançado: console `Ctrl+Alt+F2`; `lsblk -o NAME,TRAN,FSTYPE,LABEL,TYPE`,
-  `ls -l /dev/mapper/VentoyPart` e `journalctl -u solo-ventoy-state`.
+  `solo-client-state diagnose` e `journalctl -u solo-ventoy-state`.
 - O uso de IAP exige conta Google autorizada e servidor GCE pronto;
   testes offline não comprovam conexão real.
 
@@ -48,7 +52,7 @@ A tela de entrada exibe apenas "Solo Workstation". Se não conectar:
 - QEMU boot+USB físico emulado exFAT+VTOYEFI.
 - Recuperação de montagem após falha no boot (teste *red* registrado).
 - USB com partição de dados renomeada: descoberta via VTOYEFI.
-- Partição via device-mapper VentoyPart (ancestral USB verificado).
+- Partição via mapper VentoyPart ou nome legado e criação sob demanda quando a partição bruta está ocupada.
 - Perfil Wi-Fi, credencial gcloud e certificado TLS preservados após
   reinicialização **real** do kernel.
 - Novo comando `ensure` e sudo estritamente limitado;

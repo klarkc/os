@@ -77,46 +77,144 @@ usb_candidates() {
   if (( count == 1 )); then printf '%s\n' "$chosen"; fi
 }
 
+# Device-mapper aliases varied across Ventoy versions: /dev/mapper/sdX1
+# (older), /dev/mapper/VentoyPart (1.1.18) or /dev/dm-N. Verify every
+# backing device and only accept mappings of the USB data partition itself.
+usb_raw_candidates() {
+  local source resolved
+  while IFS= read -r source; do
+    [[ -b "$source" ]] || continue
+    [[ "$(lsblk -no TYPE "$source" 2>/dev/null | head -n1)" == "part" ]] || continue
+    usb_backing "$source" || continue
+    resolved="$(readlink -f "$source")"
+    [[ -b "$resolved" ]] || continue
+    printf '%s\n' "$resolved"
+  done < <(usb_candidates)
+}
+
+mapper_backs_raw() {
+  local mapper="$1" raw="$2" actual directory slave
+  [[ -b "$mapper" && -b "$raw" ]] || return 1
+  mapper="$(readlink -f "$mapper")"
+  raw="$(readlink -f "$raw")"
+  [[ "$mapper" != "$raw" ]] || return 1
+  directory="/sys/class/block/$(basename "$mapper")/slaves"
+  [[ -d "$directory" ]] || return 1
+  for slave in "$directory/"*; do
+    [[ -e "$slave" ]] || continue
+    actual="/dev/$(basename "$slave")"
+    if [[ "$(readlink -f "$actual")" == "$raw" ]]; then
+      return 0
+    fi
+    mapper_backs_raw "$actual" "$raw" && return 0
+  done
+  return 1
+}
+
+usb_mapper_candidates() {
+  local raw mapped
+  while IFS= read -r raw; do
+    for mapped in /dev/mapper/* /dev/dm-*; do
+      [[ -b "$mapped" ]] || continue
+      mapper_backs_raw "$mapped" "$raw" || continue
+      usb_backing "$mapped" || continue
+      printf '%s\n' "$mapped"
+    done
+  done < <(usb_raw_candidates)
+}
+
+try_mount_usb() {
+  local device="$1" fs options message
+  [[ -b "$device" ]] && usb_backing "$device" || return 1
+  fs="$(lsblk -no FSTYPE "$device" 2>/dev/null | head -n1 || true)"
+  if [[ -z "$fs" ]]; then
+    fs="$(blkid -p -o value -s TYPE "$device" 2>/dev/null || true)"
+  fi
+  options="rw,nosuid,nodev,noexec"
+  case "$fs" in
+    exfat|vfat|ntfs|ntfs3) options="$options,uid=0,gid=0,umask=077" ;;
+    *) return 1 ;;
+  esac
+
+  if ! message="$(mount -o "$options" "$device" "$MOUNT" 2>&1)"; then
+    printf 'USB mount unavailable: %s (%s): %s\n' "$device" "$fs" "$message" >&2
+    return 1
+  fi
+  if ! (touch "$MOUNT/.solo-client-write-test" && rm "$MOUNT/.solo-client-write-test"); then
+    echo "USB volume mounted but not writable: $device" >&2
+    umount "$MOUNT" || true
+    return 1
+  fi
+  mkdir -p "$DATA/wifi" "$GCLOUD_STORE"
+  echo "Trusted Ventoy USB volume mounted: $device"
+  return 0
+}
+
+create_usb_mapper() {
+  local raw="$1" size name="solo-client-ventoy-data" mapped="/dev/mapper/solo-client-ventoy-data"
+  [[ -b "$raw" ]] && usb_backing "$raw" || return 1
+  [[ "$(lsblk -no TYPE "$raw" 2>/dev/null | head -n1)" == part ]] || return 1
+
+  if [[ -e "$mapped" ]]; then
+    # Never replace an unrelated mapping with the same name.
+    mapper_backs_raw "$mapped" "$raw" && usb_backing "$mapped" || return 1
+  else
+    size="$(blockdev --getsz "$raw" 2>/dev/null || true)"
+    [[ "$size" =~ ^[1-9][0-9]*$ ]] || return 1
+    if ! dmsetup create "$name" --table "0 $size linear $raw 0" 2>/dev/null; then
+      return 1
+    fi
+    udevadm settle --timeout=4 >/dev/null 2>&1 || true
+  fi
+  [[ -b "$mapped" ]] && mapper_backs_raw "$mapped" "$raw" && usb_backing "$mapped" || return 1
+  printf '%s\n' "$mapped"
+}
+
 prepare_usb() {
-  local device fs options attempt
-  [[ "$(id -u)" == 0 ]] || { echo "USB recovery requires root." >&2; return 1; }
+  local device raw mapped attempt
+  [[ "$(id -u)" -eq 0 ]] || { echo "USB recovery requires root." >&2; return 1; }
   mkdir -p "$MOUNT"
   if is_ready; then return 0; fi
 
-  # A failed boot-time USB discovery is NOT permanent. Poll again after
-  # Wi-Fi pairing and on every recovery attempt.
   for attempt in 1 2 3; do
     udevadm settle --timeout=3 >/dev/null 2>&1 || true
-    while IFS= read -r device; do
-      [[ -b "$device" ]] || continue
-      usb_backing "$device" || continue
-      fs="$(lsblk -no FSTYPE "$device" 2>/dev/null | head -n1)"
-      if [[ -z "$fs" ]]; then
-        fs="$(blkid -o value -s TYPE "$device" 2>/dev/null || true)"
-      fi
-      options="rw,nosuid,nodev,noexec"
-      case "$fs" in
-        exfat|vfat|ntfs|ntfs3)
-          options="$options,uid=0,gid=0,umask=077"
-          ;;
-        *) continue ;;
-      esac
 
-      if ! mount -o "$options" "$device" "$MOUNT" 2>/dev/null; then
-        continue
-      fi
-      if ! (touch "$MOUNT/.solo-client-write-test" && rm "$MOUNT/.solo-client-write-test"); then
-        umount "$MOUNT" || true
-        continue
-      fi
-      mkdir -p "$DATA/wifi" "$GCLOUD_STORE"
-      echo "Trusted USB persistence mounted from $device."
-      return 0
+    # Direct mounts first. They are normally available on recent Ventoy,
+    # but may fail with EBUSY when the current ISO occupies this partition.
+    while IFS= read -r device; do
+      try_mount_usb "$device" && return 0
     done < <(usb_candidates)
+
+    # Existing mapper aliases: 1.1.18 VentoyPart AND old /dev/mapper/sdX1.
+    while IFS= read -r device; do
+      try_mount_usb "$device" && return 0
+    done < <(usb_mapper_candidates)
+
+    # Official Ventoy recovery: create a DM-linear view of the verified
+    # physical USB data partition when raw direct mounting stays busy.
+    while IFS= read -r raw; do
+      mapped="$(create_usb_mapper "$raw")" || continue
+      try_mount_usb "$mapped" && return 0
+    done < <(usb_raw_candidates)
+
+    # Trigger udev before another attempt; do not format, repartition or
+    # ever select an internal HDD.
+    udevadm trigger --subsystem-match=block --action=change >/dev/null 2>&1 || true
     sleep 1
   done
-  echo "Ventoy data volume still unavailable (label, device-mapper, or VTOYEFI)." >&2
+  echo "Ventoy USB inaccessible: see 'solo-client-state diagnose' on Ctrl+Alt+F2." >&2
   return 1
+}
+
+diagnose_state() {
+  echo "Solo Workstation - USB diagnostics (paths/labels only, no credentials)"
+  lsblk -o NAME,PATH,TRAN,TYPE,FSTYPE,LABEL,SIZE,MOUNTPOINTS
+  echo "Ventoy USB candidates:"
+  usb_candidates || true
+  echo "Mapped USB candidates:"
+  usb_mapper_candidates || true
+  echo "Current persistent mount:"
+  findmnt -no SOURCE,FSTYPE,TARGET "$MOUNT" || true
 }
 
 restore_state() {
@@ -223,8 +321,9 @@ case "${1:-}" in
   save) save_state ;;
   is-ready) is_ready ;;
   ensure) prepare_usb ;;
+  diagnose) diagnose_state ;;
   *)
-    echo "Usage: solo-client-state {restore|save|is-ready|ensure}" >&2
+    echo "Usage: solo-client-state {restore|save|is-ready|ensure|diagnose}" >&2
     exit 2
     ;;
 esac

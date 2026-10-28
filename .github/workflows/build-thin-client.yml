@@ -39,7 +39,7 @@ jobs:
           test "$(nix eval --raw .#nixosConfigurations.thin-client.config.system.nixos.distroName)" = "Solo Workstation"
           test "$(nix eval --json .#nixosConfigurations.thin-client.config.boot.loader.timeout)" = 1
           nix eval --json .#nixosConfigurations.thin-client.config.boot.kernelParams | jq -e 'index("quiet") != null'
-          jq -e '.control | any(.VTOY_LINUX_REMOUNT == "1")' ventoy/ventoy.json
+          jq -e '[.control[] | has("VTOY_LINUX_REMOUNT")] | all(. == false)' ventoy/ventoy.json
           jq -e '.control | any(.VTOY_SECONDARY_BOOT_MENU == "0")' ventoy/ventoy.json
           test "$(jq -r '.control[] | .VTOY_DEFAULT_IMAGE // empty' ventoy/ventoy.json)" = "/solo-thin-client-x86_64.iso"
 
