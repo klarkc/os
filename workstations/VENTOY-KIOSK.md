@@ -63,3 +63,11 @@ Documentação de referência:
 - https://www.ventoy.net/en/plugin_control.html
 - https://www.ventoy.net/en/doc_linux_remount.html
 - https://ventoy.net/en/doc_disk_layout.html
+
+## Recuperação pós-boot
+
+Quando a partição USB estava ocupada durante o boot, a recuperação tardia
+`solo-client-state ensure` não apenas a monta; importa perfis Wi-Fi,
+credenciais CLI e certificados FreeRDP persistidos no USB e solicita reload
+dos perfis ao NetworkManager em execução. A rotina recusa salvar quaisquer
+segredos em uma montagem não validada como partição de dados do USB.

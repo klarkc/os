@@ -16,7 +16,22 @@ FREERDP_DIR=/home/nixos/.config/freerdp
 FREERDP_STORE="$DATA/freerdp"
 
 is_ready() {
-  mountpoint -q "$MOUNT"
+  # A mountpoint alone does not prove the persistence destination is USB.
+  # Never write credentials if a tmpfs, internal disk, ISO or VTOYEFI volume
+  # has appeared at this path. Resolve device-mapper ancestry to raw USB data.
+  local source fs raw resolved
+  mountpoint -q "$MOUNT" || return 1
+  source="$(findmnt -nro SOURCE --target "$MOUNT" 2>/dev/null | head -n1 || true)"
+  fs="$(findmnt -nro FSTYPE --target "$MOUNT" 2>/dev/null | head -n1 || true)"
+  [[ -b "$source" ]] || return 1
+  case "$fs" in exfat|vfat|ntfs|ntfs3) ;; *) return 1 ;; esac
+  usb_backing "$source" || return 1
+  resolved="$(readlink -f "$source")"
+  while IFS= read -r raw; do
+    [[ "$resolved" == "$raw" ]] && return 0
+    mapper_backs_raw "$source" "$raw" && return 0
+  done < <(usb_raw_candidates)
+  return 1
 }
 
 # Walk the kernel's real block-device ancestry, including device-mapper.
@@ -259,6 +274,18 @@ restore_state() {
   fi
 }
 
+ensure_state() {
+  # On the Dell, the USB can become mountable only AFTER the original
+  # boot-time restore has already exited. Mounting alone would lose Wi-Fi
+  # settings and force Google login every boot. Restore the whitelist once.
+  if is_ready; then return 0; fi
+  restore_state || return 1
+  is_ready || return 1
+  if systemctl is-active --quiet NetworkManager.service; then
+    nmcli connection reload || true
+  fi
+}
+
 save_state() {
   if ! is_ready; then
     echo "Ventoy persistence unavailable. Refusing to save secrets to any disk." >&2
@@ -320,7 +347,7 @@ case "${1:-}" in
   restore) restore_state ;;
   save) save_state ;;
   is-ready) is_ready ;;
-  ensure) prepare_usb ;;
+  ensure) ensure_state ;;
   diagnose) diagnose_state ;;
   *)
     echo "Usage: solo-client-state {restore|save|is-ready|ensure|diagnose}" >&2

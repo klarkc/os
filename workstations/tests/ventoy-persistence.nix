@@ -202,7 +202,18 @@ pkgs.testers.runNixOSTest {
     client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/solo-client-state ensure")
     client.succeed("sqlite3 /home/nixos/.config/solo-gcloud/credentials.db 'SELECT token FROM ci_fixture' | grep -Fx ci-synthetic-only")
     client.succeed("grep -Fx 'psk=ci-test-password' /etc/NetworkManager/system-connections/solo-ci.nmconnection")
+    client.succeed("nmcli -t -f NAME con show | grep -Fx solo-ci-wifi")
     client.succeed("grep -Fx 'ci-xrdp-certificate' /home/nixos/.config/freerdp/server/127.0.0.1_13389.pem")
+
+    # Security regression: a wrong filesystem mounted at the persistence
+    # path must not be accepted for storing Google OAuth credentials.
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("mount -t tmpfs -o size=8M tmpfs /run/solo-client/ventoy")
+    client.succeed("! solo-client-state is-ready")
+    client.succeed("! solo-client-state save")
+    client.succeed("umount /run/solo-client/ventoy")
+    client.succeed("solo-client-state ensure")
+    client.succeed("mountpoint -q /run/solo-client/ventoy")
 
     # Simulate removal of volatile RAM state while the USB overlay persists.
     client.succeed("rm /home/nixos/.config/solo-gcloud/credentials.db")

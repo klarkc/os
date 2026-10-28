@@ -2,7 +2,7 @@
 
 let
   stateTool = pkgs.writeShellScriptBin "solo-client-state" ''
-    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd pkgs.lvm2 ]}:$PATH
+    export PATH=${lib.makeBinPath [ pkgs.util-linux pkgs.coreutils pkgs.gnugrep pkgs.gawk pkgs.findutils pkgs.sqlite pkgs.systemd pkgs.lvm2 pkgs.networkmanager ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/ventoy-state.sh} "$@"
   '';
   iapTool = pkgs.writeShellScriptBin "solo-gce-iap" ''
@@ -37,8 +37,9 @@ in
     "udev.log_level=3" "rd.udev.log_level=3"
   ];
 
-  # The kiosk can only save state or attempt to mount a validated USB.
-  # Restore, arbitrary mount operations and shells remain restricted.
+  # The kiosk can only save state or recover a validated USB. The ensure
+  # helper restores a narrow whitelist after a late mount; arbitrary shell
+  # execution, internal disks and other privileged operations are denied.
   security.sudo.extraRules = [{
     users = [ "nixos" ];
     commands = [
