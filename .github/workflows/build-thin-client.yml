@@ -33,6 +33,8 @@ jobs:
         run: bash -n workstations/scripts/gce-iap-preflight.sh
       - name: Validate WIF read-only audit script syntax
         run: bash -n workstations/scripts/gce-wif-readonly-audit.sh
+      - name: Validate approved provisioning script syntax (never execute deployment in CI)
+        run: bash -n workstations/scripts/gce-provision-approved.sh
       - name: Evaluate flake and all NixOS configurations
         run: |
           set -euo pipefail

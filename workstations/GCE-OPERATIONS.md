@@ -278,3 +278,46 @@ Official references:
 https://github.com/google-github-actions/auth
 https://github.com/google-github-actions/setup-gcloud
 https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
+
+## Approved provisioning path — 2026-10-28
+
+The operator approved the specific `e2-highmem-4` CPU-only workstation with
+**512 GiB `pd-balanced` persistent boot disk**. This does **not** authorize
+unrestricted infrastructure changes or a standing deployment administrator
+credential. The project-scoped GitHub WIF service account remains read-only.
+
+The connected Compute Engine `create_instance` API **cannot** specify
+the boot disk size/type, custom image name, boot disk retention, network
+or firewall: using it would silently create a Debian VM with the wrong
+storage. Therefore deployment must use `gcloud` under the operator's
+authorized Cloud Shell session, not that limited API.
+
+`workstations/scripts/gce-provision-approved.sh` stages the proven raw
+image artifact from successful [run 40521793755](https://github.com/klarkc/os/actions/runs/40521793755)
+at commit `96a98ff35863d96ad21d42180f8f10650422c5d2`.
+It verifies SHA256 and archive format before creating resources,
+creates an isolated custom VPC (no default allow rules), regional
+subnet, two IAP-only firewall rules for TCP 22 and 3389, imports the
+image through a **temporary private** Cloud Storage bucket, and
+creates exactly one CPU-only `solo-workstation` with a retained
+512 GiB `pd-balanced` disk. The VM uses a non-static ephemeral
+public IPv4 **for outgoing internet traffic**, not direct RDP.
+It does not provision Cloud NAT, external reserved IPs, GPU or vLLM.
+
+In authorized Cloud Shell after checking `gh auth status`:
+```bash
+git clone --branch feat/solo-gce-workstation-20261026 --single-branch https://github.com/klarkc/os.git
+cd os
+bash workstations/scripts/gce-provision-approved.sh --preflight
+SOLO_GCE_DEPLOY_APPROVED=YES bash workstations/scripts/gce-provision-approved.sh --deploy
+```
+
+The script refuses to overwrite pre-existing VM, VPC, bucket or image.
+Do not run with `bash -x`, disclose private IAM policies, paste
+tokens, or introduce GitHub Actions project-wide administrator roles.
+**Not completed:** actual provisioning, authorized Dell principal IAP
+binding, effective firewall review, real XRDP/XMonad login, HOME
+restore and stop/start. Test those as independent gates after creation.
+Also verify regional image storage/temporary staging and VM quota before
+running. Deleting the staging bucket does not delete the imported
+custom image; it incurs image storage until explicitly cleaned up.
