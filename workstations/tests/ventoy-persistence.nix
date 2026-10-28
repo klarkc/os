@@ -163,8 +163,8 @@ pkgs.testers.runNixOSTest {
     # mount returns EBUSY; older Ventoy used /dev/mapper/sdX1.
     # Mock mount only in CI via bash exported function, not in production.
     client.succeed("umount /run/solo-client/ventoy")
-    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/SOLODATA); legacy=$(basename \"$usb_data\"); printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
-    client.succeed('test -b /dev/mapper/$(basename "$(readlink -f /dev/disk/by-label/SOLODATA)")')
+    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/SOLODATA); legacy=$(basename \"$usb_data\"); printf '%s\\n' \"$legacy\" > /tmp/ci-legacy-device-name; printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
+    client.succeed("test -b /dev/mapper/$(cat /tmp/ci-legacy-device-name)")
     client.succeed("""bash -c 'mount() {
       for arg in "$@"; do
         case "$arg" in
@@ -175,7 +175,8 @@ pkgs.testers.runNixOSTest {
     }; export -f mount; solo-client-state ensure'""")
     client.succeed("findmnt -no SOURCE /run/solo-client/ventoy | grep -E '/dev/(mapper/|dm-)'")
     client.succeed("umount /run/solo-client/ventoy")
-    client.succeed("dmsetup remove \"$(basename \"$(readlink -f /dev/disk/by-label/SOLODATA)\")\"")
+    client.succeed("dmsetup remove \"$(cat /tmp/ci-legacy-device-name)\"")
+    client.succeed("udevadm trigger --subsystem-match=block --action=change && udevadm settle")
 
     # Older Ventoy may expose no alias at all. Ensure must create a
     # USB-validated linear mapping, without touching the internal HDD.
