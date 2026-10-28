@@ -55,7 +55,7 @@ fi
 echo "PRECHECK PASS: target resources absent; machine type available"
 echo "APPROVED PLAN: $vm ($zone), e2-highmem-4, 512 GiB pd-balanced boot disk"
 echo "NETWORK: dedicated $network + $subnet; ingress TCP 22/3389 only from 35.235.240.0/20"
-echo "EGRESS: ephemeral public IPv4 (no static IP, no Cloud NAT); no other allowed ingress"
+echo "EGRESS: initially NO external IP; add ephemeral IPv4 only after effective firewall audit"
 echo "IMAGE: successful GitHub Actions run $run_id, commit $sha"
 echo "STAGING: temporary private Cloud Storage bucket for tar.gz image import"
 if [[ "$1" == --preflight ]]; then
@@ -125,11 +125,14 @@ gcloud compute instances create "$vm" --project="$project" --zone="$zone" \
   --machine-type=e2-highmem-4 --image="$image" --image-project="$project" \
   --boot-disk-size=512GB --boot-disk-type=pd-balanced \
   --no-boot-disk-auto-delete --no-service-account --no-scopes \
-  --network-interface="network=$network,subnet=$subnet,stack-type=IPV4_ONLY" \
+  --network-interface="network=$network,subnet=$subnet,stack-type=IPV4_ONLY,no-address" \
   --tags="$tag" --metadata=enable-oslogin=TRUE \
   --shielded-vtpm --shielded-integrity-monitoring \
   --labels=managed-by=buildgce,environment=development
 
-echo "INSTANCE CREATED: run the fail-closed VPC and IAP authorization audit next."
+echo "INSTANCE CREATED WITHOUT PUBLIC IP: verify effective VPC and hierarchical firewall policies before adding egress."
 echo "IMPORTANT: the IAP principal role, interactive XRDP password and graphical login are not configured by this script."
+ echo "After successful effective-firewall audit, enable low-cost outbound access with:"
+ echo "gcloud compute instances add-access-config $vm --project=$project --zone=$zone --network-interface=nic0"
+ echo "That assigns an EPHEMERAL public IP; never expose ports 22/3389 outside IAP."
 echo "IMPORTANT: stop the VM after testing to limit compute cost; disk/image still incur storage cost."
