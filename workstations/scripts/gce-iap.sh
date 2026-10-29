@@ -44,6 +44,17 @@ login() {
   sudo -n "$STATE" save
 }
 
+# Read-only; never starts, stops or changes the GCE instance.
+instance_status() {
+  export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  if ! has_credentials; then
+    echo "Google CLI credentials unavailable." >&2
+    return 1
+  fi
+  "$GCLOUD" --quiet compute instances describe "$INSTANCE" \
+    --project="$PROJECT" --zone="$ZONE" --format='value(status)'
+}
+
 check() {
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   has_credentials || return 1
@@ -67,8 +78,7 @@ ensure_running() {
   fi
   local status previous="" started=false poll
   for ((poll=1; poll<=max_polls; poll++)); do
-    if ! status="$("$GCLOUD" --quiet compute instances describe "$INSTANCE" \
-        --project="$PROJECT" --zone="$ZONE" --format='value(status)')"; then
+    if ! status="$(instance_status)"; then
       echo "Cannot read wsklarkc status (login or compute.instances.get)." >&2
       return 1
     fi
@@ -130,9 +140,10 @@ case "${1:-}" in
   check) check ;;
   has-credentials) has_credentials ;;
   ensure-running) ensure_running ;;
+  instance-status) instance_status ;;
   tunnel) tunnel ;;
   *)
-    echo "Usage: lpklarkc-iap {login|check|has-credentials|ensure-running|tunnel}" >&2
+    echo "Usage: lpklarkc-iap {login|check|has-credentials|ensure-running|instance-status|tunnel}" >&2
     exit 2
     ;;
 esac

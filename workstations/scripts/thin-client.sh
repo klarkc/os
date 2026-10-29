@@ -9,19 +9,67 @@ NM_ONLINE="${LPKLARKC_NM_ONLINE_BIN:-nm-online}"
 NMCLI="${LPKLARKC_NMCLI_BIN:-nmcli}"
 IP_CMD="${LPKLARKC_IP_BIN:-ip}"
 RDP_ADDRESS="127.0.0.1:13389"
+WATCHDOG="${LPKLARKC_WATCHDOG_TOOL:-/run/current-system/sw/bin/lpklarkc-peer-watchdog}"
+POWEROFF="${LPKLARKC_POWEROFF_TOOL:-/run/current-system/sw/bin/lpklarkc-poweroff}"
+SUDO="${LPKLARKC_SUDO_BIN:-sudo}"
 TUNNEL_PID=""
 TUNNEL_LOG=""
+WATCHDOG_PID=""
+WAKE_COMPLETED=false
+RDP_READY_ONCE=false
+WAKE_STARTED_AT=0
+# The machine must not stay on forever if XRDP never comes up after wake.
+STARTUP_GRACE_SECONDS="${LPKLARKC_STARTUP_GRACE_SECONDS:-600}"
+if [[ ! "$STARTUP_GRACE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
+  echo "Invalid startup grace period" >&2
+  exit 2
+fi
 
-cleanup() {
+stop_tunnel() {
   if [[ -n "$TUNNEL_PID" ]]; then
     kill "$TUNNEL_PID" 2>/dev/null || true
     wait "$TUNNEL_PID" 2>/dev/null || true
   fi
   [[ -z "$TUNNEL_LOG" ]] || rm -f -- "$TUNNEL_LOG"
+  TUNNEL_PID=""
+  TUNNEL_LOG=""
+}
+
+cleanup() {
+  stop_tunnel
+  if [[ -n "$WATCHDOG_PID" ]]; then
+    kill "$WATCHDOG_PID" 2>/dev/null || true
+    wait "$WATCHDOG_PID" 2>/dev/null || true
+  fi
 }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+
+request_local_shutdown() {
+  printf '\n  Encerrando o Dell: a workstation remota nao esta mais disponivel.\n'
+  if ! "$SUDO" -n "$POWEROFF"; then
+    echo "Falha ao solicitar desligamento local; tente pelo console." >&2
+    return 1
+  fi
+  # The immutable privileged wrapper invokes systemctl poweroff --no-block.
+  # Do not reenter the auto-start loop while the machine is shutting down.
+  exit 0
+}
+
+peer_stopped() {
+  local status
+  # Failure to consult GCE is NOT proof that the VM has stopped.
+  # The independent watchdog also checks the actual XRDP response.
+  status="$(timeout 15 "$IAP" instance-status 2>/dev/null)" || return 1
+  case "$status" in
+    TERMINATED|STOPPING|PENDING_STOP|SUSPENDED|SUSPENDING)
+      printf '  Workstation GCE encerrada (%s).\n' "$status"
+      return 0
+      ;;
+  esac
+  return 1
+}
 
 # A Wi-Fi connection manually activated using nmtui can already have a valid
 # route while nm-online is still timing out. Verify NM link and IPv4 route.
@@ -62,7 +110,24 @@ printf '  ========================================\n\n'
 printf '  Iniciando seu ambiente de trabalho remoto.\n\n'
 
 while true; do
+  if [[ "$WAKE_COMPLETED" == true ]] && peer_stopped; then
+    request_local_shutdown || sleep 5
+    continue
+  fi
+  if [[ "$WAKE_COMPLETED" == true && "$RDP_READY_ONCE" == false ]] &&
+     (( $(date +%s) - WAKE_STARTED_AT >= STARTUP_GRACE_SECONDS )); then
+    echo "Tempo de inicializacao do XRDP excedido; desligando o Dell."
+    request_local_shutdown || sleep 5
+    continue
+  fi
   while ! network_ready; do
+    if [[ "$RDP_READY_ONCE" == true ]]; then
+      # Once paired, do not wait indefinitely in an interactive nmtui.
+      # The watchdog powers off after a sustained peer/network outage.
+      printf '\n  Rede indisponivel; aguardando reconexao automatica...\n'
+      sleep 5
+      continue
+    fi
     printf '\n  Conecte-se a uma rede Wi-Fi.\n'
     printf '  O configurador sera aberto agora.\n\n'
     nmtui || true
@@ -94,17 +159,22 @@ while true; do
     done
   fi
 
-  # Query the exact GCE resource, start once if TERMINATED, wait for
-  # RUNNING, and only then establish IAP. Retry IAM/billing failures safely.
-  if ! "$IAP" ensure-running; then
-    printf '\n  Nao foi possivel ligar ou consultar a workstation.\n'
-    printf '  Confira permissoes GCE, cobranca e rede. Tentando novamente...\n'
-    if network_ready && ! "$IAP" check; then
-      printf '  Sessao Google expirada; autorizacao necessaria.\n'
-      "$IAP" login || true
+  # At most one wake phase per client boot. After GCE first reaches RUNNING
+  # never call ensure-running again: an intentional remote shutdown must
+  # turn off the Dell, not create a costly stop/start loop.
+  if [[ "$WAKE_COMPLETED" == false ]]; then
+    if ! "$IAP" ensure-running; then
+      printf '\n  Nao foi possivel ligar ou consultar a workstation.\n'
+      printf '  Confira permissoes GCE, cobranca e rede. Tentando novamente...\n'
+      if network_ready && ! "$IAP" check; then
+        printf '  Sessao Google expirada; autorizacao necessaria.\n'
+        "$IAP" login || true
+      fi
+      sleep 30
+      continue
     fi
-    sleep 30
-    continue
+    WAKE_COMPLETED=true
+    WAKE_STARTED_AT="$(date +%s)"
   fi
 
   printf '\n  Conectando ao seu computador remoto...\n'
@@ -126,6 +196,13 @@ while true; do
   done
 
   if [[ "$ready" == true ]]; then
+    RDP_READY_ONCE=true
+    if [[ -z "$WATCHDOG_PID" ]] || ! kill -0 "$WATCHDOG_PID" 2>/dev/null; then
+      # The watchdog stays alive across FreeRDP reconnections, so a hung
+      # FreeRDP client cannot keep the local Dell powered indefinitely.
+      "$WATCHDOG" &
+      WATCHDOG_PID=$!
+    fi
     printf '  XRDP respondendo. Abrindo area de trabalho...\n'
     # xfreerdp is X11-based. Start a rootless Xorg session directly from
     # tty1, with no LightDM/Openbox/Xterm. When RDP exits, Xorg terminates
@@ -144,8 +221,11 @@ while true; do
     fi
   fi
 
-  cleanup
-  TUNNEL_PID=""
-  TUNNEL_LOG=""
+  stop_tunnel
+  # If GCE stopped while FreeRDP was connected, shut down locally.
+  # Otherwise attempt reconnect without issuing any second VM start.
+  if [[ "$WAKE_COMPLETED" == true ]] && peer_stopped; then
+    request_local_shutdown || sleep 5
+  fi
   sleep 5
 done

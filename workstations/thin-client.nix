@@ -9,6 +9,15 @@ let
     export PATH=${lib.makeBinPath [ pkgs.google-cloud-sdk pkgs.coreutils pkgs.sudo ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
+  # Only exact, immutable shutdown command receives NOPASSWD. The GCE
+  # server manages its own graceful termination when the Dell disappears.
+  poweroffTool = pkgs.writeShellScriptBin "lpklarkc-poweroff" ''
+    exec ${pkgs.systemd}/bin/systemctl poweroff --no-block
+  '';
+  peerWatchdog = pkgs.writeShellScriptBin "lpklarkc-peer-watchdog" ''
+    export PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.netcat-openbsd pkgs.sudo ]}:$PATH
+    exec ${pkgs.bash}/bin/bash ${./scripts/client-peer-watchdog.sh} "$@"
+  '';
   thinClient = pkgs.writeShellScriptBin "lpklarkc" ''
     # Connection/pairing UI runs directly on the trusted local console.
     # The X11 server is started only when an RDP session is available.
@@ -46,6 +55,9 @@ in
     commands = [
       { command = "/run/current-system/sw/bin/lpklarkc-state save"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/lpklarkc-state ensure"; options = [ "NOPASSWD" ]; }
+      # Local power control only. No root shell, guest API permission, or
+      # generic systemctl sudo allowed to the kiosk account.
+      { command = "/run/current-system/sw/bin/lpklarkc-poweroff"; options = [ "NOPASSWD" ]; }
     ];
   }];
 
@@ -126,7 +138,7 @@ in
   '';
 
   environment.systemPackages = with pkgs; [
-    stateTool iapTool thinClient freerdp networkmanager
+    stateTool iapTool thinClient poweroffTool peerWatchdog freerdp networkmanager
     google-cloud-sdk sqlite netcat-openbsd openssh
     # NixOS' system-path post-build expects share/icons for icon cache
     # generation. Keep only the tiny theme index, not the desktop stack.
