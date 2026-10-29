@@ -17,13 +17,8 @@ TUNNEL_LOG=""
 WATCHDOG_PID=""
 WAKE_COMPLETED=false
 RDP_READY_ONCE=false
-WAKE_STARTED_AT=0
-# The machine must not stay on forever if XRDP never comes up after wake.
-STARTUP_GRACE_SECONDS="${LPKLARKC_STARTUP_GRACE_SECONDS:-600}"
-if [[ ! "$STARTUP_GRACE_SECONDS" =~ ^[1-9][0-9]*$ ]]; then
-  echo "Invalid startup grace period" >&2
-  exit 2
-fi
+# The Dell never auto-suspends/hibernates. It powers off normally only when
+# remote suspension/termination has been confirmed; server work is preserved.
 
 stop_tunnel() {
   if [[ -n "$TUNNEL_PID" ]]; then
@@ -63,8 +58,14 @@ peer_stopped() {
   # The independent watchdog also checks the actual XRDP response.
   status="$(timeout 15 "$IAP" instance-status 2>/dev/null)" || return 1
   case "$status" in
-    TERMINATED|STOPPING|PENDING_STOP|SUSPENDED|SUSPENDING)
-      printf '  Workstation GCE encerrada (%s).\n' "$status"
+    TERMINATED|SUSPENDED)
+      # The server controller owns safe suspend. Ignore transitional states
+      # and confirm the *final* state twice before powering off locally.
+      local confirmation
+      sleep 3
+      confirmation="$(timeout 15 "$IAP" instance-status 2>/dev/null)" || return 1
+      [[ "$confirmation" == "$status" ]] || return 1
+      printf '  Workstation confirmou estado %s.\n' "$status"
       return 0
       ;;
   esac
@@ -114,12 +115,6 @@ while true; do
     request_local_shutdown || sleep 5
     continue
   fi
-  if [[ "$WAKE_COMPLETED" == true && "$RDP_READY_ONCE" == false ]] &&
-     (( $(date +%s) - WAKE_STARTED_AT >= STARTUP_GRACE_SECONDS )); then
-    echo "Tempo de inicializacao do XRDP excedido; desligando o Dell."
-    request_local_shutdown || sleep 5
-    continue
-  fi
   while ! network_ready; do
     if [[ "$RDP_READY_ONCE" == true ]]; then
       # Once paired, do not wait indefinitely in an interactive nmtui.
@@ -159,13 +154,12 @@ while true; do
     done
   fi
 
-  # At most one wake phase per client boot. After GCE first reaches RUNNING
-  # never call ensure-running again: an intentional remote shutdown must
-  # turn off the Dell, not create a costly stop/start loop.
+  # Only one resume phase per Dell boot; never auto-start TERMINATED or
+  # compete with a safe server-side suspend after the first connection.
   if [[ "$WAKE_COMPLETED" == false ]]; then
     if ! "$IAP" ensure-running; then
       printf '\n  Nao foi possivel ligar ou consultar a workstation.\n'
-      printf '  Confira permissoes GCE, cobranca e rede. Tentando novamente...\n'
+      printf '  Confira status, permissao resume, cota e rede. Sem start automatico.\n'
       if network_ready && ! "$IAP" check; then
         printf '  Sessao Google expirada; autorizacao necessaria.\n'
         "$IAP" login || true
@@ -174,7 +168,6 @@ while true; do
       continue
     fi
     WAKE_COMPLETED=true
-    WAKE_STARTED_AT="$(date +%s)"
   fi
 
   printf '\n  Conectando ao seu computador remoto...\n'

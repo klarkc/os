@@ -62,63 +62,61 @@ check() {
   "$GCLOUD" auth print-access-token >/dev/null 2>&1
 }
 
-# Wake-on-login: one idempotent start for the specific GCE resource.
-# RUNNING does not mean XRDP is ready. The kiosk probes RDP separately.
+# Resume-on-login: preserve the remote RAM/session; never auto-start TERMINATED.
+# RUNNING alone does not prove XRDP ready, so the kiosk probes the RDP protocol.
 ensure_running() {
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   if ! has_credentials; then
-    echo "Google credentials missing; authorize via the trusted Ventoy USB." >&2
+    echo "No Google CLI credentials; authorize on trusted Ventoy USB." >&2
     return 1
   fi
   local interval="${LPKLARKC_GCE_POLL_SECONDS:-5}"
   local max_polls="${LPKLARKC_GCE_MAX_POLLS:-120}"
   if [[ ! "$interval" =~ ^[0-9]+$ || ! "$max_polls" =~ ^[1-9][0-9]*$ ]]; then
-    echo "Invalid GCE polling interval or maximum." >&2
+    echo "Invalid GCE polling interval/count." >&2
     return 2
   fi
-  local status previous="" started=false poll
+  local status last="" resumed=false poll
   for ((poll=1; poll<=max_polls; poll++)); do
     if ! status="$(instance_status)"; then
-      echo "Cannot read wsklarkc status (login or compute.instances.get)." >&2
+      echo "Unable to query wsklarkc; check network/compute.instances.get." >&2
       return 1
     fi
     case "$status" in
       RUNNING)
-        echo "GCE workstation ligada; verificando servico RDP..."
+        echo "Workstation running; checking XRDP next."
         return 0
         ;;
-      TERMINATED)
-        if [[ "$started" == false ]]; then
-          echo "Workstation desligada; ligando automaticamente no GCE..."
-          # --async avoids broad operation polling IAM permissions.
-          # Never issue a second start request in the same invocation.
-          if ! "$GCLOUD" --quiet compute instances start "$INSTANCE" \
+      SUSPENDED)
+        if [[ "$resumed" == false ]]; then
+          echo "Workstation suspended; resuming saved RAM/session..."
+          if ! "$GCLOUD" --quiet compute instances resume "$INSTANCE" \
               --project="$PROJECT" --zone="$ZONE" --async >/dev/null; then
-            echo "Cannot start wsklarkc (compute.instances.start, quota or billing)." >&2
+            echo "Resume failed; check compute.instances.resume, quota, capacity." >&2
             return 1
           fi
-          started=true
+          resumed=true
         fi
         ;;
-      PROVISIONING|STAGING|PENDING|PENDING_STOP|STOPPING|SUSPENDING|REPAIRING)
-        # Observe transitional states without racing another start/stop.
+      TERMINATED|STOPPED)
+        echo "Workstation is $status: session RAM unavailable. Refusing automatic start." >&2
+        return 3
         ;;
-      SUSPENDED)
-        echo "wsklarkc is SUSPENDED; compute.instances.resume is a separate permission." >&2
-        return 1
+      PROVISIONING|STAGING|PENDING|PENDING_STOP|STOPPING|SUSPENDING|REPAIRING)
+        # Observe transitions without racing a controller or issuing start.
         ;;
       *)
         echo "Unexpected wsklarkc status: $status" >&2
         return 1
         ;;
     esac
-    if [[ "$status" != "$previous" ]]; then
-      echo "Aguardando workstation: $status"
-      previous="$status"
+    if [[ "$status" != "$last" ]]; then
+      echo "Awaiting workstation: $status"
+      last="$status"
     fi
     if ((poll < max_polls)); then sleep "$interval"; fi
   done
-  echo "Timeout waiting for wsklarkc RUNNING state." >&2
+  echo "GCE did not become RUNNING; no stop/start fallback." >&2
   return 1
 }
 
