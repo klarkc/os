@@ -16,7 +16,7 @@ BAHIA = ZoneInfo("America/Bahia")
 VETO_WINDOW_SECONDS = 3600
 IDLE_WINDOW_SECONDS = 7200  # candidate threshold, not production approval
 MAX_OBSERVATION_AGE_SECONDS = 60  # candidate bound; stale = no suspend
-BUDGET_BRL = Decimal("400")
+BUDGET_BRL = Decimal("560")
 
 
 @dataclass(frozen=True)
