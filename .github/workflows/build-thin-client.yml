@@ -1,6 +1,12 @@
 name: NixOS thin client + workstation CI
 on:
   workflow_dispatch:
+    inputs:
+      approve_production_deploy:
+        description: "Explicit authorization for paid GCE provisioning and production E2E"
+        required: true
+        type: boolean
+        default: false
   push:
     paths:
       - "workstations/**"
@@ -203,6 +209,8 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # Production is opt-in via an explicitly approved manual workflow dispatch;
+  # ordinary pushes/PRs only run offline evaluation, VM and image gates.
   # All production jobs are disabled on PR events and in any other branch.
   # The separate Google WIF provider ALSO requires repository numeric IDs,
   # exact branch and exact workflow_ref. Existing auditor WIF stays read-only.
@@ -210,7 +218,8 @@ jobs:
     name: Deploy approved NixOS workstation into isolated GCE VPC
     needs: [evaluate, boot-vm, iso, gce-vm, gce-image]
     if: >-
-      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      ${{ github.event_name == 'workflow_dispatch'
+          && inputs.approve_production_deploy == true
           && github.ref == 'refs/heads/feat/wsklarkc-gce'
           && github.repository == 'klarkc/os' }}
     runs-on: ubuntu-24.04
@@ -435,7 +444,8 @@ jobs:
     name: Require all production integration and authenticated E2E gates
     needs: [deploy-wsklarkc, production-integration, authorize-e2e, e2e-initial, gce-stop-start, e2e-reconnect, cleanup-e2e]
     if: >-
-      ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+      ${{ always() && github.event_name == 'workflow_dispatch'
+          && inputs.approve_production_deploy == true
           && github.ref == 'refs/heads/feat/wsklarkc-gce'
           && github.repository == 'klarkc/os' }}
     runs-on: ubuntu-24.04

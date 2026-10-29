@@ -11,6 +11,8 @@ let
   xrdpSession = pkgs.writeShellApplication {
     name = "wsklarkc-xrdp-session";
     runtimeInputs = with pkgs; [ coreutils gawk gnugrep pipewire pulseaudio procps systemd ];
+    # ShellCheck cannot follow EXIT trap handlers; functions are invoked indirectly.
+    excludeShellChecks = [ "SC2329" ];
     text = builtins.readFile ./scripts/xrdp-pipewire-session.sh;
   };
   xrdpPasswordBootstrap = pkgs.writeShellScriptBin "wsklarkc-xrdp-set-password" ''

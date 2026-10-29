@@ -10,7 +10,7 @@ stdenv.mkDerivation {
     owner = "neutrinolabs";
     repo = "pipewire-module-xrdp";
     rev = "a6e268b17093f8aab4e0fed9dcb23eaf87f7101c";
-    hash = lib.fakeHash;
+    hash = "sha256-t3xtbvPVRnkyJOJka6sYoyk1bw/ddd9+xfs+eMh+95Y=";
   };
 
   nativeBuildInputs = [ autoreconfHook pkg-config autoconf-archive ];
