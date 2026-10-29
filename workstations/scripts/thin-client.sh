@@ -100,6 +100,7 @@ while true; do
     # and the console immediately resumes the retry loop.
     startx "$(command -v xfreerdp)" /v:"$RDP_ADDRESS" /f \
       /dynamic-resolution /cert:tofu /clipboard /network:auto /sec:tls \
+      /sound:sys:alsa \
       -- :0 vt1 -keeptty -nolisten tcp || true
     printf '\n  Sessao encerrada. Reconectando...\n'
   else
