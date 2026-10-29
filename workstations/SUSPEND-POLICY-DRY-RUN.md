@@ -31,7 +31,11 @@ confirmada. O prazo é **3600 segundos INTEIROS** desde aceitação;
 em `t=3599` DENY, em `t=3600` apenas elegibilidade a nova verificação.
 O veto tem escopo próprio por proposta de idle ou mês de budget.
 A mini-ledger pura testa reenvios, deduplicação, eventos fora de ordem,
-invalidação por retomada e travessia de ciclo — **não oferece
+invalidação por retomada e travessia de ciclo. **Veto e eventos de
+encerramento/retomada autenticados não podem ser descartados apenas por
+terem sequência menor que a última notificação processada**; somente
+event IDs repetidos, identidade incorreta ou autenticação ausente são
+descartados. Isso é um teste offline: **não oferece
 persistência, locks, autenticação real nem entrega de notificação**.
 
 ## Obrigações antes de produção

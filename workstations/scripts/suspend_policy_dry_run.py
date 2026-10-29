@@ -204,12 +204,19 @@ def reduce_proposal_event(state: ProposalLedger, event: ProposalEvent) -> Propos
         or not state.proposal_id or state.reason not in {"idle", "budget"}
         or event.proposal_id != state.proposal_id or event.reason != state.reason
         or event.month != state.month or event.generation != state.generation
-        or event.sequence <= state.last_sequence or event.event_id in state.processed_ids
+        # A valid veto or close/resume event is safety-critical and must not
+        # be dropped when an unrelated higher-numbered message arrived first.
+        or not isinstance(event.sequence, int) or isinstance(event.sequence, bool)
+        or event.sequence <= 0
+        or (event.event_type not in {"veto", "close", "resume"}
+            and event.sequence <= state.last_sequence)
+        or event.event_id in state.processed_ids
         or event.timestamp_s < 0
     ):
         return state
     fields = {
-        "last_sequence": event.sequence,
+        # Never regress the high-water mark when applying a delayed veto.
+        "last_sequence": max(state.last_sequence, event.sequence),
         "processed_ids": state.processed_ids | {event.event_id},
     }
     if event.event_type == "provider_accepted":

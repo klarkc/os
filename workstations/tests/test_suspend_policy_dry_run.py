@@ -173,8 +173,32 @@ class ReplayReducerTests(unittest.TestCase):
         s=reduce_proposal_event(self.state(),self.event("provider_accepted",2))
         self.assertEqual(s.email_accepted_at_s,NOW-3600)
         self.assertEqual(reduce_proposal_event(s,self.event("provider_accepted",2)),s)
-        self.assertEqual(reduce_proposal_event(s,self.event("veto",1)),s)
+        self.assertEqual(reduce_proposal_event(s,self.event("provider_accepted",1)),s)
         self.assertEqual(reduce_proposal_event(s,replace(self.event("veto",3),event_id="event-2")),s)
+
+    def test_late_veto_with_lower_sequence_must_still_block(self):
+        s = reduce_proposal_event(self.state(), self.event("provider_accepted", 3))
+        veto = replace(self.event("veto", 2, at=NOW-1), event_id="late-veto")
+        s = reduce_proposal_event(s, veto)
+        self.assertTrue(s.vetoed)
+        self.assertEqual(s.last_sequence, 3)
+        self.assertEqual(reduce_proposal_event(s, veto), s)
+        c = replace(eligible(), vetoed_proposal=s.vetoed)
+        self.assertFalse(check(c).eligible_for_final_recheck)
+
+    def test_out_of_order_close_and_resume_invalidate_proposal(self):
+        for event_type in ("close", "resume"):
+            s = reduce_proposal_event(self.state(), self.event("provider_accepted", 4))
+            later = replace(self.event(event_type, 2), event_id="late-" + event_type)
+            s = reduce_proposal_event(s, later)
+            self.assertTrue(s.closed)
+            self.assertEqual(s.last_sequence, 4)
+            self.assertEqual(reduce_proposal_event(s, self.event("provider_accepted", 5)), s)
+
+    def test_reject_invalid_sequence_even_on_safety_events(self):
+        for sequence in (0, -1, True):
+            event = replace(self.event("veto", 1), sequence=sequence)
+            self.assertEqual(reduce_proposal_event(self.state(), event), self.state())
 
     def test_resend_cannot_shorten_accepted_veto_window(self):
         s=reduce_proposal_event(self.state(),self.event("provider_accepted",1))
