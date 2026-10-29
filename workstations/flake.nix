@@ -150,6 +150,14 @@
             # The login TTY must actually launch a rootless Xorg screen.
             client.wait_until_succeeds("test -s /tmp/lpklarkc-graphics-ok", timeout=180)
             client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
+            # User PipeWire runs with tty1 autologin; no physical audio card
+            # is needed to assert an active PipeWire/Pulse-compatible socket.
+            client.succeed("test -e /run/current-system/sw/bin/pw-cli")
+            client.wait_until_succeeds("test -S /run/user/$(id -u nixos)/pulse/native", timeout=180)
+            client.wait_until_succeeds(
+              "runuser -u nixos -- env XDG_RUNTIME_DIR=/run/user/$(id -u nixos) /run/current-system/sw/bin/pw-cli info 0 >/dev/null",
+              timeout=180
+            )
             client.succeed("test -e /run/current-system/sw/bin/lpklarkc-iap")
             client.succeed("test -e /run/current-system/sw/bin/gcloud")
             client.succeed("! test -e /run/current-system/sw/bin/lpklarkc-wg")

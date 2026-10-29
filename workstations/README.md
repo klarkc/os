@@ -17,6 +17,11 @@ arquivos no HDD do Dell.
 - Sem XFCE local, Tailscale ou WireGuard. Interface mínima com NetworkManager,
   Xorg (iniciado sob demanda por `startx`) e FreeRDP. Não há LightDM,
   Openbox, Xterm nem desktop completo.
+- Áudio bidirecional via PipeWire + WirePlumber no cliente, usando
+  `pipewire-pulse` para o backend PulseAudio do FreeRDP:
+  `/sound:sys:pulse /microphone:sys:pulse`. O XRDP expõe dispositivos
+  virtuais de reprodução e microfone no servidor (não os IDs físicos do Dell).
+  Nenhum túnel adicional nem daemon PulseAudio legado é necessário.
 - Wi-Fi, credenciais CLI Google e certificados TLS são salvos somente em
   `lpklarkc/` na partição de dados do Ventoy, montada em
   `/run/lpklarkc/ventoy`. USB confiável **sem criptografia** conforme decisão.

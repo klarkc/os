@@ -27,6 +27,11 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
   `127.0.0.1:13389`, connecting to GCE TCP `3389` via IAP.
 - Once the tunnel confirms readiness, FreeRDP opens
   `127.0.0.1:13389` fullscreen; XRDP asks for server login.
+- Duplex audio (speakers AND microphone) uses FreeRDP
+  `/sound:sys:pulse /microphone:sys:pulse` and the client's local
+  PipeWire + WirePlumber + `pipewire-pulse` compatibility service.
+  No second audio tunnel or user pairing is required. The workstation
+  sees XRDP-provided virtual audio devices, not raw Dell hardware IDs.
 - On disconnect the IAP process is stopped and reopened after retry.
 
 ```bash
@@ -34,7 +39,7 @@ gcloud --quiet compute start-iap-tunnel wsklarkc 3389 \
   --project=argon-surf-472319-b0 \
   --zone=southamerica-east1-b \
   --local-host-port=127.0.0.1:13389
-xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls
+xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls /sound:sys:pulse /microphone:sys:pulse
 ```
 
 ## Server: BuildGCE responsibilities (separate branch)
@@ -43,7 +48,13 @@ xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls
   reading the instance; IAM principal is identified at first OAuth login.
 - Firewall VPC allows only TCP 3389 from `35.235.240.0/20` to workstation;
   NixOS firewall must allow that IAP source.
-- Keep XRDP, XMonad with XFCE fallback, and persistent `klarkc` home.
+- Keep XRDP, XMonad, and persistent `klarkc` home.
+- Configure user-session PipeWire and `neutrinolabs/pipewire-module-xrdp`
+  as a reproducible Nix dependency; verify XRDP sink/source load under
+  `klarkc` session and that WirePlumber defaults to them.
+  Do NOT rely on `services.xrdp.audio.enable`: upstream NixOS currently
+  documents it as PulseAudio-only. Test both playback and microphone
+  after real XRDP login and reconnect. See LPKLARKC-RDP-AUDIO.md.
 - XRDP user password provisioned through authenticated administrative path.
   IAP authentication does NOT replace XRDP login.
 - No publicly exposed RDP, no WireGuard peer config, no UDP 51820, no

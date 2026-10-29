@@ -51,10 +51,14 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.windowManager.openbox.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.graphical-desktop.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.speechd.enable)" = false
-          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.alsa.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.pulse.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.wireplumber.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pulseaudio.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.graphics.enable)" = false
-          # Audio is forwarded through RDP into local ALSA, not a client PipeWire daemon.
-          grep -Fq '/sound:sys:alsa' scripts/thin-client.sh
+          # Duplex RDP audio uses PipeWire's PulseAudio protocol shim, not pulseaudio.
+          grep -Fq '/sound:sys:pulse /microphone:sys:pulse' scripts/thin-client.sh
           bash tests/iso-size-budget.sh --self-test
           test ! -e ventoy/ventoy.json
           # Catch obsolete identity strings in client-only sources and docs.
