@@ -63,7 +63,9 @@ Mais detalhes: [contrato IAP](./CLIENT-IAP-GCE-CONTRACT.md) e
 
 A ISO usa `iso-image.nix` + `minimal.nix` e não importa o perfil de
 instalação, Nixpkgs channel, ferramentas de particionamento/recuperação
-ou manual. BIOS/UEFI, drivers e firmware continuam disponíveis para o Dell.
+ou manual. Também desativa o daemon Nix e o registro de flakes **no
+cliente**, mantendo o Nix normalmente disponível no ambiente CI que
+compila a ISO. Nenhum pacote é instalado no Dell durante a execução. BIOS/UEFI, drivers e firmware continuam disponíveis para o Dell.
 
 O CI mede o **arquivo ISO final**, impondo **1536 MiB (1,5 GiB)** como
 limite. `tests/iso-size-budget.sh --self-test` prova que aceita o

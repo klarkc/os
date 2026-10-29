@@ -40,6 +40,10 @@ jobs:
           # Regression: no installer profile, embedded Nixpkgs channel or manual.
           nix eval --json .#nixosConfigurations.lpklarkc.config.system.nixos.variant_id | jq -e '. != "installer"'
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.documentation.enable)" = false
+          # No Nix package management or embedded nixpkgs source on live USB.
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.nix.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.nixpkgs.flake.setNixPath)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.nixpkgs.flake.setFlakeRegistry)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeEfiBootable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeBiosBootable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.enableAllHardware)" = false

@@ -17,6 +17,14 @@ let
 in
 {
   networking.hostName = "lpklarkc";
+  # A removable, disposable RDP appliance does not build or deploy Nix
+  # packages at runtime. The Nix daemon and default flake registry retain
+  # unnecessary tooling and hundreds of MiB of nixpkgs sources in the ISO.
+  # Nix remains enabled on the CI host used to build and test this image.
+  nix.enable = false;
+  nix.channel.enable = false;
+  nixpkgs.flake.setNixPath = false;
+  nixpkgs.flake.setFlakeRegistry = false;
   networking.networkmanager.enable = true;
   networking.firewall.enable = true;
   services.openssh.enable = lib.mkForce false;
