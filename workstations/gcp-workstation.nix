@@ -3,6 +3,16 @@
 let
   # Google IAP TCP forwarding source CIDR (IPv4); no VPN is used.
   iapSource = "35.235.240.0/20";
+  xrdpModule = pkgs.callPackage ./pkgs/pipewire-module-xrdp.nix { };
+  pipewireWithXrdp = pkgs.symlinkJoin {
+    name = "pipewire-with-xrdp-${pkgs.pipewire.version}";
+    paths = [ pkgs.pipewire xrdpModule ];
+  };
+  xrdpSession = pkgs.writeShellApplication {
+    name = "wsklarkc-xrdp-session";
+    runtimeInputs = with pkgs; [ coreutils gawk gnugrep pipewire pulseaudio procps systemd xmonad ];
+    text = builtins.readFile ./scripts/xrdp-pipewire-session.sh;
+  };
   xrdpPasswordBootstrap = pkgs.writeShellScriptBin "wsklarkc-xrdp-set-password" ''
     set -euo pipefail
     if [ "$(id -u)" != 0 ] || [ ! -t 0 ] || [ ! -t 1 ]; then
@@ -37,19 +47,31 @@ in
     openFirewall = false;
     # XRDP authenticates remotely and creates its own Xorg session;
     # neither XFCE nor the local TTY greeter Lemurs is required.
+    # One supervisor owns the PipeWire XRDP module for the entire XMonad
+    # session, including RDP disconnect/reconnect. No XDG autostart required.
     defaultWindowManager = ''
-      if [ -x "$HOME/.local/bin/xmonad-session" ]; then
-        exec "$HOME/.local/bin/xmonad-session"
-      fi
-      # Before HOME bootstrap, launch the NixOS XMonad with D-Bus.
-      if [ -z "$DBUS_SESSION_BUS_ADDRESS" ]; then
-        exec ${pkgs.dbus}/bin/dbus-run-session -- xmonad
-      fi
-      exec xmonad
+      exec ${xrdpSession}/bin/wsklarkc-xrdp-session
     '';
   };
-  # The initial account password is locked; null-password PAM login is forbidden.
-  security.pam.services.xrdp-sesman.allowNullPassword = lib.mkForce false;
+  # pam_systemd starts the real systemd --user manager and /run/user/UID.
+  security.pam.services.xrdp-sesman = {
+    allowNullPassword = lib.mkForce false;
+    startSession = true;
+  };
+  security.rtkit.enable = true;
+  services.pulseaudio.enable = false;
+  services.pipewire = {
+    enable = true;
+    alsa.enable = true;
+    pulse.enable = true;
+    wireplumber.enable = true;
+    systemWide = false;
+    # The running daemon searches this union for built-in + pinned XRDP
+    # modules. The XRDP environment is deliberately NOT injected here.
+    package = pipewireWithXrdp;
+  };
+  systemd.user.services.pipewire.environment.PIPEWIRE_MODULE_DIR =
+    "${pipewireWithXrdp}/lib/pipewire-0.3";
 
   services.xserver = {
     enable = true;
@@ -89,7 +111,7 @@ in
     nix-output-monitor
     gnumake gcc
     google-cloud-sdk
-    xrdpPasswordBootstrap
+    xrdpPasswordBootstrap xrdpModule xrdpSession
   ];
 
   # GCE image module provides Google OS Login and the GCE guest agent.

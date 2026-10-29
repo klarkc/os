@@ -76,8 +76,30 @@ case "$mode" in
       echo "FAIL: XMonad process has no real Xorg DISPLAY" >&2
       exit 1
     }
-    echo "PASS: XRDP authenticated $user and launched XMonad in graphical DISPLAY"
+    # Unlike checking an open RDP port or installed .so, these queries run
+    # against the actual PAM user's PipeWire/Pulse protocol socket.
+    uid="$(id -u "$user")"
+    runtime="/run/user/$uid"
+    test -S "$runtime/pipewire-0"
+    test -S "$runtime/pulse/native"
+    pactl_as_user() {
+      runuser -u "$user" -- env XDG_RUNTIME_DIR="$runtime" \
+        PULSE_SERVER="unix:$runtime/pulse/native" pactl "$@"
+    }
+    pactl_as_user info >/dev/null
+    pactl_as_user list short sinks | awk '$2 == "xrdp-sink" { ok=1 } END { exit !ok }'
+    pactl_as_user list short sources | awk '$2 == "xrdp-source" { ok=1 } END { exit !ok }'
+    [[ "$(pactl_as_user get-default-sink)" == xrdp-sink ]] || {
+      echo "FAIL: XRDP virtual sink not selected by default" >&2; exit 1;
+    }
+    [[ "$(pactl_as_user get-default-source)" == xrdp-source ]] || {
+      echo "FAIL: XRDP virtual microphone not selected by default" >&2; exit 1;
+    }
+    echo "PASS: authenticated XRDP XMonad + PipeWire playback sink xrdp-sink"
+    echo "PASS: authenticated XRDP PipeWire microphone source xrdp-source"
+    echo "PASS: both XRDP devices selected as audio defaults"
     echo "PASS: marker persisted in the test account home"
+    echo "NOTE: node discovery is NOT proof of physical Dell playback or recording"
     ;;
   marker)
     id "$user" >/dev/null

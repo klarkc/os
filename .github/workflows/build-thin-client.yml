@@ -46,7 +46,8 @@ jobs:
             workstations/scripts/gce-ci-authorize-e2e.sh \
             workstations/scripts/gce-ci-stop-start.sh \
             workstations/scripts/gce-rdp-guest-e2e.sh \
-            workstations/scripts/gce-rdp-client-e2e.sh; do
+            workstations/scripts/gce-rdp-client-e2e.sh \
+            workstations/scripts/xrdp-pipewire-session.sh; do
             bash -n "$script"
           done
       - name: Evaluate flake and all NixOS configurations
@@ -64,7 +65,14 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.windowManager.xmonad.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.windowManager.xmonad.enableContribAndExtras)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.desktopManager.xfce.enable)" = false
-          nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -F 'exec xmonad'
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -F 'wsklarkc-xrdp-session'
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.pulse.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.wireplumber.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.systemWide)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xrdp.audio.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pulseaudio.enable)" = false
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.systemd.user.services.pipewire.environment.PIPEWIRE_MODULE_DIR | grep -F 'pipewire-with-xrdp'
           if nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -Eiq 'xfce|startxfce'; then
             echo 'Unexpected XFCE session in XRDP config' >&2
             exit 1
