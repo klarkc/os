@@ -9,7 +9,7 @@ import unittest
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from suspend_policy_dry_run import (  # noqa: E402
-    Candidate, ProposalEvent, ProposalLedger, TrustedConfig,
+    Candidate, ProposalEvent, ProposalLedger, TrustedConfig, VetoLedgerRead,
     current_month, evaluate, reduce_proposal_event,
 )
 
@@ -31,6 +31,13 @@ def eligible(reason="idle"):
         proposal_id="proposal-test", proposal_open=True,
         resume_in_progress=False, other_session_active=False,
         veto_state_fresh=True, graphical_session_connected=False,
+        veto_ledger_read=VetoLedgerRead(
+            proposal_id="proposal-test", reason=reason,
+            month=current_month(NOW) if reason == "budget" else None,
+            generation=1, read_at_s=NOW, committed_sequence=1,
+            contiguous_sequence=1, source_verified=True,
+            integrity_ok=True, vetoed=False, closed=False,
+        ),
         human_state="idle", work_state="idle", resources_state="idle",
         email_state="accepted", email_provider_id="provider-msg-test",
         email_recipient_verified=True, observed_at_s=NOW,
@@ -147,6 +154,35 @@ class SuspendAdmissionTests(unittest.TestCase):
         self.assertTrue(check(replace(c, graphical_session_connected=True,
                                           graphical_notice_confirmed=True)).eligible_for_final_recheck)
 
+    def test_authoritative_ledger_read_and_gap_free_barrier(self):
+        for reason in ("idle", "budget"):
+            c = eligible(reason)
+            ledger = c.veto_ledger_read
+            for bad in (
+                None,
+                replace(ledger, source_verified=False),
+                replace(ledger, integrity_ok=False),
+                replace(ledger, proposal_id="other"),
+                replace(ledger, reason="budget" if reason == "idle" else "idle"),
+                replace(ledger, generation=2),
+                replace(ledger, month="2026-11"),
+                replace(ledger, read_at_s=NOW-61),
+                replace(ledger, read_at_s=NOW+1),
+                replace(ledger, committed_sequence=2),
+                replace(ledger, contiguous_sequence=0),
+                replace(ledger, vetoed=True),
+                replace(ledger, closed=True),
+            ):
+                with self.subTest(reason=reason, bad=bad):
+                    self.assertFalse(
+                        check(replace(c, veto_ledger_read=bad)).eligible_for_final_recheck
+                    )
+
+    def test_ledger_read_must_follow_activity_observation(self):
+        c = eligible()
+        old = replace(c.veto_ledger_read, read_at_s=NOW-1)
+        self.assertFalse(check(replace(c, veto_ledger_read=old)).eligible_for_final_recheck)
+
     def test_budget_month_rollover_rejects_old_notice(self):
         nov = int(datetime(2026,11,1,0,0,tzinfo=ZoneInfo("America/Bahia")).timestamp())
         c = replace(eligible("budget"), now_s=nov, observed_at_s=nov,
@@ -173,7 +209,10 @@ class ReplayReducerTests(unittest.TestCase):
         s=reduce_proposal_event(self.state(),self.event("provider_accepted",2))
         self.assertEqual(s.email_accepted_at_s,NOW-3600)
         self.assertEqual(reduce_proposal_event(s,self.event("provider_accepted",2)),s)
-        self.assertEqual(reduce_proposal_event(s,self.event("provider_accepted",1)),s)
+        self.assertEqual(s.last_sequence, 0)  # sequence 1 still missing
+        filled = reduce_proposal_event(s, self.event("provider_accepted", 1))
+        self.assertEqual(filled.last_sequence, 2)
+        self.assertEqual(filled.email_accepted_at_s, NOW-3600)
         self.assertEqual(reduce_proposal_event(s,replace(self.event("veto",3),event_id="event-2")),s)
 
     def test_late_veto_with_lower_sequence_must_still_block(self):
@@ -181,6 +220,8 @@ class ReplayReducerTests(unittest.TestCase):
         veto = replace(self.event("veto", 2, at=NOW-1), event_id="late-veto")
         s = reduce_proposal_event(s, veto)
         self.assertTrue(s.vetoed)
+        self.assertEqual(s.last_sequence, 0)  # still missing sequence 1
+        s = reduce_proposal_event(s, self.event("provider_accepted", 1))
         self.assertEqual(s.last_sequence, 3)
         self.assertEqual(reduce_proposal_event(s, veto), s)
         c = replace(eligible(), vetoed_proposal=s.vetoed)
@@ -192,13 +233,57 @@ class ReplayReducerTests(unittest.TestCase):
             later = replace(self.event(event_type, 2), event_id="late-" + event_type)
             s = reduce_proposal_event(s, later)
             self.assertTrue(s.closed)
-            self.assertEqual(s.last_sequence, 4)
+            self.assertEqual(s.last_sequence, 0)  # missing sequences 1 and 3
             self.assertEqual(reduce_proposal_event(s, self.event("provider_accepted", 5)), s)
 
     def test_reject_invalid_sequence_even_on_safety_events(self):
         for sequence in (0, -1, True):
             event = replace(self.event("veto", 1), sequence=sequence)
             self.assertEqual(reduce_proposal_event(self.state(), event), self.state())
+
+    def test_seq2_receipt_before_seq1_veto_denies_before_and_after_delivery(self):
+        s = reduce_proposal_event(self.state(), self.event("provider_accepted", 2))
+        self.assertEqual(s.last_sequence, 0)
+        self.assertEqual(s.processed_sequences, frozenset({2}))
+        c = eligible()
+        gap = replace(c.veto_ledger_read, committed_sequence=2,
+                      contiguous_sequence=s.last_sequence, vetoed=s.vetoed)
+        self.assertFalse(check(replace(c, veto_ledger_read=gap)).eligible_for_final_recheck)
+        s = reduce_proposal_event(s, self.event("veto", 1))
+        self.assertEqual(s.last_sequence, 2)
+        self.assertTrue(s.vetoed)
+        complete = replace(gap, contiguous_sequence=2, vetoed=s.vetoed)
+        self.assertFalse(check(replace(c, veto_ledger_read=complete)).eligible_for_final_recheck)
+
+    def test_veto_precedes_provider_receipt_and_remains_irrevocable(self):
+        s = reduce_proposal_event(self.state(), self.event("veto", 1, at=NOW-4000))
+        self.assertTrue(s.vetoed)
+        s = reduce_proposal_event(s, self.event("provider_accepted", 2))
+        self.assertEqual(s.last_sequence, 2)
+        self.assertTrue(s.vetoed)
+        c = eligible()
+        snapshot = replace(c.veto_ledger_read, committed_sequence=2,
+                           contiguous_sequence=2, vetoed=s.vetoed)
+        self.assertFalse(check(replace(c, veto_ledger_read=snapshot)).eligible_for_final_recheck)
+
+    def test_unknown_committed_gap_without_veto_still_denies(self):
+        s = reduce_proposal_event(self.state(), self.event("provider_accepted", 3))
+        self.assertEqual(s.last_sequence, 0)
+        c = eligible()
+        snapshot = replace(c.veto_ledger_read, committed_sequence=3,
+                           contiguous_sequence=s.last_sequence)
+        self.assertFalse(check(replace(c, veto_ledger_read=snapshot)).eligible_for_final_recheck)
+
+    def test_duplicate_sequence_conflict_fails_closed(self):
+        s = reduce_proposal_event(self.state(), self.event("provider_accepted", 1))
+        conflicting = replace(self.event("veto", 1), event_id="new-event-same-seq")
+        s = reduce_proposal_event(s, conflicting)
+        self.assertTrue(s.integrity_failed)
+        self.assertTrue(s.vetoed)
+        c = eligible()
+        snapshot = replace(c.veto_ledger_read, integrity_ok=not s.integrity_failed,
+                           vetoed=s.vetoed)
+        self.assertFalse(check(replace(c, veto_ledger_read=snapshot)).eligible_for_final_recheck)
 
     def test_resend_cannot_shorten_accepted_veto_window(self):
         s=reduce_proposal_event(self.state(),self.event("provider_accepted",1))

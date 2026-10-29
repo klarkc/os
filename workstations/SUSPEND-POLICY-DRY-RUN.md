@@ -31,14 +31,27 @@ confirmada. O prazo é **3600 segundos INTEIROS** desde aceitação;
 em `t=3599` DENY, em `t=3600` apenas elegibilidade a nova verificação.
 O veto tem escopo próprio por proposta de idle ou mês de budget.
 A mini-ledger pura testa reenvios, deduplicação, eventos fora de ordem,
-invalidação por retomada e travessia de ciclo. **Veto e eventos de
-encerramento/retomada autenticados não podem ser descartados apenas por
-terem sequência menor que a última notificação processada**; somente
-event IDs repetidos, identidade incorreta ou autenticação ausente são
-descartados. Isso é um teste offline: **não oferece
+invalidação por retomada e travessia de ciclo. **Veto, encerramento e
+retomada autenticados tornam-se tombstones monotônicos mesmo se chegarem
+fora de ordem.** O cursor `last_sequence` agora representa só a sequência
+CONTÍGUA processada (não o maior número visto), evitando que um recibo
+de e-mail de sequência 2 permita ignorar um veto de sequência 1 ainda
+pendente. Uma leitura simulada do ledger com identidade, geração,
+mês, origem, integridade, frescor e `committed_sequence == contiguous_sequence`
+é pré-condição da rechecagem; sem leitura ou com qualquer lacuna,
+**DENY**, inclusive antes de o veto atrasado chegar. Conflitos de
+identidade/seq também invalidam o ledger. O watermark committed precisa
+vir de um **escritor transacional autenticado**, não de Pub/Sub nem do cliente.
+Isso é um teste offline: **não oferece
 persistência, locks, autenticação real nem entrega de notificação**.
 
 ## Obrigações antes de produção
+
+Nenhuma flag `source_verified` simulada comprova autenticação real:
+o controlador de produção deve provar o watermark em leitura transacional
+com o veto/close atomicamente persistido e sincronizar a transição final
+`suspend` com mutações concorrentes de veto. Não confiar em um consumidor
+de eventos que veja lacunas ou em snapshot antigo.
 
 Controlador fora da VM, IAM mínimo, armazenamento com CAS/transações e
 auditoria, autenticação de eventos e cliente, observações seguras de

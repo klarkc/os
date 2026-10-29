@@ -30,6 +30,28 @@ class TrustedConfig:
 
 
 @dataclass(frozen=True)
+class VetoLedgerRead:
+    """Simulated authoritative snapshot; NOT an authenticated store client.
+
+    Production must produce this proof in a transaction with the final
+    permission check, not from a cached message consumer or Pub/Sub cursor.
+    committed_sequence is the durable producer watermark; contiguous_sequence
+    is the consumer's gap-free applied prefix.
+    """
+    proposal_id: str
+    reason: str
+    month: str | None
+    generation: int
+    read_at_s: int
+    committed_sequence: int
+    contiguous_sequence: int
+    source_verified: bool = False
+    integrity_ok: bool = False
+    vetoed: bool = True
+    closed: bool = True
+
+
+@dataclass(frozen=True)
 class Candidate:
     project: str = "argon-surf-472319-b0"
     zone: str = "southamerica-east1-b"
@@ -59,6 +81,7 @@ class Candidate:
     graphical_notice_confirmed: bool = False
     vetoed_proposal: bool = False
     veto_state_fresh: bool = False
+    veto_ledger_read: VetoLedgerRead | None = None
     idle_vetoed_proposals: frozenset[str] = frozenset()
     budget_vetoed_month: str | None = None
     budget_id: str | None = None
@@ -113,6 +136,26 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         return _fail("veto_state_not_verified")
     if c.vetoed_proposal:
         return _fail("proposal_vetoed")
+    ledger = c.veto_ledger_read
+    required_month = current_month(c.now_s) if c.reason == "budget" else None
+    if (
+        ledger is None or ledger.source_verified is not True
+        or ledger.integrity_ok is not True
+        or ledger.proposal_id != c.proposal_id
+        or ledger.reason != c.reason
+        or ledger.month != required_month
+        or ledger.generation != c.live_generation
+        or ledger.vetoed is not False or ledger.closed is not False
+        or not isinstance(ledger.committed_sequence, int)
+        or isinstance(ledger.committed_sequence, bool)
+        or ledger.committed_sequence < 1
+        or ledger.contiguous_sequence != ledger.committed_sequence
+        or ledger.read_at_s < c.observed_at_s
+        or not (0 <= c.now_s - ledger.read_at_s <= MAX_OBSERVATION_AGE_SECONDS)
+    ):
+        # No gaps or unknown delayed veto may be silently treated as a NO.
+        # This is still only an ADMISSION to a final transactional recheck.
+        return _fail("veto_ledger_unavailable_or_not_gap_free")
     if c.reason == "idle":
         if c.proposal_id in c.idle_vetoed_proposals:
             return _fail("idle_proposal_vetoed")
@@ -172,6 +215,8 @@ class ProposalLedger:
     generation: int
     last_sequence: int = 0
     processed_ids: frozenset[str] = frozenset()
+    processed_sequences: frozenset[int] = frozenset()
+    integrity_failed: bool = False
     email_accepted_at_s: int | None = None
     email_provider_id: str | None = None
     vetoed: bool = False
@@ -195,41 +240,59 @@ class ProposalEvent:
 
 
 def reduce_proposal_event(state: ProposalLedger, event: ProposalEvent) -> ProposalLedger:
-    """Idempotent dedup/out-of-order dry-run; no network, email or API calls.
+    """Offline monotonic tombstones plus contiguous-prefix accounting.
 
-    Event sequence must be assigned by a trusted controller, NOT by Pub/Sub.
+    This function has NO transaction, durable storage, API or authorization.
+    An authoritative transaction must expose a COMMITTED sequence watermark
+    and guarantee that every sequence through that watermark was processed.
+    Delayed veto/resume/close MUST NOT be dropped on arrival.
     """
     if (
         state.closed or not event.event_id or not event.source_authenticated
         or not state.proposal_id or state.reason not in {"idle", "budget"}
         or event.proposal_id != state.proposal_id or event.reason != state.reason
         or event.month != state.month or event.generation != state.generation
-        # A valid veto or close/resume event is safety-critical and must not
-        # be dropped when an unrelated higher-numbered message arrived first.
         or not isinstance(event.sequence, int) or isinstance(event.sequence, bool)
-        or event.sequence <= 0
-        or (event.event_type not in {"veto", "close", "resume"}
-            and event.sequence <= state.last_sequence)
-        or event.event_id in state.processed_ids
-        or event.timestamp_s < 0
+        or event.sequence < 1 or event.event_id in state.processed_ids
+        or event.timestamp_s < 0 or event.event_type not in {
+            "provider_accepted", "veto", "close", "resume"
+        }
     ):
         return state
+
+    # A different event ID reusing an already-applied sequence means the
+    # producer's identity/ordering invariant was violated: fail closed.
+    if event.sequence in state.processed_sequences:
+        return replace(
+            state, integrity_failed=True,
+            vetoed=state.vetoed or event.event_type == "veto",
+            closed=state.closed or event.event_type in {"close", "resume"},
+        )
+
+    # Never accept an unverified receipt and advance the gap-free cursor.
+    if event.event_type == "provider_accepted" and (
+        not event.recipient_verified or not event.email_provider_id
+    ):
+        return state
+
+    applied = state.processed_sequences | {event.sequence}
+    prefix = state.last_sequence
+    while prefix + 1 in applied:
+        prefix += 1
     fields = {
-        # Never regress the high-water mark when applying a delayed veto.
-        "last_sequence": max(state.last_sequence, event.sequence),
+        "last_sequence": prefix,
         "processed_ids": state.processed_ids | {event.event_id},
+        "processed_sequences": applied,
     }
     if event.event_type == "provider_accepted":
-        if not event.recipient_verified or not event.email_provider_id:
-            return state
         if state.email_accepted_at_s is None:
-            # Retries or later accepted re-sends never shorten the veto window.
+            # First PROCESSED provider receipt is conservative: a delayed
+            # older receipt must never retroactively shorten the veto window.
             fields.update(email_accepted_at_s=event.timestamp_s,
                           email_provider_id=event.email_provider_id)
     elif event.event_type == "veto":
+        # Monotonic tombstone, even when event.sequence < highest received.
         fields["vetoed"] = True
     elif event.event_type in {"close", "resume"}:
         fields["closed"] = True
-    else:
-        return state
     return replace(state, **fields)
