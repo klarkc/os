@@ -14,6 +14,14 @@ arquivos no HDD do Dell.
 - Túnel Google IAP para o recurso GCE `wsklarkc` no projeto
   `argon-surf-472319-b0`, zona `southamerica-east1-b`, porta TCP 3389.
   FreeRDP conecta exclusivamente a `127.0.0.1:13389`.
+- Dell sem suspensão/hibernação automática: boot por Ventoy e desligamento
+  normal. Se VM `SUSPENDED`, cliente executa `instances.resume` e
+  reanexa XRDP; se `RUNNING`, conecta; se `TERMINATED`, informa
+  que a RAM anterior não existe e **não inicia** a VM automaticamente.
+- Desligar Dell não encerra agentes, builds ou aplicativos remotos.
+  Quando o controlador do servidor decidir suspender com segurança,
+  watchdog local aguarda confirmação repetida de `SUSPENDED` antes de
+  desligar o Dell. Erros de Wi-Fi ou permissão GCE não desligam o cliente.
 - Sem XFCE local, Tailscale ou WireGuard. Interface mínima com NetworkManager,
   Xorg (iniciado sob demanda por `startx`) e FreeRDP. Não há LightDM,
   Openbox, Xterm nem desktop completo.
@@ -67,8 +75,8 @@ ou manual. Também desativa o daemon Nix e o registro de flakes **no
 cliente**, mantendo o Nix normalmente disponível no ambiente CI que
 compila a ISO. Nenhum pacote é instalado no Dell durante a execução. BIOS/UEFI, drivers e firmware continuam disponíveis para o Dell.
 
-O CI mede o **arquivo ISO final**, impondo **1536 MiB (1,5 GiB)** como
-limite. `tests/iso-size-budget.sh --self-test` prova que aceita o
+O CI mede o **arquivo ISO final**, impondo **1024 MiB (1 GiB)** como
+limite, após ISO validada de 1.034.944.512 bytes (987 MiB arredondados). `tests/iso-size-budget.sh --self-test` prova que aceita o
 limite exato e rejeita um byte excedente. Compilação e distribuição
 continuam condicionadas aos testes QEMU.
 

@@ -23,6 +23,12 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
 - No configuration or secrets are written to internal Dell HDD.
 - Credentials restored on subsequent boots avoid repeated login unless
   authorization is revoked or expires.
+- **Session integrity update (29 Oct):** the Dell has no automatic local
+  suspend/hibernate. On boot, `lpklarkc-iap ensure-running` invokes
+  `compute.instances.resume` only for SUSPENDED (then waits for RUNNING).
+  TERMINATED is an explicit error: never auto-start a VM that already lost
+  previous RAM. No client-initiated `instances.stop`, reset or delete.
+  The GCE controller owns suspend safety after all remote jobs finish.
 - `lpklarkc-iap tunnel` opens a TCP listener **only** at
   `127.0.0.1:13389`, connecting to GCE TCP `3389` via IAP.
 - Once the tunnel confirms readiness, FreeRDP opens
@@ -32,7 +38,11 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
   PipeWire + WirePlumber + `pipewire-pulse` compatibility service.
   No second audio tunnel or user pairing is required. The workstation
   sees XRDP-provided virtual audio devices, not raw Dell hardware IDs.
-- On disconnect the IAP process is stopped and reopened after retry.
+- On disconnect the IAP process is stopped and reopened after retry;
+  never issue a second VM wake/resume in the same Dell boot. Client
+  watchdog only requests **ordinary Dell poweroff**, not hibernation,
+  after repeatedly observing a final SUSPENDED or TERMINATED GCE state.
+  No shutdown on transient connectivity/IAM errors.
 
 ```bash
 gcloud --quiet compute start-iap-tunnel wsklarkc 3389 \
@@ -46,6 +56,10 @@ xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls /sound:sy
 
 - IAP API enabled and principal granted minimum roles for TCP tunnel and
   reading the instance; IAM principal is identified at first OAuth login.
+- The Dell also needs `compute.instances.resume` narrowly scoped to
+  `wsklarkc`, not `compute.instances.start` as automatic boot policy.
+  A distinct controller may need `compute.instances.suspend` when
+  authorized; costs/IAM approvals stay outside the client branch.
 - Firewall VPC allows only TCP 3389 from `35.235.240.0/20` to workstation;
   NixOS firewall must allow that IAP source.
 - Keep XRDP, XMonad, and persistent `klarkc` home.

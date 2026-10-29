@@ -174,6 +174,11 @@
               timeout=180
             )
             client.succeed("test -e /run/current-system/sw/bin/lpklarkc-iap")
+            client.succeed("test -e /run/current-system/sw/bin/lpklarkc-peer-watchdog")
+            # VM runs mocked GCE lifecycle and conservative watchdog offline,
+            # proving none of these tests can start, stop or bill a VM.
+            client.succeed("${pkgs.bash}/bin/bash ${./tests/gce-lifecycle.sh} ${./scripts/gce-iap.sh}")
+            client.succeed("${pkgs.bash}/bin/bash ${./tests/client-peer-watchdog-test.sh} ${./scripts/client-peer-watchdog.sh}")
             client.succeed("test -e /run/current-system/sw/bin/gcloud")
             client.succeed("! test -e /run/current-system/sw/bin/lpklarkc-wg")
             client.succeed("! systemctl is-active --quiet tailscaled.service")
