@@ -10,7 +10,7 @@ let
   };
   xrdpSession = pkgs.writeShellApplication {
     name = "wsklarkc-xrdp-session";
-    runtimeInputs = with pkgs; [ coreutils gawk gnugrep pipewire pulseaudio procps systemd xmonad ];
+    runtimeInputs = with pkgs; [ coreutils gawk gnugrep pipewire pulseaudio procps systemd ];
     text = builtins.readFile ./scripts/xrdp-pipewire-session.sh;
   };
   xrdpPasswordBootstrap = pkgs.writeShellScriptBin "wsklarkc-xrdp-set-password" ''
