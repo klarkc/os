@@ -12,7 +12,8 @@ on:
 
 concurrency:
   group: nixos-workstations-${{ github.ref }}
-  cancel-in-progress: true
+  # Do not cancel a live GCE provisioning job halfway through resource creation.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/feat/wsklarkc-gce' }}
 
 permissions:
   contents: read
@@ -33,15 +34,28 @@ jobs:
         run: bash -n workstations/scripts/gce-iap-preflight.sh
       - name: Validate WIF read-only audit script syntax
         run: bash -n workstations/scripts/gce-wif-readonly-audit.sh
-      - name: Validate approved provisioning script syntax (never execute deployment in CI)
+      - name: Validate approved provisioning script syntax
         run: bash -n workstations/scripts/gce-provision-approved.sh
+      - name: Validate server-only production and E2E scripts
+        run: |
+          set -euo pipefail
+          for script in \
+            workstations/scripts/gce-ci-iam-bootstrap.sh \
+            workstations/scripts/gce-ci-deploy.sh \
+            workstations/scripts/gce-production-integration.sh \
+            workstations/scripts/gce-ci-authorize-e2e.sh \
+            workstations/scripts/gce-ci-stop-start.sh \
+            workstations/scripts/gce-rdp-guest-e2e.sh \
+            workstations/scripts/gce-rdp-client-e2e.sh; do
+            bash -n "$script"
+          done
       - name: Evaluate flake and all NixOS configurations
         run: |
           set -euo pipefail
           cd workstations
           nix flake check --no-build --show-trace
           nix eval --raw .#nixosConfigurations.thin-client.config.networking.hostName
-          nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
+          test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName)" = wsklarkc
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.security.googleOsLogin.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PasswordAuthentication)" = false
           test "$(nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.openssh.settings.PermitRootLogin)" = prohibit-password
@@ -166,9 +180,9 @@ jobs:
         run: |
           set -euo pipefail
           cd workstations
-          nix build -L .#gce-image --out-link /tmp/solo-gce-image
+          nix build -L .#gce-image --out-link /tmp/wsklarkc-gce-image
           mkdir -p "$GITHUB_WORKSPACE/gce-dist"
-          mapfile -t images < <(find -L /tmp/solo-gce-image -maxdepth 1 -type f -name '*.raw.tar.gz' -print)
+          mapfile -t images < <(find -L /tmp/wsklarkc-gce-image -maxdepth 1 -type f -name '*.raw.tar.gz' -print)
           test "${#images[@]}" -eq 1
           cp -- "${images[0]}" "$GITHUB_WORKSPACE/gce-dist/"
           tar -tzf "${images[0]}" | grep -Fx disk.raw
@@ -176,7 +190,266 @@ jobs:
       - name: Upload versioned image (no cloud import)
         uses: actions/upload-artifact@v4
         with:
-          name: solo-gce-image-${{ github.sha }}
+          name: wsklarkc-gce-image-${{ github.sha }}
           path: gce-dist/
           if-no-files-found: error
           retention-days: 7
+
+  # All production jobs are disabled on PR events and in any other branch.
+  # The separate Google WIF provider ALSO requires repository numeric IDs,
+  # exact branch and exact workflow_ref. Existing auditor WIF stays read-only.
+  deploy-wsklarkc:
+    name: Deploy approved NixOS workstation into isolated GCE VPC
+    needs: [evaluate, boot-vm, iso, gce-vm, gce-image]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 120
+    permissions:
+      contents: read
+      id-token: write
+      actions: read
+    concurrency:
+      group: wsklarkc-production-deployment
+      cancel-in-progress: false
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-deployer@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Verify approved build artifact and deploy
+        env:
+          GH_TOKEN: ${{ github.token }}
+          WSKLARKC_GCE_DEPLOY_APPROVED: "YES"
+        run: bash workstations/scripts/gce-ci-deploy.sh
+
+  production-integration:
+    name: Audit actual GCE disk/image/network/effective firewall
+    needs: [deploy-wsklarkc]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 35
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-e2e@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Fail closed on production configuration drift or public ingress
+        run: bash workstations/scripts/gce-production-integration.sh
+
+  authorize-e2e:
+    name: Configure IAP and OS Login for restricted CI test identity
+    needs: [production-integration]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-deployer@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Grant VM-scoped ephemeral E2E access for SSH and XRDP
+        run: bash workstations/scripts/gce-ci-authorize-e2e.sh
+
+  e2e-initial:
+    name: True FreeRDP login through Google IAP and remote XMonad
+    needs: [authorize-e2e]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-e2e@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Install FreeRDP 3 and headless X11 display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends freerdp3-x11 xvfb xauth openssl
+      - name: Establish real IAP tunnel and authenticate RDP graphical session
+        run: bash workstations/scripts/gce-rdp-client-e2e.sh initial
+
+  gce-stop-start:
+    name: Real GCE stop/start with the exact retained boot disk
+    needs: [e2e-initial]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-deployer@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Stop and restart the real VM, preserving the boot disk
+        run: bash workstations/scripts/gce-ci-stop-start.sh
+
+  e2e-reconnect:
+    name: Authenticate XRDP again after GCE stop/start and verify HOME
+    needs: [gce-stop-start]
+    if: >-
+      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-e2e@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Install FreeRDP 3 and headless X11 display
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends freerdp3-x11 xvfb xauth openssl
+      - name: Verify HOME marker survived then log into XMonad again
+        run: bash workstations/scripts/gce-rdp-client-e2e.sh reconnect
+
+  cleanup-e2e:
+    name: Remove disposable XRDP test user after production run
+    needs: [authorize-e2e, e2e-initial, gce-stop-start, e2e-reconnect]
+    if: >-
+      ${{ always() && needs.authorize-e2e.result == 'success'
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Authenticate using branch- and workflow-restricted GitHub OIDC
+        uses: google-github-actions/auth@v3
+        with:
+          project_id: argon-surf-472319-b0
+          workload_identity_provider: projects/1009769829445/locations/global/workloadIdentityPools/github-wsklarkc-deploy/providers/wsklarkc-deploy
+          service_account: buildgce-e2e@argon-surf-472319-b0.iam.gserviceaccount.com
+          create_credentials_file: true
+          export_environment_variables: true
+      - name: Install Google Cloud CLI
+        uses: google-github-actions/setup-gcloud@v3
+        with:
+          project_id: argon-surf-472319-b0
+          version: ">= 416.0.0"
+      - name: Remove only wsklarkcci user, its HOME and temporary guest script
+        run: bash workstations/scripts/gce-rdp-client-e2e.sh cleanup
+
+  production-acceptance:
+    name: Require all production integration and authenticated E2E gates
+    needs: [deploy-wsklarkc, production-integration, authorize-e2e, e2e-initial, gce-stop-start, e2e-reconnect, cleanup-e2e]
+    if: >-
+      ${{ always() && (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
+          && github.ref == 'refs/heads/feat/wsklarkc-gce'
+          && github.repository == 'klarkc/os' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Enforce completed production E2E (not TCP-only smoke)
+        env:
+          DEPLOY: ${{ needs.deploy-wsklarkc.result }}
+          PROD: ${{ needs.production-integration.result }}
+          AUTHZ: ${{ needs.authorize-e2e.result }}
+          LOGIN: ${{ needs.e2e-initial.result }}
+          RESTART: ${{ needs.gce-stop-start.result }}
+          RELOGIN: ${{ needs.e2e-reconnect.result }}
+          CLEANUP: ${{ needs.cleanup-e2e.result }}
+        run: |
+          set -euo pipefail
+          for gate in DEPLOY PROD AUTHZ LOGIN RESTART RELOGIN CLEANUP; do
+            if [ "${!gate}" != success ]; then
+              echo "FAIL: production acceptance gate $gate => ${!gate}" >&2
+              exit 1
+            fi
+            echo "PASS: $gate"
+          done
+          echo "PASS: real IAP -> authenticated XRDP/XMonad -> stop/start -> authenticated reconnect"
+          echo "NOTE: the Dell physical hardware remains a separate BuildClient acceptance test"
