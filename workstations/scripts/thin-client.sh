@@ -32,9 +32,26 @@ network_ready() {
   "$IP_CMD" -4 route show default | grep -q '^default'
 }
 
+# A local IAP TCP listener does not prove that the remote XRDP service
+# has booted. Request the 19-byte RDP X.224 negotiation (no credentials),
+# and require a TPKT response from the actual destination.
+rdp_responding() {
+  local host="${1:-127.0.0.1}" port="${2:-13389}" reply
+  reply="$(
+    printf '\003\000\000\023\016\340\000\000\000\000\000\001\000\010\000\003\000\000\000' |
+      timeout 5 nc -w 3 "$host" "$port" 2>/dev/null |
+      od -An -tx1 -N2 | tr -d '[:space:]'
+  )" || true
+  [[ "$reply" == "0300" ]]
+}
+
 # Regression-test entrypoint; no credentials or remote service required.
 if [[ "${1:-}" == "--check-network" ]]; then
   network_ready
+  exit $?
+fi
+if [[ "${1:-}" == "--check-rdp" ]]; then
+  rdp_responding "${2:-127.0.0.1}" "${3:-13389}"
   exit $?
 fi
 
@@ -77,24 +94,39 @@ while true; do
     done
   fi
 
+  # Query the exact GCE resource, start once if TERMINATED, wait for
+  # RUNNING, and only then establish IAP. Retry IAM/billing failures safely.
+  if ! "$IAP" ensure-running; then
+    printf '\n  Nao foi possivel ligar ou consultar a workstation.\n'
+    printf '  Confira permissoes GCE, cobranca e rede. Tentando novamente...\n'
+    if network_ready && ! "$IAP" check; then
+      printf '  Sessao Google expirada; autorizacao necessaria.\n'
+      "$IAP" login || true
+    fi
+    sleep 30
+    continue
+  fi
+
   printf '\n  Conectando ao seu computador remoto...\n'
   TUNNEL_LOG="$(mktemp)"
   "$IAP" tunnel >"$TUNNEL_LOG" 2>&1 &
   TUNNEL_PID=$!
 
   ready=false
-  for ((attempt = 0; attempt < 65; attempt++)); do
+  # Cold boots enter RUNNING before XRDP is listening. Wait for a true
+  # RDP response through IAP instead of merely a local TCP listener.
+  for ((attempt = 0; attempt < 90; attempt++)); do
     if ! kill -0 "$TUNNEL_PID" 2>/dev/null; then break; fi
     if grep -qF 'Listening on port [13389]' "$TUNNEL_LOG" &&
-       nc -z -w 1 127.0.0.1 13389 2>/dev/null; then
+       rdp_responding; then
       ready=true
       break
     fi
-    sleep 1
+    sleep 2
   done
 
   if [[ "$ready" == true ]]; then
-    printf '  Conexao pronta. Abrindo area de trabalho...\n'
+    printf '  XRDP respondendo. Abrindo area de trabalho...\n'
     # xfreerdp is X11-based. Start a rootless Xorg session directly from
     # tty1, with no LightDM/Openbox/Xterm. When RDP exits, Xorg terminates
     # and the console immediately resumes the retry loop.
@@ -105,7 +137,7 @@ while true; do
     printf '\n  Sessao encerrada. Reconectando...\n'
   else
     printf '\n  Nao foi possivel conectar ao servidor.\n'
-    printf '  Confira se a workstation esta ligada e o IAP foi liberado.\n'
+    printf '  Verifique XRDP, IAM e o tunel IAP.\n'
     if network_ready && ! "$IAP" check; then
       printf '  Sessao Google expirada; autorizacao necessaria.\n'
       "$IAP" login || true

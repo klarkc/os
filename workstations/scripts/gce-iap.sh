@@ -12,7 +12,7 @@ RDP_PORT=3389
 LOCAL_PORT=13389
 STATE="${LPKLARKC_STATE_TOOL:-/run/current-system/sw/bin/lpklarkc-state}"
 GCLOUD="${LPKLARKC_GCLOUD_BIN:-gcloud}"
-export CLOUDSDK_CONFIG=/home/nixos/.config/lpklarkc-gcloud
+export CLOUDSDK_CONFIG="${LPKLARKC_GCLOUD_CONFIG:-/home/nixos/.config/lpklarkc-gcloud}"
 export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=1
 
 has_credentials() {
@@ -51,6 +51,67 @@ check() {
   "$GCLOUD" auth print-access-token >/dev/null 2>&1
 }
 
+# Wake-on-login: one idempotent start for the specific GCE resource.
+# RUNNING does not mean XRDP is ready. The kiosk probes RDP separately.
+ensure_running() {
+  export CLOUDSDK_CORE_DISABLE_PROMPTS=1
+  if ! has_credentials; then
+    echo "Google credentials missing; authorize via the trusted Ventoy USB." >&2
+    return 1
+  fi
+  local interval="${LPKLARKC_GCE_POLL_SECONDS:-5}"
+  local max_polls="${LPKLARKC_GCE_MAX_POLLS:-120}"
+  if [[ ! "$interval" =~ ^[0-9]+$ || ! "$max_polls" =~ ^[1-9][0-9]*$ ]]; then
+    echo "Invalid GCE polling interval or maximum." >&2
+    return 2
+  fi
+  local status previous="" started=false poll
+  for ((poll=1; poll<=max_polls; poll++)); do
+    if ! status="$("$GCLOUD" --quiet compute instances describe "$INSTANCE" \
+        --project="$PROJECT" --zone="$ZONE" --format='value(status)')"; then
+      echo "Cannot read wsklarkc status (login or compute.instances.get)." >&2
+      return 1
+    fi
+    case "$status" in
+      RUNNING)
+        echo "GCE workstation ligada; verificando servico RDP..."
+        return 0
+        ;;
+      TERMINATED)
+        if [[ "$started" == false ]]; then
+          echo "Workstation desligada; ligando automaticamente no GCE..."
+          # --async avoids broad operation polling IAM permissions.
+          # Never issue a second start request in the same invocation.
+          if ! "$GCLOUD" --quiet compute instances start "$INSTANCE" \
+              --project="$PROJECT" --zone="$ZONE" --async >/dev/null; then
+            echo "Cannot start wsklarkc (compute.instances.start, quota or billing)." >&2
+            return 1
+          fi
+          started=true
+        fi
+        ;;
+      PROVISIONING|STAGING|PENDING|PENDING_STOP|STOPPING|SUSPENDING|REPAIRING)
+        # Observe transitional states without racing another start/stop.
+        ;;
+      SUSPENDED)
+        echo "wsklarkc is SUSPENDED; compute.instances.resume is a separate permission." >&2
+        return 1
+        ;;
+      *)
+        echo "Unexpected wsklarkc status: $status" >&2
+        return 1
+        ;;
+    esac
+    if [[ "$status" != "$previous" ]]; then
+      echo "Aguardando workstation: $status"
+      previous="$status"
+    fi
+    if ((poll < max_polls)); then sleep "$interval"; fi
+  done
+  echo "Timeout waiting for wsklarkc RUNNING state." >&2
+  return 1
+}
+
 tunnel() {
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   has_credentials || {
@@ -68,9 +129,10 @@ case "${1:-}" in
   login) login ;;
   check) check ;;
   has-credentials) has_credentials ;;
+  ensure-running) ensure_running ;;
   tunnel) tunnel ;;
   *)
-    echo "Usage: lpklarkc-iap {login|check|has-credentials|tunnel}" >&2
+    echo "Usage: lpklarkc-iap {login|check|has-credentials|ensure-running|tunnel}" >&2
     exit 2
     ;;
 esac
