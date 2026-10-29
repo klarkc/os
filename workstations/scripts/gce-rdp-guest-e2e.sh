@@ -23,7 +23,8 @@ case "$mode" in
       }
       echo "PASS: previously provisioned temporary account still exists"
     else
-      useradd --create-home --shell /bin/bash "$user"
+      # NixOS does not promise /bin/bash (the executable is store-backed).
+      useradd --create-home --shell "$(command -v bash)" "$user"
     fi
     printf '%s:%s\n' "$user" "$password" | chpasswd
     unset password
