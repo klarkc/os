@@ -49,6 +49,11 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.enableAllHardware)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.enableRedistributableFirmware)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.wirelessRegulatoryDatabase)" = true
+          # Dell i14-5458 D08P target: no modern ath11k/ath12k payloads.
+          ! grep -Eq '"\$source"/ath1[12]k' flake.nix
+          grep -Fq 'iwlwifi-3160-' flake.nix
+          grep -Fq 'iwlwifi-7265' flake.nix
+          grep -Fq 'ar3k' flake.nix
           # The RDP kiosk launches rootless Xorg on demand, without a DE.
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.startx.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.lightdm.enable)" = false

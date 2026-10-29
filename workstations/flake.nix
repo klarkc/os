@@ -7,28 +7,42 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
-      # Curated firmware for Intel graphics and common Dell 5458 Wi-Fi cards.
-      # Omit unrelated AMD/NVIDIA, TV, server and embedded-device payloads.
+      # The Dell Inspiron i14-5458-D08P shipped with Qualcomm 9565 /
+      # Dell Wireless 1707 (ath9k), while some Inspiron 5458 variants
+      # use Intel 3160/7265. Keep Broadcom/Realtek/older QCA fallbacks
+      # for exchanged cards and USB adapters, but not 2020s Wi-Fi/GPU
+      # payloads unrelated to the Broadwell Dell.
+      # References: Dell Wireless 1707/Qualcomm 9565 driver 46G81 and
+      # Dell Intel Dual Band Wireless AC 3160/7265 driver WRRMC.
       slimFirmware = pkgs.runCommand "lpklarkc-essential-firmware" { } ''
         set -eu
-        mkdir -p "$out/lib/firmware"
+        mkdir -p "$out/lib/firmware/i915"
         source="${pkgs.linux-firmware}/lib/firmware"
+        # Broadwell i3-5005U/Intel HD Graphics 5500: retain firmware
+        # for Haswell/Broadwell and adjacent Skylake only.
+        for item in "$source"/i915/hsw* "$source"/i915/bdw* "$source"/i915/skl*; do
+          [ -e "$item" ] || continue
+          cp -aL -- "$item" "$out/lib/firmware/i915/"
+        done
+        # WLAN model variations and 2015-era replacement cards.
         for item in \
-          "$source"/iwlwifi-* "$source"/i915 "$source"/intel \
-          "$source"/brcm "$source"/cypress \
-          "$source"/rtlwifi "$source"/rtl_bt "$source"/rtl_nic \
-          "$source"/rtw88 "$source"/rtw89 "$source"/ath9k_htc \
-          "$source"/ath10k "$source"/ath11k "$source"/ath12k \
-          "$source"/qca "$source"/mediatek "$source"/mrvl \
-          "$source"/libertas "$source"/mt7601u* \
-          "$source"/ti-connectivity \
+          "$source"/iwlwifi-3160-* "$source"/iwlwifi-3165-* \
+          "$source"/iwlwifi-7260-* "$source"/iwlwifi-7265* \
+          "$source"/iwlwifi-8000C-* "$source"/iwlwifi-8265-* \
+          "$source"/brcm "$source"/rtlwifi "$source"/rtl_bt \
+          "$source"/rtl_nic "$source"/ath9k_htc "$source"/ath10k \
+          "$source"/qca "$source"/ar3k "$source"/intel \
           "$source"/LICENCE* "$source"/LICENSE*; do
           [ -e "$item" ] || continue
           cp -aL -- "$item" "$out/lib/firmware/"
         done
-        # Fail instead of shipping firmware-empty ISO.
-        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-*' -print -quit)"
+        # Fail the build rather than silently lose the Intel WLAN fallback
+        # or proprietary firmware for frequently installed Dell adapters.
+        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-3160-*' -print -quit)"
+        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-7265*' -print -quit)"
         test -d "$out/lib/firmware/brcm"
+        test -d "$out/lib/firmware/qca"
+        test ! -e "$out/lib/firmware/ath12k"
       '';
       isoModule = { modulesPath, lib, ... }:
         let

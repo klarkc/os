@@ -85,8 +85,11 @@ o console tenta reconectar. `Ctrl+Alt+F2` abre recuperação local.
 
 ### Firmware e hardware
 
-A ISO contém drivers de boot USB/ISO e firmware selecionado para Wi-Fi Intel,
-Broadcom, Atheros, Realtek e MediaTek, além do vídeo Intel. São omitidos
-firmwares de GPU AMD/NVIDIA e equipamentos não necessários ao thin client.
-O Google CLI e o FreeRDP continuam completos. O chipset real do Dell ainda
-precisa de validação por teste físico.
+A ISO contém drivers de boot USB/ISO e firmware direcionado ao Dell Inspiron
+i14-5458-D08P: vídeo Intel HD Graphics 5500/Broadwell e WLAN Qualcomm 9565 /
+Dell Wireless 1707, com fallback Intel 3160/7265, Broadcom, Realtek e QCA
+de geração próxima. Não embute firmware de Wi-Fi 6E/7 e GPUs modernas que
+não pertencem a esse notebook. O Google CLI e o FreeRDP permanecem completos.
+A PCI ID real do adaptador do Dell e o áudio físico ainda exigem teste de
+aceitação; substituições posteriores da placa Wi-Fi podem exigir firmware
+adicional. Não utilizar esta ISO enxuta como imagem genérica para outros PCs.
