@@ -37,10 +37,13 @@ fora de ordem.** O cursor `last_sequence` agora representa só a sequência
 CONTÍGUA processada (não o maior número visto), evitando que um recibo
 de e-mail de sequência 2 permita ignorar um veto de sequência 1 ainda
 pendente. Uma leitura simulada do ledger com identidade, geração,
-mês, origem, integridade, frescor e `committed_sequence == contiguous_sequence`
+mês, **projeto/zona/instance ID**, origem, integridade, frescor,
+**tipos inteiros válidos** e `committed_sequence == contiguous_sequence`
 é pré-condição da rechecagem; sem leitura ou com qualquer lacuna,
 **DENY**, inclusive antes de o veto atrasado chegar. Conflitos de
-identidade/seq também invalidam o ledger. O watermark committed precisa
+identidade/seq também invalidam o ledger. A suíte testa todas as seis
+permutações de entrega de dois recibos e um veto, conferindo o
+prefixo contíguo e a permanência do tombstone de veto. O watermark committed precisa
 vir de um **escritor transacional autenticado**, não de Pub/Sub nem do cliente.
 Isso é um teste offline: **não oferece
 persistência, locks, autenticação real nem entrega de notificação**.

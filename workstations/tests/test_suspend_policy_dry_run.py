@@ -1,5 +1,6 @@
 """No-network, deterministic-time regressions for GCE suspend policy."""
 from dataclasses import replace
+from itertools import permutations
 from datetime import datetime
 from decimal import Decimal
 from pathlib import Path
@@ -32,6 +33,8 @@ def eligible(reason="idle"):
         resume_in_progress=False, other_session_active=False,
         veto_state_fresh=True, graphical_session_connected=False,
         veto_ledger_read=VetoLedgerRead(
+            project="argon-surf-472319-b0", zone="southamerica-east1-b",
+            instance_id="test-instance-id",
             proposal_id="proposal-test", reason=reason,
             month=current_month(NOW) if reason == "budget" else None,
             generation=1, read_at_s=NOW, committed_sequence=1,
@@ -163,13 +166,19 @@ class SuspendAdmissionTests(unittest.TestCase):
                 replace(ledger, source_verified=False),
                 replace(ledger, integrity_ok=False),
                 replace(ledger, proposal_id="other"),
+                replace(ledger, project="different-project"),
+                replace(ledger, zone="different-zone"),
+                replace(ledger, instance_id="different-vm-id"),
                 replace(ledger, reason="budget" if reason == "idle" else "idle"),
                 replace(ledger, generation=2),
                 replace(ledger, month="2026-11"),
                 replace(ledger, read_at_s=NOW-61),
                 replace(ledger, read_at_s=NOW+1),
                 replace(ledger, committed_sequence=2),
+                replace(ledger, committed_sequence=True),
                 replace(ledger, contiguous_sequence=0),
+                replace(ledger, contiguous_sequence=True),
+                replace(ledger, read_at_s=True),
                 replace(ledger, vetoed=True),
                 replace(ledger, closed=True),
             ):
@@ -284,6 +293,35 @@ class ReplayReducerTests(unittest.TestCase):
         snapshot = replace(c.veto_ledger_read, integrity_ok=not s.integrity_failed,
                            vetoed=s.vetoed)
         self.assertFalse(check(replace(c, veto_ledger_read=snapshot)).eligible_for_final_recheck)
+
+    def test_every_delivery_permutation_preserves_veto_and_gap_freedom(self):
+        events = {
+            1: self.event("provider_accepted", 1, at=NOW-4000),
+            2: self.event("provider_accepted", 2, at=NOW-3600),
+            3: self.event("veto", 3, at=NOW-1),
+        }
+        for ordering in permutations((1, 2, 3)):
+            with self.subTest(delivery=ordering):
+                state = self.state()
+                seen = set()
+                for sequence in ordering:
+                    state = reduce_proposal_event(state, events[sequence])
+                    seen.add(sequence)
+                    prefix = 0
+                    while prefix + 1 in seen:
+                        prefix += 1
+                    self.assertEqual(state.last_sequence, prefix)
+                    self.assertEqual(state.processed_sequences, frozenset(seen))
+                    if 3 in seen:
+                        self.assertTrue(state.vetoed)
+                self.assertTrue(state.vetoed)
+                self.assertEqual(state.last_sequence, 3)
+                c = eligible()
+                ledger = replace(c.veto_ledger_read, committed_sequence=3,
+                                 contiguous_sequence=3, vetoed=state.vetoed)
+                self.assertFalse(
+                    check(replace(c, veto_ledger_read=ledger)).eligible_for_final_recheck
+                )
 
     def test_resend_cannot_shorten_accepted_veto_window(self):
         s=reduce_proposal_event(self.state(),self.event("provider_accepted",1))

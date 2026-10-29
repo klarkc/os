@@ -38,6 +38,9 @@ class VetoLedgerRead:
     committed_sequence is the durable producer watermark; contiguous_sequence
     is the consumer's gap-free applied prefix.
     """
+    project: str
+    zone: str
+    instance_id: str
     proposal_id: str
     reason: str
     month: str | None
@@ -141,6 +144,8 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
     if (
         ledger is None or ledger.source_verified is not True
         or ledger.integrity_ok is not True
+        or ledger.project != c.project or ledger.zone != c.zone
+        or ledger.instance_id != c.instance_id
         or ledger.proposal_id != c.proposal_id
         or ledger.reason != c.reason
         or ledger.month != required_month
@@ -149,7 +154,11 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         or not isinstance(ledger.committed_sequence, int)
         or isinstance(ledger.committed_sequence, bool)
         or ledger.committed_sequence < 1
+        or not isinstance(ledger.contiguous_sequence, int)
+        or isinstance(ledger.contiguous_sequence, bool)
         or ledger.contiguous_sequence != ledger.committed_sequence
+        or not isinstance(ledger.read_at_s, int)
+        or isinstance(ledger.read_at_s, bool)
         or ledger.read_at_s < c.observed_at_s
         or not (0 <= c.now_s - ledger.read_at_s <= MAX_OBSERVATION_AGE_SECONDS)
     ):
