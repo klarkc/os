@@ -110,6 +110,9 @@ in
     xterm alacritty
     xorg.xauth xorg.xsetroot xorg.xmodmap
     xclip dbus dunst
+    # pactl is a PulseAudio-protocol CLI client used by the real user/E2E
+    # to inspect PipeWire's sink/source; the PulseAudio daemon stays disabled.
+    pulseaudio
     nix-output-monitor
     gnumake gcc
     google-cloud-sdk

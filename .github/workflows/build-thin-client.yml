@@ -42,6 +42,14 @@ jobs:
         run: bash -n workstations/scripts/gce-wif-readonly-audit.sh
       - name: Validate approved provisioning script syntax
         run: bash -n workstations/scripts/gce-provision-approved.sh
+      - name: Reject destructive legacy stop/start test
+        run: |
+          set -euo pipefail
+          if grep -Eq 'gcloud[[:space:]]+compute[[:space:]]+instances[[:space:]]+(stop|start|reset|delete)' workstations/scripts/gce-ci-stop-start.sh; then
+            echo 'Forbidden GCE stop/start/reset/delete in session-preserving CI' >&2
+            exit 1
+          fi
+          grep -F 'if: ${{ false }}' .github/workflows/build-thin-client.yml
       - name: Validate server-only production and E2E scripts
         run: |
           set -euo pipefail
@@ -346,13 +354,14 @@ jobs:
       - name: Establish real IAP tunnel and authenticate RDP graphical session
         run: bash workstations/scripts/gce-rdp-client-e2e.sh initial
 
+  # Hard safety gate: stop/start discards RAM and live XMonad processes.
+  # Do not reenable this gate until a proven session-preserving
+  # instances.suspend/resume E2E replaces it on a disposable test VM.
+  # Its skipped status deliberately blocks downstream production acceptance.
   gce-stop-start:
-    name: Real GCE stop/start with the exact retained boot disk
+    name: DISABLED - stop/start violates session-preservation contract
     needs: [e2e-initial]
-    if: >-
-      ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch')
-          && github.ref == 'refs/heads/feat/wsklarkc-gce'
-          && github.repository == 'klarkc/os' }}
+    if: ${{ false }}
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
