@@ -11,18 +11,18 @@
         let
           # Only a build dependency. No splash daemon or image editor is
           # installed on the thin client itself.
-          splash = pkgs.runCommand "solo-boot-splash.png"
+          splash = pkgs.runCommand "lpklarkc-boot-splash.png"
             { nativeBuildInputs = [ pkgs.imagemagick ]; } ''
               magick -size 1024x768 xc:'#101820' "$out"
             '';
         in {
           imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
-          isoImage.isoName = "solo-thin-client-x86_64.iso";
+          isoImage.isoName = "lpklarkc-x86_64.iso";
           isoImage.grubTheme = null;
           isoImage.splashImage = splash;
           isoImage.efiSplashImage = splash;
           isoImage.appendToMenuLabel = "";
-          system.nixos.distroName = lib.mkForce "Solo Workstation";
+          system.nixos.distroName = lib.mkForce "lpklarkc";
           # BIOS syslinux TIMEOUT 0 means *no* timeout; use 1 second for
           # reliable automatic boot on both legacy BIOS and UEFI machines.
           boot.loader.timeout = lib.mkForce 1;
@@ -32,11 +32,11 @@
       };
     in
     {
-      nixosConfigurations.thin-client = mk [ isoModule ./thin-client.nix ];
+      nixosConfigurations.lpklarkc = mk [ isoModule ./thin-client.nix ];
       nixosConfigurations.gcp-workstation = mk [ gceModule ./gcp-workstation.nix ];
 
       packages.${system} = {
-        thin-client-iso = self.nixosConfigurations.thin-client.config.system.build.isoImage;
+        lpklarkc-iso = self.nixosConfigurations.lpklarkc.config.system.build.isoImage;
         gce-image = self.nixosConfigurations.gcp-workstation.config.system.build.googleComputeImage;
       };
 
@@ -46,7 +46,7 @@
         ventoy-usb-persistence-vm = import ./tests/ventoy-persistence.nix { inherit pkgs; };
 
         boot-and-network-vm = pkgs.testers.runNixOSTest {
-          name = "solo-thin-client-and-workstation";
+          name = "lpklarkc-and-workstation";
           nodes = {
             client = { lib, ... }: {
               imports = [ ./thin-client.nix ];
@@ -77,18 +77,17 @@
             client.wait_for_unit("multi-user.target")
             server.wait_for_unit("multi-user.target")
             client.succeed("systemctl is-active NetworkManager.service")
-            client.succeed("test -e /run/current-system/sw/bin/solo-gce-iap")
+            client.succeed("test -e /run/current-system/sw/bin/lpklarkc-iap")
             client.succeed("test -e /run/current-system/sw/bin/gcloud")
-            client.succeed("! test -e /run/current-system/sw/bin/solo-client-wg")
-            client.succeed("! test -e /run/current-system/sw/bin/solo-gce-endpoint")
+            client.succeed("! test -e /run/current-system/sw/bin/lpklarkc-wg")
             client.succeed("! systemctl is-active --quiet tailscaled.service")
-            client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
-            client.succeed("test -e /run/current-system/sw/bin/solo-client-state")
+            client.succeed("systemctl show -P Result lpklarkc-ventoy-state.service | grep -Fx success")
+            client.succeed("test -e /run/current-system/sw/bin/lpklarkc-state")
             client.succeed("test -e /run/current-system/sw/bin/xfreerdp")
-            client.succeed("! mountpoint -q /run/solo-client/ventoy")
-            client.succeed("test ! -d /run/solo-client/ventoy/solo-client")
-            client.succeed("! test -e /home/nixos/.config/solo-gcloud/credentials.db")
-            client.succeed("systemctl start solo-save-state.service")
+            client.succeed("! mountpoint -q /run/lpklarkc/ventoy")
+            client.succeed("test ! -d /run/lpklarkc/ventoy/lpklarkc")
+            client.succeed("! test -e /home/nixos/.config/lpklarkc-gcloud/credentials.db")
+            client.succeed("systemctl start lpklarkc-save-state.service")
             server.succeed("systemctl is-active xrdp.service")
             server.succeed("systemctl is-active xrdp-sesman.service")
             # Server is managed independently by BuildGCE. Do not assert

@@ -5,10 +5,10 @@
 set -euo pipefail
 umask 077
 
-MOUNT=/run/solo-client/ventoy
-DATA="$MOUNT/solo-client"
+MOUNT=/run/lpklarkc/ventoy
+DATA="$MOUNT/lpklarkc"
 NM_DIR=/etc/NetworkManager/system-connections
-GCLOUD_CONFIG=/home/nixos/.config/solo-gcloud
+GCLOUD_CONFIG=/home/nixos/.config/lpklarkc-gcloud
 GCLOUD_STORE="$DATA/gcloud-cli"
 GCLOUD_DB="$GCLOUD_CONFIG/credentials.db"
 GCLOUD_DEFAULT="$GCLOUD_CONFIG/configurations/config_default"
@@ -155,7 +155,7 @@ try_mount_usb() {
     printf 'USB mount unavailable: %s (%s): %s\n' "$device" "$fs" "$message" >&2
     return 1
   fi
-  if ! (touch "$MOUNT/.solo-client-write-test" && rm "$MOUNT/.solo-client-write-test"); then
+  if ! (touch "$MOUNT/.lpklarkc-write-test" && rm "$MOUNT/.lpklarkc-write-test"); then
     echo "USB volume mounted but not writable: $device" >&2
     umount "$MOUNT" || true
     return 1
@@ -166,7 +166,7 @@ try_mount_usb() {
 }
 
 create_usb_mapper() {
-  local raw="$1" size name="solo-client-ventoy-data" mapped="/dev/mapper/solo-client-ventoy-data"
+  local raw="$1" size name="lpklarkc-ventoy-data" mapped="/dev/mapper/lpklarkc-ventoy-data"
   [[ -b "$raw" ]] && usb_backing "$raw" || return 1
   [[ "$(lsblk -no TYPE "$raw" 2>/dev/null | head -n1)" == part ]] || return 1
 
@@ -217,12 +217,12 @@ prepare_usb() {
     udevadm trigger --subsystem-match=block --action=change >/dev/null 2>&1 || true
     sleep 1
   done
-  echo "Ventoy USB inaccessible: see 'solo-client-state diagnose' on Ctrl+Alt+F2." >&2
+  echo "Ventoy USB inaccessible: see 'lpklarkc-state diagnose' on Ctrl+Alt+F2." >&2
   return 1
 }
 
 diagnose_state() {
-  echo "Solo Workstation - USB diagnostics (paths/labels only, no credentials)"
+  echo "lpklarkc - USB diagnostics (paths/labels only, no credentials)"
   lsblk -o NAME,PATH,TRAN,TYPE,FSTYPE,LABEL,SIZE,MOUNTPOINTS
   echo "Ventoy USB candidates:"
   usb_candidates || true
@@ -350,7 +350,7 @@ case "${1:-}" in
   ensure) ensure_state ;;
   diagnose) diagnose_state ;;
   *)
-    echo "Usage: solo-client-state {restore|save|is-ready|ensure|diagnose}" >&2
+    echo "Usage: lpklarkc-state {restore|save|is-ready|ensure|diagnose}" >&2
     exit 2
     ;;
 esac

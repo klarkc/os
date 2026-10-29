@@ -7,12 +7,12 @@ umask 077
 
 PROJECT=argon-surf-472319-b0
 ZONE=southamerica-east1-b
-INSTANCE=solo-workstation
+INSTANCE=wsklarkc
 RDP_PORT=3389
 LOCAL_PORT=13389
-STATE="${SOLO_STATE_TOOL:-/run/current-system/sw/bin/solo-client-state}"
-GCLOUD="${SOLO_GCLOUD_BIN:-gcloud}"
-export CLOUDSDK_CONFIG=/home/nixos/.config/solo-gcloud
+STATE="${LPKLARKC_STATE_TOOL:-/run/current-system/sw/bin/lpklarkc-state}"
+GCLOUD="${LPKLARKC_GCLOUD_BIN:-gcloud}"
+export CLOUDSDK_CONFIG=/home/nixos/.config/lpklarkc-gcloud
 export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=1
 
 has_credentials() {
@@ -54,7 +54,7 @@ check() {
 tunnel() {
   export CLOUDSDK_CORE_DISABLE_PROMPTS=1
   has_credentials || {
-    echo "No Google CLI credentials. Run: solo-gce-iap login" >&2
+    echo "No Google CLI credentials. Run: lpklarkc-iap login" >&2
     return 1
   }
   # Listen exclusively on loopback. The destination VM requires no public IP.
@@ -70,7 +70,7 @@ case "${1:-}" in
   has-credentials) has_credentials ;;
   tunnel) tunnel ;;
   *)
-    echo "Usage: solo-gce-iap {login|check|has-credentials|tunnel}" >&2
+    echo "Usage: lpklarkc-iap {login|check|has-credentials|tunnel}" >&2
     exit 2
     ;;
 esac

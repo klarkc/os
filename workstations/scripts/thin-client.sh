@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
-# Solo Workstation kiosk. Wi-Fi -> trusted USB -> Google IAP -> RDP.
+# lpklarkc kiosk. Wi-Fi -> trusted USB -> Google IAP -> RDP.
 # A full desktop is not installed; Ctrl+Alt+F2 remains for recovery.
 set -uo pipefail
 
-STATE="${SOLO_STATE_TOOL:-/run/current-system/sw/bin/solo-client-state}"
-IAP="${SOLO_IAP_TOOL:-/run/current-system/sw/bin/solo-gce-iap}"
-NM_ONLINE="${SOLO_NM_ONLINE_BIN:-nm-online}"
-NMCLI="${SOLO_NMCLI_BIN:-nmcli}"
-IP_CMD="${SOLO_IP_BIN:-ip}"
+STATE="${LPKLARKC_STATE_TOOL:-/run/current-system/sw/bin/lpklarkc-state}"
+IAP="${LPKLARKC_IAP_TOOL:-/run/current-system/sw/bin/lpklarkc-iap}"
+NM_ONLINE="${LPKLARKC_NM_ONLINE_BIN:-nm-online}"
+NMCLI="${LPKLARKC_NMCLI_BIN:-nmcli}"
+IP_CMD="${LPKLARKC_IP_BIN:-ip}"
 RDP_ADDRESS="127.0.0.1:13389"
 TUNNEL_PID=""
 TUNNEL_LOG=""
@@ -40,7 +40,7 @@ fi
 
 printf '\033[2J\033[H'
 printf '\n  ========================================\n'
-printf '              SOLO WORKSTATION\n'
+printf '              LPKLARKC\n'
 printf '  ========================================\n\n'
 printf '  Iniciando seu ambiente de trabalho remoto.\n\n'
 
@@ -60,7 +60,7 @@ while true; do
     if (( usb_retries == 1 || usb_retries % 4 == 0 )); then
       printf '\n  Unidade USB de configuracao indisponivel.\n'
       printf '  Tentando recuperar acesso ao pendrive, sem alterar o disco interno.\n'
-      printf '  Diagnostico: Ctrl+Alt+F2 e execute solo-client-state diagnose\n'
+      printf '  Diagnostico: Ctrl+Alt+F2 e execute lpklarkc-state diagnose\n'
       # Present the last precise error instead of an endless generic loop.
       printf '  %s\n' "$(printf '%s\n' "$usb_error" | tail -n1)"
     fi

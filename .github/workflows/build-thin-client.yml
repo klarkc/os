@@ -1,4 +1,4 @@
-name: NixOS thin client + workstation CI
+name: lpklarkc + GCE workstation CI
 on:
   workflow_dispatch:
   push:
@@ -34,14 +34,20 @@ jobs:
           set -euo pipefail
           cd workstations
           nix flake check --no-build --show-trace
-          nix eval --raw .#nixosConfigurations.thin-client.config.networking.hostName
+          test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.networking.hostName)" = "lpklarkc"
+          test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.isoImage.isoName)" = "lpklarkc-x86_64.iso"
+          test ! -e ventoy/ventoy.json
+          # Catch obsolete identity strings in client-only sources and docs.
+          if grep -Eini 's[o]lo' \
+            README.md VENTOY-KIOSK.md CLIENT-IAP-GCE-CONTRACT.md flake.nix thin-client.nix \
+            scripts/ventoy-state.sh scripts/thin-client.sh scripts/gce-iap.sh tests/ventoy-persistence.nix; then
+            echo "Obsolete client identity detected" >&2
+            exit 1
+          fi
           nix eval --raw .#nixosConfigurations.gcp-workstation.config.networking.hostName
-          test "$(nix eval --raw .#nixosConfigurations.thin-client.config.system.nixos.distroName)" = "Solo Workstation"
-          test "$(nix eval --json .#nixosConfigurations.thin-client.config.boot.loader.timeout)" = 1
-          nix eval --json .#nixosConfigurations.thin-client.config.boot.kernelParams | jq -e 'index("quiet") != null'
-          jq -e '[.control[] | has("VTOY_LINUX_REMOUNT")] | all(. == false)' ventoy/ventoy.json
-          jq -e '.control | any(.VTOY_SECONDARY_BOOT_MENU == "0")' ventoy/ventoy.json
-          test "$(jq -r '.control[] | .VTOY_DEFAULT_IMAGE // empty' ventoy/ventoy.json)" = "/solo-thin-client-x86_64.iso"
+          test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.nixos.distroName)" = "lpklarkc"
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.boot.loader.timeout)" = 1
+          nix eval --json .#nixosConfigurations.lpklarkc.config.boot.kernelParams | jq -e 'index("quiet") != null'
 
   boot-vm:
     name: Boot VMs and verify Ventoy USB state after reboot
@@ -86,18 +92,19 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
-      - name: Build NixOS ISO
+      - name: Build lpklarkc ISO
         run: |
           set -euo pipefail
           cd workstations
-          nix build -L .#thin-client-iso --out-link /tmp/solo-iso
+          nix build -L .#lpklarkc-iso --out-link /tmp/lpklarkc-iso
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          cp /tmp/solo-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
-          cp ventoy/ventoy.json "$GITHUB_WORKSPACE/dist/ventoy.json"
+          cp /tmp/lpklarkc-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
+          test -f "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
+          test ! -e "$GITHUB_WORKSPACE/dist/ventoy.json"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.iso > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
-          name: solo-thin-client-iso
+          name: lpklarkc-iso
           path: dist/
           if-no-files-found: error
           retention-days: 7
