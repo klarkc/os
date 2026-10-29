@@ -2,9 +2,9 @@
 
 Canonical issue: https://github.com/klarkc/os/issues/21
 Server branch: `feat/wsklarkc-gce`
-Client branch: `feat/solo-thin-client-ci-20261026` (NOT modified here).
+Client branch: `feat/lpklarkc-ci-20261029` (NOT modified here).
 
-**Lifecycle v2 override:** any references below to GCE suspend/resume as
+**Lifecycle v2 override:** any references below to GCE stop/start as
 a reconnect test are historical and invalid for preserving RAM/XMonad.
 Never perform stop/start as an idle/budget fallback. The required path
 is a separately approved Compute Engine suspend/resume E2E in an

@@ -10,6 +10,7 @@
 > R$400 reference. Obtain an explicit new decision on shape/storage/cost
 > and an approved, equivalent disposable-VM suspend/resume E2E first.
 > All live jobs remain disabled pending explicit approval.
+
 **Separate client branch:** BuildClient owns `feat/lpklarkc-ci-20261029`.
 No edits to the Dell's NixOS image, Ventoy scripts, Wi-Fi state or its CI.
 The shared integration is Google IAP TCP, no VPN or public RDP.
