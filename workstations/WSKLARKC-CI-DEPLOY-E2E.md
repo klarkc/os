@@ -20,6 +20,7 @@ The shared integration is Google IAP TCP, no VPN or public RDP.
 | Desktop | XRDP + Xorg + **XMonad only**; no XFCE/Lemurs |
 | GPU | None, CUDA and vLLM disabled |
 | Public IP | None on initial deployment; later egress requires independent effective-firewall check |
+| Boot firmware | Legacy/MBR from pinned NixOS GCE image; no Shielded VM vTPM until separate UEFI/GPT migration and boot tests |
 | Client flow | IAP TCP → localhost `127.0.0.1:13389` → FreeRDP → authenticated XRDP/XMonad |
 | Test account | `wsklarkcci` created only for CI E2E and deleted in cleanup |
 
