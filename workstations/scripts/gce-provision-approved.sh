@@ -127,6 +127,10 @@ echo "PASS: custom NixOS image imported"
 gcloud storage rm "$uri"
 gcloud storage buckets delete "gs://$bucket" --quiet
 
+# The pinned NixOS Google image currently uses an MBR/legacy boot layout.
+# Google Shielded VM requires a UEFI/GPT custom image, so DO NOT force vTPM
+# or integrity monitoring on this image. Migrate image boot layout separately
+# and test its boot/recovery before enabling Shielded VM.
 # Explicit parameters make it impossible to accidentally provision Debian,
 # a smaller auto-deleted disk, a machine with a GPU or the default VPC.
 # The VM receives no GCE service account or OAuth API scopes.
@@ -136,7 +140,6 @@ gcloud compute instances create "$vm" --project="$project" --zone="$zone" \
   --no-boot-disk-auto-delete --no-service-account --no-scopes \
   --network-interface="network=$network,subnet=$subnet,stack-type=IPV4_ONLY,no-address" \
   --tags="$tag" --metadata=enable-oslogin=TRUE \
-  --shielded-vtpm --shielded-integrity-monitoring \
   --labels=managed-by=buildgce,environment=development
 
 echo "INSTANCE CREATED WITHOUT PUBLIC IP: verify effective VPC and hierarchical firewall policies before adding egress."
