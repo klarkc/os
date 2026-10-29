@@ -81,6 +81,18 @@ in
   # Rootless Xorg is still needed by xfreerdp. The Dell does NOT need a
   # display manager, window manager, terminal emulator or desktop session.
   # Start Xorg with startx only after a valid Google IAP tunnel is ready.
+  # NixOS automatically enables the generic graphical-desktop profile
+  # whenever xserver.enable = true. That profile pulls in speech synthesis
+  # (including ~676MB of mbrola voices), PipeWire, CJK fonts, XDG tools,
+  # desktop icons, pinentry and additional graphical libraries. An
+  # on-demand Xorg session running only FreeRDP needs none of these.
+  services.graphical-desktop.enable = lib.mkForce false;
+  services.speechd.enable = lib.mkForce false;
+  services.pipewire.enable = lib.mkForce false;
+  fonts.enableDefaultPackages = lib.mkForce false;
+  # FreeRDP 2D and the modesetting driver should not need Mesa/LLVM DRI.
+  # QEMU tests the actual Xorg startx path before any ISO is published.
+  hardware.graphics.enable = lib.mkForce false;
   services.xserver.enable = true;
   services.xserver.xkb.layout = "br";
   services.xserver.displayManager.startx.enable = true;
