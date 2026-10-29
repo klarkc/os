@@ -21,7 +21,23 @@ tester="buildgce-e2e@$project.iam.gserviceaccount.com"
   exit 1
 }
 echo "Configuring isolated GitHub WIF pool for this ONE branch and workflow."
-echo "Existing auditor identity will remain unchanged."
+echo "Existing auditor identity remains read-only; its branch gate will move."
+# Replace, don't widen, the original auditor's branch restriction. The old
+# BuildGCE branch is obsolete but contains live workflow code; it must lose
+# OIDC access before the new branch gains it.
+audit_condition="assertion.repository_id=='639154288' && assertion.repository_owner_id=='724959' && assertion.ref=='refs/heads/feat/wsklarkc-gce'"
+gcloud iam workload-identity-pools providers update-oidc github-actions \
+  --project="$project" --location=global \
+  --workload-identity-pool=github-buildgce \
+  --attribute-condition="$audit_condition" --quiet >/dev/null
+actual_audit="$(gcloud iam workload-identity-pools providers describe github-actions \
+  --project="$project" --location=global \
+  --workload-identity-pool=github-buildgce --format='value(attributeCondition)')"
+[[ "$actual_audit" == "$audit_condition" ]] || {
+  echo "FAIL: original auditor branch restriction was not migrated" >&2
+  exit 1
+}
+echo "PASS: existing READ-ONLY auditor OIDC moved from old branch to wsklarkc"
 
 if ! gcloud iam workload-identity-pools describe "$pool" --project="$project" --location=global >/dev/null 2>&1; then
   gcloud iam workload-identity-pools create "$pool" --project="$project" --location=global \
