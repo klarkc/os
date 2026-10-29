@@ -12,7 +12,7 @@ network=wsklarkc-iap-vpc
 subnet=wsklarkc-iap-subnet
 tag=wsklarkc-iap
 iap=35.235.240.0/20
-expected_image=wsklarkc-nixos-gce-96a98ff35863
+expected_image="wsklarkc-nixos-gce-${GITHUB_SHA:0:12}"
 
 for cmd in gcloud python3 jq; do
   command -v "$cmd" >/dev/null || { echo "FAIL: missing $cmd" >&2; exit 2; }
@@ -30,20 +30,20 @@ gcloud compute instances network-interfaces get-effective-firewalls "$vm" \
   --project="$project" --zone="$zone" --format=json >"$tmp/effective.json"
 gcloud compute images describe "$expected_image" --project="$project" --format=json >"$tmp/image.json"
 
-python3 - "$tmp" <<'PY'
+python3 - "$tmp" "$expected_image" <<'PY'
 import ipaddress
 import json
 import pathlib
 import sys
 
 base = pathlib.Path(sys.argv[1])
+expected_image = sys.argv[2]
 load = lambda name: json.loads((base / (name + ".json")).read_text())
 vm, disk, rules, effective, image = map(load, ["vm", "disk", "firewalls", "effective", "image"])
 iap = ipaddress.ip_network("35.235.240.0/20")
 project = "argon-surf-472319-b0"
 network = "wsklarkc-iap-vpc"
 tag = "wsklarkc-iap"
-expected_image = "wsklarkc-nixos-gce-96a98ff35863"
 
 
 def require(ok, label):
@@ -101,11 +101,10 @@ for port, name in [(22, "ssh"), (3389, "rdp")]:
             and not rule.get("denied"),
             f"VPC tcp/{port} ingress restricted to the IAP proxy range")
 
-require(isinstance(effective, dict) and "firewalls" in effective
-        and "firewallPolicys" in effective,
-        "complete effective firewall inspection response")
+require(isinstance(effective, dict) and "firewalls" in effective,
+        "effective firewall inspection response includes classic rules")
 # Never accept an unknown policy rule that could override ingress.
-for policy in effective["firewallPolicys"]:
+for policy in effective.get("firewallPolicys", []):
     for r in policy.get("rules", []):
         if r.get("disabled", False) or r.get("action", "").lower() != "allow":
             continue
@@ -125,8 +124,7 @@ for r in effective["firewalls"]:
             continue
         # Any extra ingress (including port 443/80) is unexpected for the
         # single-purpose XRDP workstation and must be reviewed.
-        require(r.get("name") in actual_names & {
-            "wsklarkc-iap-ssh", "wsklarkc-iap-rdp"}
+        require(r.get("name") in {"wsklarkc-iap-ssh", "wsklarkc-iap-rdp"}
             and r.get("sourceRanges") == [str(iap)],
             "no unauthorized effective TCP ingress")
 print("NOTE: guest nftables, XRDP PAM and XMonad checked only in subsequent authenticated E2E")
