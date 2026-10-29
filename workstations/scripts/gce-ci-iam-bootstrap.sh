@@ -4,6 +4,7 @@
 # New WIF pool admits ONLY this deployment workflow on this branch.
 set -euo pipefail
 umask 077
+command -v jq >/dev/null || { echo "FAIL: jq is required in Cloud Shell" >&2; exit 2; }
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 project=argon-surf-472319-b0
@@ -39,35 +40,85 @@ actual_audit="$(gcloud iam workload-identity-pools providers describe github-act
 }
 echo "PASS: existing READ-ONLY auditor OIDC moved from old branch to wsklarkc"
 
-if ! gcloud iam workload-identity-pools describe "$pool" --project="$project" --location=global >/dev/null 2>&1; then
-  gcloud iam workload-identity-pools create "$pool" --project="$project" --location=global \
-    --display-name="BuildGCE deploy and E2E workflow"
+# IAM creates are eventually consistent: create returning successfully is
+# NOT evidence that an immediate describe can see the resource. Retrying
+# the whole bootstrap during this window must not re-create the provider.
+wait_visible() {
+  local what="$1"
+  shift
+  local attempt
+  for attempt in $(seq 1 18); do
+    if "$@" >/dev/null 2>&1; then
+      echo "PASS: $what is visible (attempt $attempt)"
+      return 0
+    fi
+    if [ "$attempt" -lt 18 ]; then
+      echo "WAIT: $what not yet readable; retrying after 5 seconds ($attempt/18)"
+      sleep 5
+    fi
+  done
+  echo "FAIL: $what still unavailable after bounded retries" >&2
+  return 1
+}
+
+pool_describe=(gcloud iam workload-identity-pools describe "$pool" --project="$project" --location=global)
+provider_describe=(gcloud iam workload-identity-pools providers describe "$provider" --project="$project" --location=global --workload-identity-pool="$pool")
+
+if ! "${pool_describe[@]}" >/dev/null 2>&1; then
+  # A pre-existing resource may briefly report NOT_FOUND during propagation.
+  # Do not discard its state or fail on an "already exists" create race.
+  if ! gcloud iam workload-identity-pools create "$pool" \
+    --project="$project" --location=global \
+    --display-name="BuildGCE deploy and E2E workflow"; then
+    echo "NOTICE: pool create did not complete; checking for an existing resource" >&2
+  fi
 fi
-if ! gcloud iam workload-identity-pools providers describe "$provider" \
-    --project="$project" --location=global --workload-identity-pool="$pool" >/dev/null 2>&1; then
-  gcloud iam workload-identity-pools providers create-oidc "$provider" \
+wait_visible "WIF pool $pool" "${pool_describe[@]}"
+pool_state="$("${pool_describe[@]}" --format='value(state)')"
+[[ "$pool_state" == ACTIVE ]] || {
+  echo "FAIL: deployment WIF pool must be ACTIVE, found: $pool_state" >&2
+  exit 1
+}
+
+if ! "${provider_describe[@]}" >/dev/null 2>&1; then
+  if ! gcloud iam workload-identity-pools providers create-oidc "$provider" \
     --project="$project" --location=global --workload-identity-pool="$pool" \
     --issuer-uri="https://token.actions.githubusercontent.com" \
     --attribute-mapping="google.subject=assertion.sub,attribute.repository_id=assertion.repository_id,attribute.workflow_ref=assertion.workflow_ref" \
-    --attribute-condition="$condition"
+    --attribute-condition="$condition"; then
+    echo "NOTICE: provider create did not complete; checking for an existing resource" >&2
+  fi
 fi
+wait_visible "WIF provider $provider" "${provider_describe[@]}"
 
-actual="$(gcloud iam workload-identity-pools providers describe "$provider" \
-  --project="$project" --location=global --workload-identity-pool="$pool" \
-  --format='value(attributeCondition)')"
-[[ "$actual" == "$condition" ]] || { echo "FAIL: WIF provider has unexpected security conditions" >&2; exit 1; }
-state="$(gcloud iam workload-identity-pools providers describe "$provider" \
-  --project="$project" --location=global --workload-identity-pool="$pool" \
-  --format='value(state)')"
-[[ "$state" == ACTIVE ]] || { echo "FAIL: WIF provider is not ACTIVE" >&2; exit 1; }
+# Reject a provider with a different trust boundary; do not rewrite it
+# automatically or silently broaden an existing OIDC mapping/condition.
+provider_tmp="$(mktemp)"
+trap 'rm -f -- "$provider_tmp"' EXIT
+"${provider_describe[@]}" --format=json > "$provider_tmp"
+jq -e --arg expected "$condition" '
+  .state == "ACTIVE"
+  and .attributeCondition == $expected
+  and .oidc.issuerUri == "https://token.actions.githubusercontent.com"
+  and .attributeMapping["google.subject"] == "assertion.sub"
+  and .attributeMapping["attribute.repository_id"] == "assertion.repository_id"
+  and .attributeMapping["attribute.workflow_ref"] == "assertion.workflow_ref"
+' "$provider_tmp" >/dev/null || {
+  echo "FAIL: provider state, issuer, mapping or branch/workflow condition differs" >&2
+  exit 1
+}
+echo "PASS: deployment provider ACTIVE with exact GitHub trust boundary"
 
 for spec in "buildgce-deployer:Approved BuildGCE deployment" "buildgce-e2e:BuildGCE E2E test only"; do
   id="${spec%%:*}"
   display="${spec#*:}"
   sa="$id@$project.iam.gserviceaccount.com"
   if ! gcloud iam service-accounts describe "$sa" --project="$project" >/dev/null 2>&1; then
-    gcloud iam service-accounts create "$id" --project="$project" --display-name="$display"
+    if ! gcloud iam service-accounts create "$id" --project="$project" --display-name="$display"; then
+      echo "NOTICE: service account create returned an error; checking whether it already exists" >&2
+    fi
   fi
+  wait_visible "service account $id" gcloud iam service-accounts describe "$sa" --project="$project"
   gcloud iam service-accounts add-iam-policy-binding "$sa" --project="$project" \
     --role=roles/iam.workloadIdentityUser --member="$member" --condition=None --quiet >/dev/null
   echo "PASS: repo-scoped WIF binding for $id"
