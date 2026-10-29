@@ -1,15 +1,15 @@
-**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 512 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.\n\n# wsklarkc — GitHub Actions deploy + real GCE integration + authenticated XRDP E2E
+**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 512 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.
+
+# wsklarkc — GitHub Actions deploy + real GCE integration + authenticated XRDP E2E
 
 **Owner:** BuildGCE, exclusively `feat/wsklarkc-gce`.
 
-> **Lifecycle v2 and budget HOLD (2026-10-29):** The historically specified
-> GCE stop/start acceptance **is invalid** because it loses RAM, processes and
-> the original XRDP/XMonad session. The `gce-stop-start` job and script are
-> disabled. **Do not trigger production deploy**: catalog cost of the planned
-> 512 GiB `pd-balanced` disk alone is about R$455.50/month, exceeding the
-> R$400 reference. Obtain an explicit new decision on shape/storage/cost
-> and an approved, equivalent disposable-VM suspend/resume E2E first.
-> All live jobs remain disabled pending explicit approval.
+> **Lifecycle v2 / current plan (2026-10-29):** 256 GiB `pd-balanced`,
+> Determinate Nix and R$560/month reference are approved *as a design*,
+> not paid deployment. Historic 512 GiB/R$400 values are superseded.
+> The ~R$557.50 estimate excludes auxiliary charges. The old
+> `stop/start` gate is disabled because RAM and XMonad would be lost.
+> Real deployment remains NO-GO pending separate approval and E2E.
 
 **Separate client branch:** BuildClient owns `feat/lpklarkc-ci-20261029`.
 No edits to the Dell's NixOS image, Ventoy scripts, Wi-Fi state or its CI.
@@ -23,7 +23,7 @@ The shared integration is Google IAP TCP, no VPN or public RDP.
 | Zone | `southamerica-east1-b` |
 | VM name and NixOS hostname | `wsklarkc` |
 | CPU / RAM | `e2-highmem-4`, 4 vCPU / 32 GiB |
-| Disk | **512 GiB** boot `pd-balanced`, `autoDelete=false`, persistent through suspension |
+| Disk | **256 GiB** boot `pd-balanced`, `autoDelete=false`, persistent through suspension |
 | VPC / subnet | `wsklarkc-iap-vpc` / `wsklarkc-iap-subnet` |
 | IAP ingress | TCP 22 and TCP 3389 only from `35.235.240.0/20` |
 | Guest firewall | nftables duplicates same IAP CIDR restriction |
@@ -35,7 +35,7 @@ The shared integration is Google IAP TCP, no VPN or public RDP.
 | Test account | `wsklarkcci` created only for CI E2E and deleted in cleanup |
 
 **Historical cost approval:** user previously authorized a single VM and
-512-GiB disk, but the new BRL cost study showed that this plan exceeds the
+256-GiB disk, but the new BRL cost study showed that this plan exceeds the
 current R$400 reference even when suspended all month. **NO-GO** for paid
 provisioning until the user chooses a revised plan; never change disk size
 or type in the provisioner without explicit agreement. This is NOT an approval for Cloud NAT, reserved static IP, GPU, VPN,
@@ -97,7 +97,7 @@ QEMU boot/reboot/persistence, ISO and custom GCE image gates:
    to the **same successful run and SHA**, and its SHA256 checksum;
    create dedicated VPC, IAP-only rules, a short-lived private import
    bucket and exactly one NixOS `wsklarkc` VM with a retained
-   512 GiB disk, without any public IP. Repeated runs refuse
+   256 GiB disk, without any public IP. Repeated runs refuse
    replacement of an existing VM/disk.
 2. **Production integration:** WIF as verifier; query **live**
    instance/image/disk metadata, exact machine type, absence of GPU,

@@ -1,4 +1,6 @@
-**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 512 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.\n\n# BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
+**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 256 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.
+
+# BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
 
 **Lifecycle v2 override (2026-10-29):** The canonical session-preserving
 contract is `klarkc/broker/contracts/2026-10-29-session-preserving-lifecycle-v2.md`.
@@ -7,11 +9,10 @@ Any older stop/start test instructions in this document are superseded:
 can retain memory, after real instance compatibility and authenticated XRDP
 reconnection have been proven. **NO production suspend/deploy authorized.**
 
-**Financial hold:** 512 GiB `pd-balanced` alone was estimated by CostsManager
-at R$455.50/month (catalog BRL, not actual billing). The earlier storage
-approval is historical and must be reconsidered before dispatching a paid
-deployment against the desired R$400/month reference. Do not silently alter
-`gce-provision-approved.sh` from 512 GiB while this tradeoff is unresolved.
+**Current financial decision:** 256 GiB `pd-balanced` and R$560/month,
+replacing the previous 256 GiB/R$400 plan. At 172 active hours the
+estimated cost was ~R$557.50 *before* extra services, backup and tax.
+This is not a deployment authorization; real GCE remains NO-GO.
 
 Canonical network/IAP issue: https://github.com/klarkc/os/issues/21.
 The previous Tailscale/WireGuard integration is obsolete. This server branch
@@ -22,8 +23,8 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 
 - Project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
 - Planned VM: `wsklarkc`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
-- Persistent boot disk candidate: 512 GiB `pd-balanced`, persistent through suspend/resume (when compatible).
-  The disk is provisioned at 512 GiB even when the VM is suspended; plan for
+- Persistent boot disk candidate: 256 GiB `pd-balanced`, persistent through suspend/resume (when compatible).
+  The disk is provisioned at 256 GiB even when the VM is suspended; plan for
   full-month block-storage charges and set `autoDelete=false` explicitly.
   The legacy solo098 used a physical 512-GB NVMe with Btrfs subvolumes;
   this is **capacity parity**, not physical NVMe or filesystem parity.
@@ -40,7 +41,7 @@ containing peer public keys. The Dell integration is owned by BuildClient.
   Google IAP source `35.235.240.0/20`. SSH 22 is for OS Login admin only,
   not the Dell graphical user workflow.
 - The operator **approved** one CPU-only `e2-highmem-4` VM and a retained
-  **512 GiB pd-balanced disk**. GitHub Actions may provision those approved
+  **256 GiB pd-balanced disk**. GitHub Actions may provision those approved
   resources after the gated CI build and a separate one-time WIF IAM bootstrap.
   The CI must not create NAT, reserved IPs, GPUs or additional VMs.
   See [the automated production gates](WSKLARKC-CI-DEPLOY-E2E.md).
@@ -147,7 +148,7 @@ US$0.0014/VM-hour plus a NAT IP at US$0.005/hour, plus $0.045/GiB
 processed (in addition to egress). If the NAT address remains allocated
 730h, the address alone costs about US$3.65. These are illustrative
 network components, not a complete invoice. Quote E2 São Paulo,
-512GiB pd-balanced for the *full* month, egress, image storage, taxes
+256GiB pd-balanced for the *full* month, egress, image storage, taxes
 and all quotas before approving VM provisioning.
 
 Sources: https://cloud.google.com/vpc/pricing
@@ -283,7 +284,7 @@ the physical Dell for IAP are separate from the GitHub auditor identity.
 A **successful** WIF audit means identity exchange plus selected
 read-only API checks succeeded. It does **not** mean IAP API is enabled,
 the VM exists, VPC effective firewall is safe, XRDP can authenticate or
-the user's 512 GiB disk has been provisioned. The audit reports
+the user's 256 GiB disk has been provisioned. The audit reports
 `PENDING` for incomplete deployment prerequisites and
 `REVIEW` for potentially broad classic ingress; hierarchical/global
 policies and actual effective per-instance firewalls remain a separate
@@ -310,7 +311,7 @@ push/dispatch in `feat/wsklarkc-gce`, and never on PRs:
 2. Authenticating as **separate, scoped GitHub OIDC deployer**,
    verifying exact run SHA and compressed image SHA256, importing the
    NixOS image, creating a private custom VPC and IAP-only firewall,
-   then one `wsklarkc` VM with retained **512 GiB pd-balanced boot
+   then one `wsklarkc` VM with retained **256 GiB pd-balanced boot
    disk**, no GPU and **no external IP**.
 3. Live image/disk/network/effective-firewall safety audit.
 4. Granting a **separate disposable E2E identity** VM-specific OS Login

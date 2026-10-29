@@ -1,3 +1,5 @@
+# Current decision (2026-10-29): 256 GiB pd-balanced and R$560/month replace the old 512 GiB/R$400 design. Historical measurements and comparisons below are preserved only as migration evidence. No GCE provisioning is authorized.
+
 # Inventory: solo098 Arch Linux dotfiles to CPU-only NixOS GCE
 
 **Evidence date:** 2026-10-27. Source snapshot: [klarkc/dotfiles main at
