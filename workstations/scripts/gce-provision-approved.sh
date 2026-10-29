@@ -147,4 +147,5 @@ echo "IMPORTANT: the IAP principal role, interactive XRDP password and graphical
  echo "After successful effective-firewall audit, enable low-cost outbound access with:"
  echo "gcloud compute instances add-access-config $vm --project=$project --zone=$zone --network-interface=nic0"
  echo "That assigns an EPHEMERAL public IP; never expose ports 22/3389 outside IAP."
-echo "IMPORTANT: stop the VM after testing to limit compute cost; disk/image still incur storage cost."
+echo "COST HOLD: 512 GiB pd-balanced alone was estimated at R$455.50/month (BRL catalog 2026-10-29), above the user's R$400 reference. Confirm revised cost/shape approval before any deployment."
+echo "LIFECYCLE v2: DO NOT stop/start the workstation to reduce costs; it loses RAM and active sessions. Only approved Compute Engine suspend/resume may qualify after independent compatibility E2E."

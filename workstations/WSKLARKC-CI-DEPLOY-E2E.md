@@ -1,6 +1,15 @@
 # wsklarkc — GitHub Actions deploy + real GCE integration + authenticated XRDP E2E
 
 **Owner:** BuildGCE, exclusively `feat/wsklarkc-gce`.
+
+> **Lifecycle v2 and budget HOLD (2026-10-29):** The historically specified
+> GCE stop/start acceptance **is invalid** because it loses RAM, processes and
+> the original XRDP/XMonad session. The `gce-stop-start` job and script are
+> disabled. **Do not trigger production deploy**: catalog cost of the planned
+> 512 GiB `pd-balanced` disk alone is about R$455.50/month, exceeding the
+> R$400 reference. Obtain an explicit new decision on shape/storage/cost
+> and an approved, equivalent disposable-VM suspend/resume E2E first.
+> All live jobs remain disabled pending explicit approval.
 **Separate client branch:** BuildClient owns `feat/lpklarkc-ci-20261029`.
 No edits to the Dell's NixOS image, Ventoy scripts, Wi-Fi state or its CI.
 The shared integration is Google IAP TCP, no VPN or public RDP.
@@ -13,7 +22,7 @@ The shared integration is Google IAP TCP, no VPN or public RDP.
 | Zone | `southamerica-east1-b` |
 | VM name and NixOS hostname | `wsklarkc` |
 | CPU / RAM | `e2-highmem-4`, 4 vCPU / 32 GiB |
-| Disk | **512 GiB** boot `pd-balanced`, `autoDelete=false`, retained after stop/start |
+| Disk | **512 GiB** boot `pd-balanced`, `autoDelete=false`, persistent through suspension |
 | VPC / subnet | `wsklarkc-iap-vpc` / `wsklarkc-iap-subnet` |
 | IAP ingress | TCP 22 and TCP 3389 only from `35.235.240.0/20` |
 | Guest firewall | nftables duplicates same IAP CIDR restriction |
@@ -24,10 +33,13 @@ The shared integration is Google IAP TCP, no VPN or public RDP.
 | Client flow | IAP TCP → localhost `127.0.0.1:13389` → FreeRDP → authenticated XRDP/XMonad |
 | Test account | `wsklarkcci` created only for CI E2E and deleted in cleanup |
 
-**Cost approval:** user authorized this single VM and its 512-GiB disk.
-This is NOT an approval for Cloud NAT, reserved static IP, GPU, VPN,
+**Historical cost approval:** user previously authorized a single VM and
+512-GiB disk, but the new BRL cost study showed that this plan exceeds the
+current R$400 reference even when suspended all month. **NO-GO** for paid
+provisioning until the user chooses a revised plan; never change disk size
+or type in the provisioner without explicit agreement. This is NOT an approval for Cloud NAT, reserved static IP, GPU, VPN,
 other VMs, or unbounded operation. Disks and imported custom images
-continue to incur storage charges while the VM is stopped.
+continue to incur storage charges while the VM is suspended.
 
 ## One-time Cloud Shell authorization (required)
 
@@ -104,13 +116,15 @@ QEMU boot/reboot/persistence, ISO and custom GCE image gates:
    privileged probe **requires a process named `xmonad` owned
    by `wsklarkcci` with an Xorg `DISPLAY`**. An opened TCP
    socket alone NEVER passes.
-5. **Real stop/start:** deployer stops and restarts **the same GCE VM**.
-   It verifies same instance ID, same 512-GiB persistent boot disk
-   and no external IP.
-6. **Authenticated reconnection:** a new GitHub runner connects
-   through IAP again, verifies the marker in the original test
-   user's **persistent HOME**, resets the disposable password
-   securely and proves another real XRDP/XMonad login.
+5. **BLOCKED legacy gate:** Real stop/start is **not run** because it
+   destroys the running process/RAM state. Replacing this gate requires
+   `instances.suspend` / `instances.resume` on a separately approved
+   *disposable equivalent VM*, confirming identical boot ID, XMonad PID,
+   session DISPLAY, sentinel in RAM and agent/tmux PIDs.
+6. **Authenticated reconnection (BLOCKED):** after the replacement
+   suspend/resume gate, reconnect via IAP and verify the **same existing**
+   XMonad process/session (not just a new login and persisted HOME marker).
+   Verify `xrdp-sink`/`xrdp-source` and real playback/microphone separately.
 7. **Always-cleanup (after authorization):** remove only temporary
    `wsklarkcci`, its HOME and temporary test script. Real `klarkc`
    HOME, private secrets and dotfiles are never touched.
@@ -118,8 +132,11 @@ QEMU boot/reboot/persistence, ISO and custom GCE image gates:
    production jobs report success, including cleanup. No job may
    replace authenticated XRDP with an unsecured port scan.
 
-The production jobs run only on **push/dispatch on
-`feat/wsklarkc-gce`** (not PRs), with WIF at job scope.
+Production deployment is **manual opt-in only** via `workflow_dispatch`
+on `feat/wsklarkc-gce` with `approve_production_deploy=true`, AND remains
+**NO-GO** until renewed budget approval and lifecycle E2E redesign. Ordinary
+pushes run offline tests and image builds, not paid cloud changes.
+WIF is used only for authorized production jobs.
 No production job is allowed to run against main/BuildClient.
 CI concurrency does not cancel mid-deployment operations.
 

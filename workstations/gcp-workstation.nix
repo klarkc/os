@@ -54,6 +54,19 @@ in
     defaultWindowManager = ''
       exec ${xrdpSession}/bin/wsklarkc-xrdp-session
     '';
+    # Lifecycle v2: a disconnected client MUST NOT terminate the graphical
+    # desktop. Set these in generated sesman.ini rather than relying on
+    # upstream defaults that may change in a future Nixpkgs revision.
+    extraConfDirCommands = ''
+      sed -i -e 's/^KillDisconnected=.*/KillDisconnected=false/' \
+             -e 's/^DisconnectedTimeLimit=.*/DisconnectedTimeLimit=0/' \
+             -e 's/^IdleTimeLimit=.*/IdleTimeLimit=0/' \
+             -e 's/^Policy=.*/Policy=Default/' "$out/sesman.ini"
+      grep -Fxq 'KillDisconnected=false' "$out/sesman.ini"
+      grep -Fxq 'DisconnectedTimeLimit=0' "$out/sesman.ini"
+      grep -Fxq 'IdleTimeLimit=0' "$out/sesman.ini"
+      grep -Fxq 'Policy=Default' "$out/sesman.ini"
+    '';
   };
   # pam_systemd starts the real systemd --user manager and /run/user/UID.
   security.pam.services.xrdp-sesman = {

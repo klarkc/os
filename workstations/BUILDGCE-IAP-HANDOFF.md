@@ -4,6 +4,13 @@ Canonical issue: https://github.com/klarkc/os/issues/21
 Server branch: `feat/wsklarkc-gce`
 Client branch: `feat/solo-thin-client-ci-20261026` (NOT modified here).
 
+**Lifecycle v2 override:** any references below to GCE suspend/resume as
+a reconnect test are historical and invalid for preserving RAM/XMonad.
+Never perform stop/start as an idle/budget fallback. The required path
+is a separately approved Compute Engine suspend/resume E2E in an
+equivalent disposable VM, followed by real IAP/XRDP reattachment and
+bidirectional audio verification. No production deployment is authorized.
+
 ## Confirmed server-side design
 
 The `gcp-workstation.nix` image includes XRDP on TCP 3389,
@@ -40,7 +47,7 @@ a separate cost-approval gate.
      /f /dynamic-resolution /cert:tofu /sec:tls
    ```
 
-5. Recover on tunnel termination or VM stop/start without Wi-Fi or
+5. Recover on tunnel termination or VM suspend/resume without Wi-Fi or
    Google interactive reauthentication unless the Google refresh
    mechanism actually requires it. Provide a clearly visible failure
    when permissions expire or VM is not running.

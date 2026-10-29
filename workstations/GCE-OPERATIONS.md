@@ -1,6 +1,19 @@
 # BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
 
-Canonical contract: https://github.com/klarkc/os/issues/21.
+**Lifecycle v2 override (2026-10-29):** The canonical session-preserving
+contract is `klarkc/broker/contracts/2026-10-29-session-preserving-lifecycle-v2.md`.
+Any older stop/start test instructions in this document are superseded:
+**never stop/start as an idle/budget fallback**; only GCE suspend/resume
+can retain memory, after real instance compatibility and authenticated XRDP
+reconnection have been proven. **NO production suspend/deploy authorized.**
+
+**Financial hold:** 512 GiB `pd-balanced` alone was estimated by CostsManager
+at R$455.50/month (catalog BRL, not actual billing). The earlier storage
+approval is historical and must be reconsidered before dispatching a paid
+deployment against the desired R$400/month reference. Do not silently alter
+`gce-provision-approved.sh` from 512 GiB while this tradeoff is unresolved.
+
+Canonical network/IAP issue: https://github.com/klarkc/os/issues/21.
 The previous Tailscale/WireGuard integration is obsolete. This server branch
 MUST NOT depend on a VPN daemon, external VPN keys, UDP/51820 or metadata
 containing peer public keys. The Dell integration is owned by BuildClient.
@@ -9,8 +22,8 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 
 - Project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
 - Planned VM: `wsklarkc`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
-- Persistent boot disk candidate: 512 GiB `pd-balanced`, retained on stop.
-  The disk is provisioned at 512 GiB even when the VM is stopped; plan for
+- Persistent boot disk candidate: 512 GiB `pd-balanced`, persistent through suspend/resume (when compatible).
+  The disk is provisioned at 512 GiB even when the VM is suspended; plan for
   full-month block-storage charges and set `autoDelete=false` explicitly.
   The legacy solo098 used a physical 512-GB NVMe with Btrfs subvolumes;
   this is **capacity parity**, not physical NVMe or filesystem parity.
@@ -199,9 +212,9 @@ xfreerdp /v:127.0.0.1:13389 /f /dynamic-resolution /cert:tofu /sec:tls
 
 Record: authenticated tunnel establishment, actual remote TCP 3389,
 interactive graphical login as `klarkc`, Xorg/XMonad only,
-fullscreen/resizing, reconnect after IAP interruption, and post-stop/start
+fullscreen/resizing, reconnect after IAP interruption, and post-suspend/resume
 return. The VM must retain `/home/klarkc/.git` and a real writable marker
-after a GCE stop/start, not just a QEMU reboot. Verify the boot disk remains
+after a real GCE suspend/resume, including identical boot ID, XMonad PID and RAM sentinel; a QEMU reboot is not equivalent. Verify the boot disk remains
 attached and persistent. Do not claim E2E complete from green CI alone.
 
 **BuildClient handoff confirmed (2026-10-27):** the independent client branch
@@ -229,7 +242,7 @@ lists **zero VM instances, zero zonal disks, zero custom images, and zero
 snapshots** in `argon-surf-472319-b0` (zone
 `southamerica-east1-b` for zonal resources). Consequently the intended
 instance's IAM bindings, VPC effective rules, IAP tunnel, XRDP login,
-persisted HOME and stop/start could not be validated. The connected
+persisted HOME and session-preserving suspend/resume could not be validated. The connected
 Compute Engine integration does not expose the Service Usage, IAM,
 IAP or VPC firewall APIs. Their existence or configuration must not be
 inferred from a green NixOS CI.
@@ -305,7 +318,7 @@ push/dispatch in `feat/wsklarkc-gce`, and never on PRs:
 5. Real `gcloud compute start-iap-tunnel wsklarkc 3389` and
    FreeRDP over TLS with a one-time password via stdin, followed by
    server-side proof of an authenticated user-owned XMonad process.
-6. Actual VM stop/start, immutable boot disk and persistent HOME marker;
+6. Legacy stop/start gate is disabled. Await separately approved suspend/resume on an equivalent disposable VM, with unchanged instance/boot ID, RAM sentinel and XMonad PIDs;
    second authenticated XRDP/XMonad login over a new IAP tunnel.
 7. Removing the temporary E2E user and its HOME; explicit final green
    gate **only if all production tests and cleanup pass**.

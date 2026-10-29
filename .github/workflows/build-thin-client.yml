@@ -71,6 +71,10 @@ jobs:
             workstations/scripts/xrdp-pipewire-session.sh; do
             bash -n "$script"
           done
+      - name: Validate suspend admission gate in offline dry-run (NO cloud credentials)
+        run: |
+          set -euo pipefail
+          python3 -m unittest discover -s workstations/tests -p 'test_suspend_policy_dry_run.py' -v
       - name: Evaluate flake and all NixOS configurations
         run: |
           set -euo pipefail

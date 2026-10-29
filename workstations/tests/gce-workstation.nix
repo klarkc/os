@@ -49,6 +49,11 @@ pkgs.testers.runNixOSTest {
     server.succeed("test -x /run/current-system/sw/bin/xmonad")
     server.succeed("test -x /run/current-system/sw/bin/xterm")
     server.succeed("grep -F 'wsklarkc-xrdp-session' /etc/xrdp/startwm.sh")
+    # A preserved GCE RAM image is useless if sesman has destroyed XMonad.
+    # These are necessary configuration checks, not reconnection E2E proof.
+    for setting in ("KillDisconnected=false", "DisconnectedTimeLimit=0",
+                    "IdleTimeLimit=0", "Policy=Default"):
+        server.succeed("grep -Fx " + setting + " /etc/xrdp/sesman.ini")
     server.succeed("test -x /run/current-system/sw/bin/wsklarkc-xrdp-session")
     server.succeed("grep -F 'XRDP_PULSE_SOURCE_SOCKET' /run/current-system/sw/bin/wsklarkc-xrdp-session")
     server.succeed("grep -F 'xrdp-sink' /run/current-system/sw/bin/wsklarkc-xrdp-session")
