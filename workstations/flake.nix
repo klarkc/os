@@ -86,6 +86,19 @@
               virtualisation.memorySize = 2048;
               virtualisation.graphics = true;
               services.xserver.videoDrivers = [ "modesetting" ];
+              # Exercise rootless Xorg via getty@tty1 and startx without any
+              # display manager or WM. Production launches xfreerdp only
+              # after IAP; here use a local no-network X11 probe.
+              environment.loginShellInit = lib.mkForce ''
+                if [ "$(id -un)" = "nixos" ] && [ "$(tty)" = "/dev/tty1" ] &&
+                   [ ! -e /tmp/lpklarkc-graphics-ok ]; then
+                  ${pkgs.xinit}/bin/startx ${pkgs.writeShellScript "lpklarkc-x11-probe" ''
+                    test -n "$DISPLAY" || exit 1
+                    ${pkgs.coreutils}/bin/printf '%s\n' "$DISPLAY" > /tmp/lpklarkc-graphics-ok
+                    ${pkgs.coreutils}/bin/sleep 5
+                  ''} -- :0 vt1 -keeptty -nolisten tcp
+                fi
+              '';
               system.stateVersion = "26.05";
             };
             server = { lib, ... }: {
@@ -102,6 +115,11 @@
             client.wait_for_unit("multi-user.target")
             server.wait_for_unit("multi-user.target")
             client.succeed("systemctl is-active NetworkManager.service")
+            client.succeed("! systemctl is-active --quiet display-manager.service")
+            client.succeed("test -e /run/current-system/sw/bin/startx")
+            # The login TTY must actually launch a rootless Xorg screen.
+            client.wait_until_succeeds("test -s /tmp/lpklarkc-graphics-ok", timeout=180)
+            client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
             client.succeed("test -e /run/current-system/sw/bin/lpklarkc-iap")
             client.succeed("test -e /run/current-system/sw/bin/gcloud")
             client.succeed("! test -e /run/current-system/sw/bin/lpklarkc-wg")

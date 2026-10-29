@@ -10,16 +10,9 @@ let
     exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
   thinClient = pkgs.writeShellScriptBin "lpklarkc" ''
-    # CLI diagnostic mode without X11; used by deterministic CI regressions.
-    if [ "$1" = "--check-network" ]; then
-      exec ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh} --check-network
-    fi
-    exec ${pkgs.xterm}/bin/xterm \
-      -fullscreen -b 18 \
-      -T "lpklarkc" \
-      -fa "DejaVu Sans Mono" -fs 15 \
-      -bg "#101820" -fg "#ecf2fa" -cr "#61ddc2" \
-      -e ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh}
+    # Connection/pairing UI runs directly on the trusted local console.
+    # The X11 server is started only when an RDP session is available.
+    exec ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh} "$@"
   '';
 in
 {
@@ -85,27 +78,28 @@ in
     path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils pkgs.sqlite ];
   };
 
+  # Rootless Xorg is still needed by xfreerdp. The Dell does NOT need a
+  # display manager, window manager, terminal emulator or desktop session.
+  # Start Xorg with startx only after a valid Google IAP tunnel is ready.
   services.xserver.enable = true;
   services.xserver.xkb.layout = "br";
-  services.xserver.windowManager.openbox.enable = true;
-  services.xserver.displayManager.lightdm = {
-    enable = true;
-    greeter.enable = false;
-  };
-  services.displayManager = {
-    autoLogin = { enable = true; user = "nixos"; };
-    defaultSession = "none+openbox";
-  };
-  services.xserver.displayManager.sessionCommands = ''
-    ${thinClient}/bin/lpklarkc &
+  services.xserver.displayManager.startx.enable = true;
+  services.xserver.windowManager.openbox.enable = lib.mkForce false;
+  services.xserver.displayManager.lightdm.enable = lib.mkForce false;
+
+  # The local kiosk starts from autologin on tty1. Keep tty2/other consoles
+  # for recovery. startx runs under 'nixos', never as root.
+  services.getty.autologinUser = "nixos";
+  environment.loginShellInit = ''
+    if [ "$(id -un)" = "nixos" ] && [ "$(tty)" = "/dev/tty1" ] && [ -z "$DISPLAY" ]; then
+      exec ${thinClient}/bin/lpklarkc
+    fi
   '';
 
   environment.systemPackages = with pkgs; [
     stateTool iapTool thinClient freerdp networkmanager
-    google-cloud-sdk sqlite netcat-openbsd
-    xterm xorg.xsetroot openssh
+    google-cloud-sdk sqlite netcat-openbsd openssh
   ];
-  fonts.packages = [ pkgs.dejavu_fonts ];
   console.keyMap = "br-abnt2";
   time.timeZone = "America/Bahia";
   system.stateVersion = "26.05";

@@ -38,7 +38,7 @@ pkgs.testers.runNixOSTest {
     # which races the dmsetup tests and can return spurious EBUSY. Disable
     # only its graphical autostart and periodic save timer IN THIS TEST VM.
     # The independent boot-and-network VM covers the graphical services.
-    services.xserver.displayManager.sessionCommands = lib.mkForce "";
+    environment.loginShellInit = lib.mkForce "";
     systemd.timers.lpklarkc-save-state.wantedBy = lib.mkForce [];
 
     virtualisation.memorySize = 2048;

@@ -95,8 +95,12 @@ while true; do
 
   if [[ "$ready" == true ]]; then
     printf '  Conexao pronta. Abrindo area de trabalho...\n'
-    xfreerdp /v:"$RDP_ADDRESS" /f /dynamic-resolution \
-      /cert:tofu /clipboard /network:auto /sec:tls || true
+    # xfreerdp is X11-based. Start a rootless Xorg session directly from
+    # tty1, with no LightDM/Openbox/Xterm. When RDP exits, Xorg terminates
+    # and the console immediately resumes the retry loop.
+    startx "$(command -v xfreerdp)" /v:"$RDP_ADDRESS" /f \
+      /dynamic-resolution /cert:tofu /clipboard /network:auto /sec:tls \
+      -- :0 vt1 -keeptty -nolisten tcp || true
     printf '\n  Sessao encerrada. Reconectando...\n'
   else
     printf '\n  Nao foi possivel conectar ao servidor.\n'

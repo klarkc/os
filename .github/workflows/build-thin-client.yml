@@ -42,6 +42,10 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.documentation.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeEfiBootable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeBiosBootable)" = true
+          # The RDP kiosk launches rootless Xorg on demand, without a DE.
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.startx.enable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.lightdm.enable)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.windowManager.openbox.enable)" = false
           bash tests/iso-size-budget.sh --self-test
           test ! -e ventoy/ventoy.json
           # Catch obsolete identity strings in client-only sources and docs.
@@ -116,13 +120,14 @@ jobs:
           fi
           install -m 0644 -- "${iso_files[0]}" "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           test -s "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
+          # Diagnose the actual closure BEFORE gating, even when over budget.
+          echo "Largest Nix store paths in the client runtime closure (bytes):"
+          toplevel="$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.build.toplevel)"
+          nix path-info -r --size "$toplevel" | sort -k2nr | sed -n '1,35p'
           # Assert the measured final ISO is at most 1.5 GiB (1536 MiB).
           MAX_ISO_MIB=1536 bash tests/iso-size-budget.sh "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           test ! -e "$GITHUB_WORKSPACE/dist/ventoy.json"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum lpklarkc-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
-          echo "Largest packages in the client runtime Nix store (bytes):"
-          toplevel="$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.build.toplevel)"
-          nix path-info -r --size "$toplevel" | sort -k2nr | head -25
           test "$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -type f | wc -l)" -eq 2
       - uses: actions/upload-artifact@v4
         with:

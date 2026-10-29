@@ -15,6 +15,9 @@ Se você aplicou opções desse arquivo fornecidas em versões anteriores,
 remova **somente aquelas opções**, preservando outras configurações suas
 ou de outras ISOs.
 
+O cliente não utiliza LightDM, Openbox ou Xterm. Wi-Fi/Google funcionam
+no console; Xorg só inicia quando há túnel IAP e FreeRDP disponível.
+
 A aparência de `lpklarkc` muda **dentro da ISO**; o menu,
 timeout e opções do Ventoy permanecem integralmente sob seu controle.
 

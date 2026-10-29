@@ -15,7 +15,8 @@ arquivos no HDD do Dell.
   `argon-surf-472319-b0`, zona `southamerica-east1-b`, porta TCP 3389.
   FreeRDP conecta exclusivamente a `127.0.0.1:13389`.
 - Sem XFCE local, Tailscale ou WireGuard. Interface mínima com NetworkManager,
-  Xorg, Openbox, Xterm e FreeRDP.
+  Xorg (iniciado sob demanda por `startx`) e FreeRDP. Não há LightDM,
+  Openbox, Xterm nem desktop completo.
 - Wi-Fi, credenciais CLI Google e certificados TLS são salvos somente em
   `lpklarkc/` na partição de dados do Ventoy, montada em
   `/run/lpklarkc/ventoy`. USB confiável **sem criptografia** conforme decisão.
@@ -65,3 +66,12 @@ limite exato e rejeita um byte excedente. Compilação e distribuição
 continuam condicionadas aos testes QEMU.
 
 O Ventoy não é configurado nem alterado por este projeto.
+
+## Inicialização sem display manager
+
+O console `tty1` faz autologin no usuário `nixos` e abre diretamente
+`lpklarkc`. O pareamento Wi-Fi/`nmtui` e a autenticação Google rodam
+no próprio console. **Somente quando o túnel IAP está disponível**, o
+cliente inicia Xorg sem display manager ou window manager para renderizar
+o `xfreerdp` em tela cheia. Quando a sessão RDP termina, o Xorg encerra e
+o console tenta reconectar. `Ctrl+Alt+F2` abre recuperação local.
