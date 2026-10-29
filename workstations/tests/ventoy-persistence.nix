@@ -161,9 +161,11 @@ pkgs.testers.runNixOSTest {
 
     # Dell regression (2026-10-28): Ventoy bootable, direct raw USB
     # mount returns EBUSY; older Ventoy used /dev/mapper/sdX1.
+    # Use the older sdX1 mapper *shape*, but a distinct synthetic name;
+    # aliasing the real /dev/sda1 name causes a nondeterministic udev EBUSY.
     # Mock mount only in CI via bash exported function, not in production.
     client.succeed("umount /run/lpklarkc/ventoy")
-    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/LPKDATA); legacy=$(basename \"$usb_data\"); printf '%s\\n' \"$legacy\" > /tmp/ci-legacy-device-name; printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
+    client.succeed("usb_data=$(readlink -f /dev/disk/by-label/LPKDATA); legacy=sdz1; test \"$legacy\" != \"$(basename \"$usb_data\")\"; printf '%s\\n' \"$legacy\" > /tmp/ci-legacy-device-name; printf '0 %s linear %s 0\\n' \"$(blockdev --getsz \"$usb_data\")\" \"$usb_data\" | dmsetup create \"$legacy\"")
     client.succeed("test -b /dev/mapper/$(cat /tmp/ci-legacy-device-name)")
     client.succeed("""bash -c 'mount() {
       for arg in "$@"; do
