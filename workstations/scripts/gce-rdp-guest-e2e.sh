@@ -51,12 +51,10 @@ case "$mode" in
     id "$user" >/dev/null
     test -f "$marker"
     grep -Fx 'wsklarkc-ci-persistence-verified-after-real-stop-start' "$marker" >/dev/null
-    login_pid=""
-    for _ in $(seq 1 30); do
-      login_pid="$(pgrep -u "$user" -x xmonad | head -n 1 || true)"
-      [[ -n "$login_pid" ]] && break
-      sleep 2
-    done
+    # One bounded probe per remote invocation. The runner retries while
+    # its actual FreeRDP process remains alive; do not block 60 seconds
+    # inside SSH for each attempt.
+    login_pid="$(pgrep -u "$user" -x xmonad | head -n 1 || true)"
     [[ -n "$login_pid" ]] || {
       echo "FAIL: no authenticated user-owned XMonad process after RDP login" >&2
       exit 1
