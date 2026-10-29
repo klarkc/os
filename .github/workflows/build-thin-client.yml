@@ -55,6 +55,7 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.alsa.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.pulse.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.wireplumber.enable)" = true
+          nix eval --json .#nixosConfigurations.lpklarkc.config.environment.pathsToLink | jq -e 'index("/share/icons") != null'
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pulseaudio.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.graphics.enable)" = false
           # Duplex RDP audio uses PipeWire's PulseAudio protocol shim, not pulseaudio.

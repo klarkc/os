@@ -95,6 +95,10 @@ in
   };
   services.pulseaudio.enable = lib.mkForce false;
   fonts.enableDefaultPackages = lib.mkForce false;
+  # With the generic graphical profile disabled, NixOS' system-path
+  # post-build icon-cache hook still expects an icon directory.
+  # Link only the already-installed minimal hicolor theme, not a DE.
+  environment.pathsToLink = [ "/share/icons" ];
   # FreeRDP 2D and the modesetting driver should not need Mesa/LLVM DRI.
   # QEMU tests the actual Xorg startx path before any ISO is published.
   hardware.graphics.enable = lib.mkForce false;

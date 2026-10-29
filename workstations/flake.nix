@@ -152,6 +152,7 @@
             client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
             # User PipeWire runs with tty1 autologin; no physical audio card
             # is needed to assert an active PipeWire/Pulse-compatible socket.
+            client.succeed("test -d /run/current-system/sw/share/icons")
             client.succeed("test -e /run/current-system/sw/bin/pw-cli")
             client.wait_until_succeeds("test -S /run/user/$(id -u nixos)/pulse/native", timeout=180)
             client.wait_until_succeeds(
