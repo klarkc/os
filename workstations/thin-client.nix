@@ -111,6 +111,9 @@ in
   environment.systemPackages = with pkgs; [
     stateTool iapTool thinClient freerdp networkmanager
     google-cloud-sdk sqlite netcat-openbsd openssh
+    # NixOS' system-path post-build expects share/icons for icon cache
+    # generation. Keep only the tiny theme index, not the desktop stack.
+    hicolor-icon-theme
   ];
   console.keyMap = "br-abnt2";
   time.timeZone = "America/Bahia";
