@@ -33,6 +33,14 @@ pkgs.testers.runNixOSTest {
     # Ensure tests exercise the explicit NOPASSWD helper allowlist.
     security.sudo.wheelNeedsPassword = true;
 
+    # This test deliberately unmounts/remaps a USB block device. The normal
+    # full-screen kiosk attempts 'ensure'/'save' as soon as networking is up,
+    # which races the dmsetup tests and can return spurious EBUSY. Disable
+    # only its graphical autostart and periodic save timer IN THIS TEST VM.
+    # The independent boot-and-network VM covers the graphical services.
+    services.xserver.displayManager.sessionCommands = lib.mkForce "";
+    systemd.timers.lpklarkc-save-state.wantedBy = lib.mkForce [];
+
     virtualisation.memorySize = 2048;
     virtualisation.graphics = true;
     virtualisation.qemu.options = [
