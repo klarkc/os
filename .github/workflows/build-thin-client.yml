@@ -61,6 +61,14 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.graphical-desktop.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.speechd.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.enable)" = true
+          # Explicitly disable the default laptop lid-close auto-suspend.
+          nix eval --json .#nixosConfigurations.lpklarkc.config.services.logind.settings.Login |
+            jq -e '.HandleLidSwitch == "ignore" and .HandleLidSwitchExternalPower == "ignore" and
+                   .HandleLidSwitchDocked == "ignore" and .HandleSuspendKey == "ignore" and
+                   .HandleHibernateKey == "ignore" and .IdleAction == "ignore"'
+          nix eval --json .#nixosConfigurations.lpklarkc.config.systemd.sleep.settings.Sleep |
+            jq -e '.AllowSuspend == "no" and .AllowHibernation == "no" and
+                   .AllowHybridSleep == "no" and .AllowSuspendThenHibernate == "no"'
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.alsa.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.pulse.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.pipewire.wireplumber.enable)" = true

@@ -24,7 +24,8 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
 - Credentials restored on subsequent boots avoid repeated login unless
   authorization is revoked or expires.
 - **Session integrity update (29 Oct):** the Dell has no automatic local
-  suspend/hibernate. On boot, `lpklarkc-iap ensure-running` invokes
+  suspend/hibernate. systemd-logind ignores lid-close and sleep keys;
+  systemd sleep/hibernate is disabled. The normal power key still powers off. On boot, `lpklarkc-iap ensure-running` invokes
   `compute.instances.resume` only for SUSPENDED (then waits for RUNNING).
   TERMINATED is an explicit error: never auto-start a VM that already lost
   previous RAM. No client-initiated `instances.stop`, reset or delete.

@@ -14,8 +14,9 @@ arquivos no HDD do Dell.
 - Túnel Google IAP para o recurso GCE `wsklarkc` no projeto
   `argon-surf-472319-b0`, zona `southamerica-east1-b`, porta TCP 3389.
   FreeRDP conecta exclusivamente a `127.0.0.1:13389`.
-- Dell sem suspensão/hibernação automática: boot por Ventoy e desligamento
-  normal. Se VM `SUSPENDED`, cliente executa `instances.resume` e
+- Dell sem suspensão/hibernação automática: o logind ignora fechamento
+  da tampa e teclas de suspensão; as operações de sleep estão desabilitadas.
+  A tecla física de energia mantém o desligamento normal. Boot por Ventoy. Se VM `SUSPENDED`, cliente executa `instances.resume` e
   reanexa XRDP; se `RUNNING`, conecta; se `TERMINATED`, informa
   que a RAM anterior não existe e **não inicia** a VM automaticamente.
 - Desligar Dell não encerra agentes, builds ou aplicativos remotos.

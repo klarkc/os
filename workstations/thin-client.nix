@@ -39,6 +39,24 @@ in
   services.openssh.enable = lib.mkForce false;
   services.tailscale.enable = lib.mkForce false;
 
+  # No local suspend/hibernate: even closing the lid must NOT silently
+  # put the Dell into sleep (logind normally defaults to 'suspend').
+  # Keep the physical power key's ordinary poweroff behavior unchanged.
+  services.logind.settings.Login = {
+    HandleLidSwitch = "ignore";
+    HandleLidSwitchExternalPower = "ignore";
+    HandleLidSwitchDocked = "ignore";
+    HandleSuspendKey = "ignore";
+    HandleHibernateKey = "ignore";
+    IdleAction = "ignore";
+  };
+  systemd.sleep.settings.Sleep = {
+    AllowSuspend = "no";
+    AllowHibernation = "no";
+    AllowHybridSleep = "no";
+    AllowSuspendThenHibernate = "no";
+  };
+
   # Quiet boot, kiosk-like interface, diagnostic console still available.
   boot.consoleLogLevel = lib.mkDefault 3;
   boot.initrd.verbose = lib.mkDefault false;
