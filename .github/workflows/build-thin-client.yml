@@ -38,10 +38,13 @@ jobs:
           test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.isoImage.isoName)" = "lpklarkc-x86_64.iso"
           test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.image.baseName)" = "lpklarkc-x86_64"
           # Regression: no installer profile, embedded Nixpkgs channel or manual.
-          test "$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.nixos.variant_id)" != "installer"
+          nix eval --json .#nixosConfigurations.lpklarkc.config.system.nixos.variant_id | jq -e '. != "installer"'
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.documentation.enable)" = false
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeEfiBootable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.isoImage.makeBiosBootable)" = true
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.enableAllHardware)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.enableRedistributableFirmware)" = false
+          test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.hardware.wirelessRegulatoryDatabase)" = true
           # The RDP kiosk launches rootless Xorg on demand, without a DE.
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.startx.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.lpklarkc.config.services.xserver.displayManager.lightdm.enable)" = false

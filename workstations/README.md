@@ -75,3 +75,11 @@ no próprio console. **Somente quando o túnel IAP está disponível**, o
 cliente inicia Xorg sem display manager ou window manager para renderizar
 o `xfreerdp` em tela cheia. Quando a sessão RDP termina, o Xorg encerra e
 o console tenta reconectar. `Ctrl+Alt+F2` abre recuperação local.
+
+### Firmware e hardware
+
+A ISO contém drivers de boot USB/ISO e firmware selecionado para Wi-Fi Intel,
+Broadcom, Atheros, Realtek e MediaTek, além do vídeo Intel. São omitidos
+firmwares de GPU AMD/NVIDIA e equipamentos não necessários ao thin client.
+O Google CLI e o FreeRDP continuam completos. O chipset real do Dell ainda
+precisa de validação por teste físico.

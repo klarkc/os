@@ -7,6 +7,29 @@
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
+      # Curated firmware for Intel graphics and common Dell 5458 Wi-Fi cards.
+      # Omit unrelated AMD/NVIDIA, TV, server and embedded-device payloads.
+      slimFirmware = pkgs.runCommand "lpklarkc-essential-firmware" { } ''
+        set -eu
+        mkdir -p "$out/lib/firmware"
+        source="${pkgs.linux-firmware}/lib/firmware"
+        for item in \
+          "$source"/iwlwifi-* "$source"/i915 "$source"/intel \
+          "$source"/brcm "$source"/cypress \
+          "$source"/rtlwifi "$source"/rtl_bt "$source"/rtl_nic \
+          "$source"/rtw88 "$source"/rtw89 "$source"/ath9k_htc \
+          "$source"/ath10k "$source"/ath11k "$source"/ath12k \
+          "$source"/qca "$source"/mediatek "$source"/mrvl \
+          "$source"/libertas "$source"/mt7601u* \
+          "$source"/ti-connectivity \
+          "$source"/LICENCE* "$source"/LICENSE*; do
+          [ -e "$item" ] || continue
+          cp -aL -- "$item" "$out/lib/firmware/"
+        done
+        # Fail instead of shipping firmware-empty ISO.
+        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-*' -print -quit)"
+        test -d "$out/lib/firmware/brcm"
+      '';
       isoModule = { modulesPath, lib, ... }:
         let
           # Only a build dependency. No splash daemon or image editor is
@@ -23,9 +46,16 @@
             (modulesPath + "/profiles/minimal.nix")
           ];
 
-          # Preserve real Dell Wi-Fi firmware, BIOS/UEFI and Ventoy ISO boot.
-          hardware.enableAllHardware = true;
-          hardware.enableRedistributableFirmware = true;
+          # Only modules required for USB/ISO boot, SATA/NVMe and QEMU.
+          # The generic installer embeds firmware for hundreds of devices.
+          hardware.enableAllHardware = false;
+          hardware.enableRedistributableFirmware = false;
+          hardware.wirelessRegulatoryDatabase = true;
+          hardware.firmware = [ slimFirmware ];
+          boot.initrd.availableKernelModules = [
+            "xhci_pci" "ehci_pci" "usb_storage" "uas" "sd_mod"
+            "ahci" "nvme" "virtio_pci" "virtio_blk" "virtio_scsi"
+          ];
           isoImage.makeBiosBootable = true;
           isoImage.makeEfiBootable = true;
           isoImage.makeUsbBootable = true;
