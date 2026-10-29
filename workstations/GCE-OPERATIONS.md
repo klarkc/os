@@ -26,8 +26,11 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 - Both OS firewall and GCE VPC firewall restrict admin ports to the IPv4
   Google IAP source `35.235.240.0/20`. SSH 22 is for OS Login admin only,
   not the Dell graphical user workflow.
-- This document does not authorize billable GCE operations. **No VM, firewall,
-  NAT, public IP, image, disk, bucket or IAM policy is created by CI.**
+- The operator **approved** one CPU-only `e2-highmem-4` VM and a retained
+  **512 GiB pd-balanced disk**. GitHub Actions may provision those approved
+  resources after the gated CI build and a separate one-time WIF IAM bootstrap.
+  The CI must not create NAT, reserved IPs, GPUs or additional VMs.
+  See [the automated production gates](WSKLARKC-CI-DEPLOY-E2E.md).
 
 ## CI gates
 
@@ -202,7 +205,7 @@ after a GCE stop/start, not just a QEMU reboot. Verify the boot disk remains
 attached and persistent. Do not claim E2E complete from green CI alone.
 
 **BuildClient handoff confirmed (2026-10-27):** the independent client branch
-`feat/solo-thin-client-ci-20261026`, commit
+`feat/lpklarkc-ci-20261029`, commit
 `94ea18bf8bdef3bcfe1ff68ef9c363bcc71c72bb`, implements IAP TCP
 at `127.0.0.1:13389`, USB persistence for gcloud CLI credentials and
 FreeRDP TLS trust pins, and reconnect/error handling. Its GitHub Actions
@@ -279,50 +282,54 @@ https://github.com/google-github-actions/auth
 https://github.com/google-github-actions/setup-gcloud
 https://docs.cloud.google.com/iam/docs/workload-identity-federation-with-deployment-pipelines
 
-## Approved provisioning path — 2026-10-28
+## Approved CI provisioning and production E2E — 2026-10-29
 
-The operator approved the specific `e2-highmem-4` CPU-only workstation with
-**512 GiB `pd-balanced` persistent boot disk**. This does **not** authorize
-unrestricted infrastructure changes or a standing deployment administrator
-credential. The project-scoped GitHub WIF service account remains read-only.
+**Current BuildGCE branch:** `feat/wsklarkc-gce`.
+**Server GCE instance and NixOS hostname:** `wsklarkc`.
+**BuildClient branch:** `feat/lpklarkc-ci-20261029` — owned by the
+independent client agent. BuildGCE **does not modify client code**.
 
-The connected Compute Engine `create_instance` API **cannot** specify
-the boot disk size/type, custom image name, boot disk retention, network
-or firewall: using it would silently create a Debian VM with the wrong
-storage. Therefore deployment must use `gcloud` under the operator's
-authorized Cloud Shell session, not that limited API.
+The current `.github/workflows/build-thin-client.yml` carries
+additional **server-only production jobs**, running exclusively on
+push/dispatch in `feat/wsklarkc-gce`, and never on PRs:
 
-`workstations/scripts/gce-provision-approved.sh` stages the proven raw
-image artifact from successful [run 40521793755](https://github.com/klarkc/os/actions/runs/40521793755)
-at commit `96a98ff35863d96ad21d42180f8f10650422c5d2`.
-It verifies SHA256 and archive format before creating resources,
-creates an isolated custom VPC (no default allow rules), regional
-subnet, two IAP-only firewall rules for TCP 22 and 3389, imports the
-image through a **temporary private** Cloud Storage bucket, and
-creates exactly one CPU-only `wsklarkc` with a retained
-512 GiB `pd-balanced` disk. For defense in depth the VM is **initially provisioned WITHOUT a public
-IP**. After confirming the effective per-instance and hierarchical VPC
-firewall policies are safe, the operator may add a non-static ephemeral
-public IPv4 for outgoing internet traffic via
-`gcloud compute instances add-access-config wsklarkc --project=argon-surf-472319-b0 --zone=southamerica-east1-b --network-interface=nic0`.
-This is not an RDP endpoint. No Cloud NAT, external reserved IPs, GPU or vLLM
-is provisioned. Until that step, Private Google Access works for Google
-APIs but arbitrary external package downloads may not.
+1. Existing NixOS evaluation, QEMU, Ventoy ISO and custom GCE image.
+2. Authenticating as **separate, scoped GitHub OIDC deployer**,
+   verifying exact run SHA and compressed image SHA256, importing the
+   NixOS image, creating a private custom VPC and IAP-only firewall,
+   then one `wsklarkc` VM with retained **512 GiB pd-balanced boot
+   disk**, no GPU and **no external IP**.
+3. Live image/disk/network/effective-firewall safety audit.
+4. Granting a **separate disposable E2E identity** VM-specific OS Login
+   and IAP access conditioned on TCP 22 and 3389.
+5. Real `gcloud compute start-iap-tunnel wsklarkc 3389` and
+   FreeRDP over TLS with a one-time password via stdin, followed by
+   server-side proof of an authenticated user-owned XMonad process.
+6. Actual VM stop/start, immutable boot disk and persistent HOME marker;
+   second authenticated XRDP/XMonad login over a new IAP tunnel.
+7. Removing the temporary E2E user and its HOME; explicit final green
+   gate **only if all production tests and cleanup pass**.
 
-In authorized Cloud Shell after checking `gh auth status`:
-```bash
-git clone --branch feat/wsklarkc-gce --single-branch https://github.com/klarkc/os.git
-cd os
-bash workstations/scripts/gce-provision-approved.sh --preflight
-WSKLARKC_GCE_DEPLOY_APPROVED=YES bash workstations/scripts/gce-provision-approved.sh --deploy
-```
+Both WIF identities have **no JSON keys or GitHub secrets**. The
+existing `buildgce-auditor` keeps only read-only roles, but its
+OIDC provider must first be moved to `feat/wsklarkc-gce`. All
+resources must pass fail-closed security checks before a remote
+login or external IP may be considered.
 
-The script refuses to overwrite pre-existing VM, VPC, bucket or image.
-Do not run with `bash -x`, disclose private IAM policies, paste
-tokens, or introduce GitHub Actions project-wide administrator roles.
-**Not completed:** actual provisioning, authorized Dell principal IAP
-binding, effective firewall review, real XRDP/XMonad login, HOME
-restore and stop/start. Test those as independent gates after creation.
-Also verify regional image storage/temporary staging and VM quota before
-running. Deleting the staging bucket does not delete the imported
-custom image; it incurs image storage until explicitly cleaned up.
+**One-time prerequisite:** Google Cloud project administrator must
+run the versioned
+[`gce-ci-iam-bootstrap.sh`](scripts/gce-ci-iam-bootstrap.sh)
+from Cloud Shell to create the two job identities, grant their
+explicit permissions and update the old auditor branch condition.
+This does not itself create paid resources. The connected GCE plugin
+cannot configure IAM or custom image/VM creation; the CI deployer
+does that after the WIF bootstrap, not manual `--deploy`.
+
+**Remaining independent acceptance:** authorize the real Dell
+Google login principal, set `klarkc`'s personal XRDP password
+**interactively** (never in CI), restore private HOME and SoloSIG
+development data, and physically test `lpklarkc`. The CI E2E
+simulates the authenticated graphical login using a **separate
+temporary account**, not the user's private credentials. See
+[the complete handoff](WSKLARKC-CI-DEPLOY-E2E.md).
+
