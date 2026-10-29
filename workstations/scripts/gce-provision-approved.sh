@@ -115,6 +115,7 @@ jq -e --arg vm "$vm" '
 # Image is built already; no Nix recompilation on Cloud Shell.
 gcloud storage buckets create "gs://$bucket" --project="$project" \
   --location="$region" --default-storage-class=STANDARD \
+  --soft-delete-duration=0 \
   --uniform-bucket-level-access --public-access-prevention
 gcloud storage cp --quiet "$archive" "$uri"
 gcloud compute images create "$image" --project="$project" \
