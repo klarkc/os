@@ -16,8 +16,33 @@
               magick -size 1024x768 xc:'#101820' "$out"
             '';
         in {
-          imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
+          # An RDP appliance does not need the NixOS installer profile,
+          # its Nixpkgs source channel or all system repair packages.
+          imports = [
+            (modulesPath + "/installer/cd-dvd/iso-image.nix")
+            (modulesPath + "/profiles/minimal.nix")
+          ];
+
+          # Preserve real Dell Wi-Fi firmware, BIOS/UEFI and Ventoy ISO boot.
+          hardware.enableAllHardware = true;
+          hardware.enableRedistributableFirmware = true;
+          isoImage.makeBiosBootable = true;
+          isoImage.makeEfiBootable = true;
+          isoImage.makeUsbBootable = true;
           isoImage.isoName = "lpklarkc-x86_64.iso";
+          # The NixOS ISO builder names its derivation from image.baseName.
+          image.baseName = lib.mkForce "lpklarkc-x86_64";
+
+          # Previously supplied by installation-device.nix. Keep only the
+          # kiosk account and the TTY recovery path (not installer packages).
+          users.users.nixos = {
+            isNormalUser = true;
+            extraGroups = [ "networkmanager" "video" ];
+            initialHashedPassword = "";
+          };
+          services.getty.autologinUser = "nixos";
+          security.sudo.enable = true;
+          security.sudo.wheelNeedsPassword = true;
           isoImage.grubTheme = null;
           isoImage.splashImage = splash;
           isoImage.efiSplashImage = splash;

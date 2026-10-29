@@ -52,3 +52,16 @@ GCE nesta branch do cliente. IAM, firewall, XRDP, usuário remoto
 
 Mais detalhes: [contrato IAP](./CLIENT-IAP-GCE-CONTRACT.md) e
 [uso do Ventoy](./VENTOY-KIOSK.md).
+
+## Orçamento de tamanho
+
+A ISO usa `iso-image.nix` + `minimal.nix` e não importa o perfil de
+instalação, Nixpkgs channel, ferramentas de particionamento/recuperação
+ou manual. BIOS/UEFI, drivers e firmware continuam disponíveis para o Dell.
+
+O CI mede o **arquivo ISO final**, impondo **1536 MiB (1,5 GiB)** como
+limite. `tests/iso-size-budget.sh --self-test` prova que aceita o
+limite exato e rejeita um byte excedente. Compilação e distribuição
+continuam condicionadas aos testes QEMU.
+
+O Ventoy não é configurado nem alterado por este projeto.
