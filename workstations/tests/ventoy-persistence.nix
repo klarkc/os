@@ -175,7 +175,10 @@ pkgs.testers.runNixOSTest {
     }; export -f mount; lpklarkc-state ensure'""")
     client.succeed("findmnt -no SOURCE /run/lpklarkc/ventoy | grep -E '/dev/(mapper/|dm-)'")
     client.succeed("umount /run/lpklarkc/ventoy")
-    client.succeed("dmsetup remove \"$(cat /tmp/ci-legacy-device-name)\"")
+    # udev/blkid may transiently hold the synthetic mapper open even after
+    # the test unmounts it; --retry is purpose-built for this EBUSY race.
+    client.succeed("udevadm settle && dmsetup remove --retry \"$(cat /tmp/ci-legacy-device-name)\"")
+    client.succeed("! test -e /dev/mapper/$(cat /tmp/ci-legacy-device-name)")
     client.succeed("udevadm trigger --subsystem-match=block --action=change && udevadm settle")
 
     # Older Ventoy may expose no alias at all. Ensure must create a
