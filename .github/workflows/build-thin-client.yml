@@ -91,6 +91,10 @@ jobs:
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.windowManager.xmonad.enableContribAndExtras)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.xserver.desktopManager.xfce.enable)" = false
           nix eval --raw .#nixosConfigurations.gcp-workstation.config.services.xrdp.defaultWindowManager | grep -F 'wsklarkc-xrdp-session'
+          test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.nix.gc.automatic)" = true
+          nix eval --raw .#nixosConfigurations.gcp-workstation.config.nix.gc.options | grep -Fx -- '--delete-older-than 30d'
+          grep -F -- '--boot-disk-size=256GB' scripts/gce-provision-approved.sh
+          grep -F '256 GiB pd-balanced persistent disk' scripts/gce-production-integration.sh
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.pulse.enable)" = true
           test "$(nix eval --json .#nixosConfigurations.gcp-workstation.config.services.pipewire.wireplumber.enable)" = true

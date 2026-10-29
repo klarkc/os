@@ -53,7 +53,7 @@ if gcloud storage buckets describe "gs://$bucket" --format='value(name)' >/dev/n
 fi
 
 echo "PRECHECK PASS: target resources absent; machine type available"
-echo "APPROVED PLAN: $vm ($zone), e2-highmem-4, 512 GiB pd-balanced boot disk"
+echo "APPROVED PLAN: $vm ($zone), e2-highmem-4, 256 GiB pd-balanced boot disk"
 echo "NETWORK: dedicated $network + $subnet; ingress TCP 22/3389 only from 35.235.240.0/20"
 echo "EGRESS: initially NO external IP; add ephemeral IPv4 only after effective firewall audit"
 echo "IMAGE: successful GitHub Actions run $run_id, commit $sha"
@@ -136,7 +136,7 @@ gcloud storage buckets delete "gs://$bucket" --quiet
 # The VM receives no GCE service account or OAuth API scopes.
 gcloud compute instances create "$vm" --project="$project" --zone="$zone" \
   --machine-type=e2-highmem-4 --image="$image" --image-project="$project" \
-  --boot-disk-size=512GB --boot-disk-type=pd-balanced \
+  --boot-disk-size=256GB --boot-disk-type=pd-balanced \
   --no-boot-disk-auto-delete --no-service-account --no-scopes \
   --network-interface="network=$network,subnet=$subnet,stack-type=IPV4_ONLY,no-address" \
   --tags="$tag" --metadata=enable-oslogin=TRUE \
@@ -147,5 +147,5 @@ echo "IMPORTANT: the IAP principal role, interactive XRDP password and graphical
  echo "After successful effective-firewall audit, enable low-cost outbound access with:"
  echo "gcloud compute instances add-access-config $vm --project=$project --zone=$zone --network-interface=nic0"
  echo "That assigns an EPHEMERAL public IP; never expose ports 22/3389 outside IAP."
-echo "COST HOLD: 512 GiB pd-balanced alone was estimated at R$455.50/month (BRL catalog 2026-10-29), above the user's R$400 reference. Confirm revised cost/shape approval before any deployment."
+echo "COST: 256 GiB pd-balanced/4vCPU/32GiB at 172 active hours ~R$557.50 per month (2026-10-29 catalog), EXCLUDING ancillary services. R$560 is not a hard cap or a deploy authorization."
 echo "LIFECYCLE v2: DO NOT stop/start the workstation to reduce costs; it loses RAM and active sessions. Only approved Compute Engine suspend/resume may qualify after independent compatibility E2E."

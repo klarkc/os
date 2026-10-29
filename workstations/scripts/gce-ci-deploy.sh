@@ -21,7 +21,7 @@ if gcloud compute instances describe "$vm" --project="$project" --zone="$zone" -
   # The next job ALWAYS validates every instance property, disk, network
   # and effective firewall before authorizing E2E; no automatic drift fix.
 else
-  echo "CREATING: exactly one approved NixOS VM; disk 512 GiB, no public IP"
+  echo "CREATING: exactly one approved NixOS VM; disk 256 GiB, no public IP"
   WSKLARKC_GCE_DEPLOY_APPROVED=YES bash workstations/scripts/gce-provision-approved.sh --deploy
 fi
 gcloud compute instances describe "$vm" --project="$project" --zone="$zone" \

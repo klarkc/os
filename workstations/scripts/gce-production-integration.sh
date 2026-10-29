@@ -65,8 +65,8 @@ require(len([d for d in vm.get("disks", []) if d.get("boot")]) == 1,
         "exactly one boot disk")
 require(all(d.get("autoDelete") is False for d in vm["disks"] if d.get("boot")),
         "boot disk autoDelete=false (survives VM deletion)")
-require(str(disk.get("sizeGb")) == "512" and suffix(disk.get("type"), "pd-balanced"),
-        "512 GiB pd-balanced persistent disk")
+require(str(disk.get("sizeGb")) == "256" and suffix(disk.get("type"), "pd-balanced"),
+        "256 GiB pd-balanced persistent disk")
 require(disk.get("status") == "READY", "disk ready")
 require(image.get("name") == expected_image and image.get("status") == "READY",
         "approved NixOS custom image READY")

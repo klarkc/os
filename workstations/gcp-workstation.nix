@@ -32,6 +32,26 @@ in
   i18n.defaultLocale = "en_US.UTF-8";
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
   nix.settings.trusted-users = [ "root" "klarkc" ];
+  nix.settings.extra-substituters = [ "https://install.determinate.systems" ];
+  nix.settings.extra-trusted-public-keys = [
+    "cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM="
+  ];
+  # One GC owner: disable Determinate Nixd automatic GC; run NixOS weekly
+  # retaining the last 30 days of generations and all live GC roots.
+  environment.etc."determinate/config.json".text =
+    builtins.toJSON { garbageCollector.strategy = "disabled"; };
+  nix.gc = {
+    automatic = true;
+    dates = "Sun *-*-* 03:35:00";
+    randomizedDelaySec = "30min";
+    persistent = true;
+    options = "--delete-older-than 30d";
+  };
+  systemd.services.nix-gc.serviceConfig = {
+    Nice = 19;
+    CPUSchedulingPolicy = "idle";
+    IOSchedulingClass = "idle";
+  };
 
   # Defense in depth: accept administrative TCP only from Google IAP proxies.
   # Do NOT use allowedTCPPorts here: that would expose 22/3389 to all sources.

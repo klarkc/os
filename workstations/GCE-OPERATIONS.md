@@ -1,4 +1,4 @@
-# BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
+**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 512 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.\n\n# BuildGCE: persistent NixOS workstation via Google Cloud IAP TCP
 
 **Lifecycle v2 override (2026-10-29):** The canonical session-preserving
 contract is `klarkc/broker/contracts/2026-10-29-session-preserving-lifecycle-v2.md`.

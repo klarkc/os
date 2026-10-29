@@ -22,7 +22,7 @@ ausência comprovada de interação **e** trabalho (inclusive agentes aguardando
 LLM com CPU quase zero) **e** atividade relevante de recursos; leases,
 sessões e estado de veto frescos; geração de resume sem alteração; política
 financeira independente com gasto **real**, BRL, ciclo mensal, orçamento
-autenticado, `costAmount > budgetAmount == R$400` (nunca previsão).
+autenticado, `costAmount > budgetAmount == R$560` (nunca previsão).
 Informação ausente/contraditória/inconclusiva => **DENY**.
 
 Aviso precisa ter aceitação confirmada pelo provedor de e-mail e timestamp

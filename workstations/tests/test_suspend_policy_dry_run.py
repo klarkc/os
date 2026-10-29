@@ -53,8 +53,8 @@ def eligible(reason="idle"):
             budget_id="configured-budget-id", budget_currency="BRL",
             billing_account_id="test-billing-account", budget_scope="billing_account",
             budget_source_verified=True, budget_kind="actual",
-            budget_period=current_month(NOW), cost_amount_brl=Decimal("400.01"),
-            budget_amount_brl=Decimal("400"),
+            budget_period=current_month(NOW), cost_amount_brl=Decimal("560.01"),
+            budget_amount_brl=Decimal("560"),
         )
     return Candidate(**common)
 
@@ -104,16 +104,16 @@ class SuspendAdmissionTests(unittest.TestCase):
         self.assertTrue(check(replace(c, human_idle_since_s=NOW - 7200,
                                           resources_idle_since_s=NOW - 7200)).eligible_for_final_recheck)
 
-    def test_budget_only_actual_strict_greater_than_400(self):
+    def test_budget_only_actual_strict_greater_than_560(self):
         c = eligible("budget")
-        for value in (Decimal("399.99"), Decimal("400")):
+        for value in (Decimal("559.99"), Decimal("560")):
             self.assertFalse(check(replace(c, cost_amount_brl=value)).eligible_for_final_recheck)
-        self.assertTrue(check(replace(c, cost_amount_brl=Decimal("400.0001"))).eligible_for_final_recheck)
+        self.assertTrue(check(replace(c, cost_amount_brl=Decimal("560.0001"))).eligible_for_final_recheck)
         for changes in (
             {"budget_kind": "forecast"}, {"budget_currency": "USD"},
             {"budget_period": "2026-09"}, {"budget_id": "unknown"},
             {"billing_account_id": "wrong"}, {"budget_source_verified": False},
-            {"budget_scope": "project"}, {"budget_amount_brl": Decimal("399")},
+            {"budget_scope": "project"}, {"budget_amount_brl": Decimal("559")},
             {"cost_amount_brl": None}, {"cost_amount_brl": 401.0},
             {"cost_amount_brl": Decimal("NaN")},
         ):

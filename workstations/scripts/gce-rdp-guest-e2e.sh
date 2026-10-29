@@ -37,11 +37,11 @@ case "$mode" in
       echo "FAIL: XRDP services not active" >&2
       exit 1
     }
-    # A 512 GiB block device is not sufficient if the root filesystem
+    # A 256 GiB block device is not sufficient if the root filesystem
     # was never expanded from the raw NixOS image's original size.
     home_size_gib="$(df -BG -P /home/klarkc | awk 'NR==2 {gsub(/G/,"",$2); print $2}')"
-    [[ "$home_size_gib" =~ ^[0-9]+$ && "$home_size_gib" -ge 470 ]] || {
-      echo "FAIL: /home/klarkc root filesystem is not resized for the 512 GiB disk" >&2
+    [[ "$home_size_gib" =~ ^[0-9]+$ && "$home_size_gib" -ge 235 ]] || {
+      echo "FAIL: /home/klarkc root filesystem is not resized for the 256 GiB disk" >&2
       exit 1
     }
     echo "PASS: /home/klarkc has expanded writable filesystem capacity"

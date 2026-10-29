@@ -1,8 +1,9 @@
 {
   description = "Disposable Dell thin client and CPU-only GCE NixOS workstation";
   inputs.nixpkgs.url = "github:NixOS/nixpkgs/nixpkgs-unstable";
+  inputs.determinate.url = "https://flakehub.com/f/DeterminateSystems/determinate/3";
 
-  outputs = { self, nixpkgs }:
+  outputs = { self, nixpkgs, determinate }:
     let
       system = "x86_64-linux";
       pkgs = import nixpkgs { inherit system; };
@@ -17,7 +18,7 @@
     in
     {
       nixosConfigurations.thin-client = mk [ isoModule ./thin-client.nix ];
-      nixosConfigurations.gcp-workstation = mk [ gceModule ./gcp-workstation.nix ];
+      nixosConfigurations.gcp-workstation = mk [ gceModule determinate.nixosModules.default ./gcp-workstation.nix ];
 
       packages.${system} = {
         thin-client-iso = self.nixosConfigurations.thin-client.config.system.build.isoImage;
@@ -28,7 +29,7 @@
         # Disposable QEMU boot tests (including persistent-state reboot).
         # No production credentials or billable cloud resources.
         ventoy-usb-persistence-vm = import ./tests/ventoy-persistence.nix { inherit pkgs; };
-        gce-workstation-security-vm = import ./tests/gce-workstation.nix { inherit pkgs; };
+        gce-workstation-security-vm = import ./tests/gce-workstation.nix { inherit pkgs; determinateModule = determinate.nixosModules.default; };
 
         boot-and-network-vm = pkgs.testers.runNixOSTest {
           name = "solo-thin-client-and-workstation";
@@ -49,7 +50,7 @@
               system.stateVersion = "26.05";
             };
             server = { lib, ... }: {
-              imports = [ ./gcp-workstation.nix ];
+              imports = [ determinate.nixosModules.default ./gcp-workstation.nix ];
               # The production image uses GCE OS Login for SSH.
               # Here only exercise native services in a normal VM.
               virtualisation.memorySize = 2048;

@@ -1,9 +1,9 @@
-{ pkgs }:
+{ pkgs, determinateModule }:
 
 pkgs.testers.runNixOSTest {
   name = "wsklarkc-gce-iap-workstation";
   nodes.server = { ... }: {
-    imports = [ ../gcp-workstation.nix ];
+    imports = [ determinateModule ../gcp-workstation.nix ];
     virtualisation.memorySize = 3072;
     virtualisation.graphics = true;
     system.stateVersion = "26.05";
@@ -21,6 +21,11 @@ pkgs.testers.runNixOSTest {
     server.succeed("id klarkc")
     server.succeed("test -d /home/klarkc")
     server.succeed("test -x /run/current-system/sw/bin/git")
+    server.succeed("systemctl cat nix-daemon.service | grep -F determinate-nixd")
+    server.succeed("test -r /etc/determinate/config.json")
+    server.succeed("grep -F disabled /etc/determinate/config.json")
+    server.succeed("systemctl is-enabled nix-gc.timer | grep -Fx enabled")
+    server.succeed("systemctl cat nix-gc.service | grep -F -- '--delete-older-than 30d'")
     server.succeed("ss -lnt | grep ':3389'")
     server.succeed("ss -lnt | grep ':22'")
 

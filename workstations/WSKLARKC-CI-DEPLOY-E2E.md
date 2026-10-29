@@ -1,4 +1,4 @@
-# wsklarkc — GitHub Actions deploy + real GCE integration + authenticated XRDP E2E
+**Current decision 2026-10-29:** 256 GiB `pd-balanced` and R$560/month supersede the historic 512 GiB/R$400 plan. The ~R$557.50/month estimate excludes additional costs. No production deployment, billing or IAM actions are authorized. Any outdated values below describe previous designs only; never use them for active provisioning.\n\n# wsklarkc — GitHub Actions deploy + real GCE integration + authenticated XRDP E2E
 
 **Owner:** BuildGCE, exclusively `feat/wsklarkc-gce`.
 
