@@ -41,7 +41,7 @@ gates passed, not Google IAM/tunnel/graphical E2E acceptance.
 The planned GCE machine is `e2-highmem-4` (4 vCPU/32 GiB), with a
 persistent 512 GiB `pd-balanced` boot disk. The NixOS `klarkc` account
 begins with a locked password; after approved provisioning use an
-authenticated IAP/OS Login SSH tty and run `sudo solo-xrdp-set-password`
+authenticated IAP/OS Login SSH tty and run `sudo wsklarkc-xrdp-set-password`
 before XRDP login. XMonad is the **sole** desktop: after dotfiles
 bootstrap XRDP starts the user's XMonad wrapper; before checkout it
 starts the NixOS-provided XMonad through D-Bus. XFCE is removed.

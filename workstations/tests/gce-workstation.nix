@@ -1,7 +1,7 @@
 { pkgs }:
 
 pkgs.testers.runNixOSTest {
-  name = "solo-gce-iap-workstation";
+  name = "wsklarkc-gce-iap-workstation";
   nodes.server = { ... }: {
     imports = [ ../gcp-workstation.nix ];
     virtualisation.memorySize = 3072;
@@ -17,6 +17,7 @@ pkgs.testers.runNixOSTest {
     server.wait_for_unit("xrdp.service")
     server.wait_for_unit("xrdp-sesman.service")
     server.wait_for_unit("sshd.service")
+    server.succeed("hostname | grep -Fx wsklarkc")
     server.succeed("id klarkc")
     server.succeed("test -d /home/klarkc")
     server.succeed("test -x /run/current-system/sw/bin/git")
@@ -36,8 +37,8 @@ pkgs.testers.runNixOSTest {
             )
 
     # An IAP tunnel authenticates the transport, NOT the graphical login.
-    server.succeed("test -x /run/current-system/sw/bin/solo-xrdp-set-password")
-    server.fail("solo-xrdp-set-password")  # no interactive administrator TTY
+    server.succeed("test -x /run/current-system/sw/bin/wsklarkc-xrdp-set-password")
+    server.fail("wsklarkc-xrdp-set-password")  # no interactive administrator TTY
     server.succeed("getent shadow klarkc | grep '^klarkc:!:'")
     server.succeed("${pkgs.openssh}/bin/sshd -t -f /etc/ssh/sshd_config")
     server.succeed("grep -Eqi '^[[:space:]]*PasswordAuthentication[[:space:]]+no[[:space:]]*$' /etc/ssh/sshd_config")

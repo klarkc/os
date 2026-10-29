@@ -7,12 +7,12 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 project=argon-surf-472319-b0
 zone=southamerica-east1-b
-vm=solo-workstation
-network=solo-iap-vpc
-subnet=solo-iap-subnet
-tag=solo-workstation-iap
+vm=wsklarkc
+network=wsklarkc-iap-vpc
+subnet=wsklarkc-iap-subnet
+tag=wsklarkc-iap
 iap=35.235.240.0/20
-expected_image=solo-nixos-gce-96a98ff35863
+expected_image=wsklarkc-nixos-gce-96a98ff35863
 
 for cmd in gcloud python3 jq; do
   command -v "$cmd" >/dev/null || { echo "FAIL: missing $cmd" >&2; exit 2; }
@@ -41,9 +41,9 @@ load = lambda name: json.loads((base / (name + ".json")).read_text())
 vm, disk, rules, effective, image = map(load, ["vm", "disk", "firewalls", "effective", "image"])
 iap = ipaddress.ip_network("35.235.240.0/20")
 project = "argon-surf-472319-b0"
-network = "solo-iap-vpc"
-tag = "solo-workstation-iap"
-expected_image = "solo-nixos-gce-96a98ff35863"
+network = "wsklarkc-iap-vpc"
+tag = "wsklarkc-iap"
+expected_image = "wsklarkc-nixos-gce-96a98ff35863"
 
 
 def require(ok, label):
@@ -56,7 +56,7 @@ def suffix(value, name):
     return isinstance(value, str) and value.endswith("/" + name)
 
 
-require(vm.get("name") == "solo-workstation" and vm.get("status") == "RUNNING",
+require(vm.get("name") == "wsklarkc" and vm.get("status") == "RUNNING",
         "production VM RUNNING")
 require(suffix(vm.get("machineType"), "e2-highmem-4"),
         "4-vCPU/32-GiB e2-highmem-4")
@@ -82,7 +82,7 @@ interfaces = vm.get("networkInterfaces", [])
 require(len(interfaces) == 1, "exactly one network interface")
 nic = interfaces[0]
 require(suffix(nic.get("network"), network), "custom isolated VPC")
-require(suffix(nic.get("subnetwork"), "solo-iap-subnet"), "isolated regional subnet")
+require(suffix(nic.get("subnetwork"), "wsklarkc-iap-subnet"), "isolated regional subnet")
 require(not nic.get("accessConfigs") and not nic.get("ipv6AccessConfigs"),
         "NO externally accessible VM IP address")
 
@@ -93,7 +93,7 @@ on_network = [r for r in rules if r.get("network") == network_url
 require(len(on_network) == 2,
         "only two active classic ingress allow rules on dedicated VPC")
 for port, name in [(22, "ssh"), (3389, "rdp")]:
-    rule = next((r for r in on_network if r.get("name") == "solo-workstation-iap-" + name), None)
+    rule = next((r for r in on_network if r.get("name") == "wsklarkc-iap-" + name), None)
     require(rule is not None and rule.get("sourceRanges") == [str(iap)]
             and rule.get("targetTags") == [tag]
             and not rule.get("sourceTags") and not rule.get("sourceServiceAccounts")
@@ -114,7 +114,7 @@ for policy in effective["firewallPolicys"]:
         raise SystemExit("FAIL: inherited effective firewall allow requires review")
 
 actual_names = {r.get("name") for r in effective["firewalls"]}
-require({"solo-workstation-iap-ssh", "solo-workstation-iap-rdp"} <= actual_names,
+require({"wsklarkc-iap-ssh", "wsklarkc-iap-rdp"} <= actual_names,
         "both IAP-only rules actually apply to this instance")
 for r in effective["firewalls"]:
     if r.get("direction", "INGRESS") != "INGRESS" or r.get("disabled", False):
@@ -126,7 +126,7 @@ for r in effective["firewalls"]:
         # Any extra ingress (including port 443/80) is unexpected for the
         # single-purpose XRDP workstation and must be reviewed.
         require(r.get("name") in actual_names & {
-            "solo-workstation-iap-ssh", "solo-workstation-iap-rdp"}
+            "wsklarkc-iap-ssh", "wsklarkc-iap-rdp"}
             and r.get("sourceRanges") == [str(iap)],
             "no unauthorized effective TCP ingress")
 print("NOTE: guest nftables, XRDP PAM and XMonad checked only in subsequent authenticated E2E")

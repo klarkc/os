@@ -1,7 +1,7 @@
 # BuildGCE -> BuildClient: IAP TCP integration contract
 
 Canonical issue: https://github.com/klarkc/os/issues/21
-Server branch: `feat/solo-gce-workstation-20261026`
+Server branch: `feat/wsklarkc-gce`
 Client branch: `feat/solo-thin-client-ci-20261026` (NOT modified here).
 
 ## Confirmed server-side design
@@ -11,11 +11,11 @@ Xorg/XMonad only, without XFCE or local Lemurs. NixOS nftables allows new TCP 33
 from `35.235.240.0/20` only; optional SSH/OS Login admin TCP 22
 also requires the IAP CIDR. No Tailscale, WireGuard or VPN pairing.
 The local graphical account is `klarkc`, and its initial password
-is locked until an interactive admin runs `solo-xrdp-set-password`.
+is locked until an interactive admin runs `wsklarkc-xrdp-set-password`.
 IAP authorizes a tunnel, not the XRDP username/password.
 
 Cloud IAM, APIs and firewall cannot be called **verified** until an
-actual `solo-workstation` VM has been provisioned and audited. That is
+actual `wsklarkc` VM has been provisioned and audited. That is
 a separate cost-approval gate.
 
 ## BuildClient acceptance interface
@@ -27,7 +27,7 @@ a separate cost-approval gate.
 3. Open and keep alive the *local* tunnel:
    
    ```bash
-   gcloud compute start-iap-tunnel solo-workstation 3389 \
+   gcloud compute start-iap-tunnel wsklarkc 3389 \
      --project=argon-surf-472319-b0 \
      --zone=southamerica-east1-b \
      --local-host-port=localhost:13389

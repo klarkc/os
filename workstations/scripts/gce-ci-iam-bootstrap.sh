@@ -8,10 +8,10 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 project=argon-surf-472319-b0
 number=1009769829445
-pool=github-buildgce-prod
-provider=buildgce-deploy-e2e
-workflow_ref='klarkc/os/.github/workflows/gce-deploy-e2e.yml@refs/heads/feat/solo-gce-workstation-20261026'
-condition="assertion.repository_id=='639154288' && assertion.repository_owner_id=='724959' && assertion.ref=='refs/heads/feat/solo-gce-workstation-20261026' && assertion.workflow_ref=='$workflow_ref'"
+pool=github-wsklarkc-deploy
+provider=wsklarkc-deploy
+workflow_ref='klarkc/os/.github/workflows/build-thin-client.yml@refs/heads/feat/wsklarkc-gce'
+condition="assertion.repository_id=='639154288' && assertion.repository_owner_id=='724959' && assertion.ref=='refs/heads/feat/wsklarkc-gce' && assertion.workflow_ref=='$workflow_ref'"
 member="principalSet://iam.googleapis.com/projects/$number/locations/global/workloadIdentityPools/$pool/attribute.repository_id/639154288"
 deployer="buildgce-deployer@$project.iam.gserviceaccount.com"
 tester="buildgce-e2e@$project.iam.gserviceaccount.com"
@@ -69,7 +69,7 @@ done
 
 # E2E identity cannot create/stop/delete VMs or alter VPC/IAM.
 # After instance creation the DEPLOYMENT job grants osAdminLogin on ONLY
-# solo-workstation and instance-specific IAP access for TCP 22 and 3389.
+# wsklarkc and instance-specific IAP access for TCP 22 and 3389.
 for role in roles/compute.viewer; do
   gcloud projects add-iam-policy-binding "$project" \
     --member="serviceAccount:$tester" --role="$role" --condition=None --quiet >/dev/null

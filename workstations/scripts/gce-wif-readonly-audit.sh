@@ -7,7 +7,7 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 project=argon-surf-472319-b0
 zone=southamerica-east1-b
-instance=solo-workstation
+instance=wsklarkc
 service_account="buildgce-auditor@$project.iam.gserviceaccount.com"
 principal="principalSet://iam.googleapis.com/projects/1009769829445/locations/global/workloadIdentityPools/github-buildgce/attribute.repository_id/639154288"
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# One-time Cloud Shell deployment of the APPROVED, tested NixOS GCE image.
-# Requires operator's authenticated gcloud and gh. No credentials in git,
+# GitHub Actions deployment of the approved, tested NixOS GCE image.
+# Uses scoped WIF identity and ephemeral GitHub Actions GH_TOKEN. No credentials in git,
 # image, instance metadata or logging; no IAM role escalation.
 # Flags: --preflight (read-only) and --deploy (creates authorized resources).
 set -euo pipefail
@@ -11,16 +11,16 @@ project=argon-surf-472319-b0
 project_number=1009769829445
 zone=southamerica-east1-b
 region=southamerica-east1
-vm=solo-workstation
-network=solo-iap-vpc
-subnet=solo-iap-subnet
+vm=wsklarkc
+network=wsklarkc-iap-vpc
+subnet=wsklarkc-iap-subnet
 subnet_cidr=10.83.0.0/24
-tag=solo-workstation-iap
-sha=96a98ff35863d96ad21d42180f8f10650422c5d2
-run_id=40521793755
-artifact="solo-gce-image-$sha"
-image="solo-nixos-gce-${sha:0:12}"
-bucket="solo-gce-image-$project_number"
+tag=wsklarkc-iap
+sha="${GITHUB_SHA:-}"
+run_id="${GITHUB_RUN_ID:-}"
+artifact="wsklarkc-gce-image-$sha"
+image="wsklarkc-nixos-gce-${sha:0:12}"
+bucket="wsklarkc-gce-image-$project_number"
 uri="gs://$bucket/$image.raw.tar.gz"
 
 usage() { echo "Usage: $0 --preflight | --deploy" >&2; exit 2; }
@@ -63,8 +63,16 @@ if [[ "$1" == --preflight ]]; then
   exit 0
 fi
 
-[[ "${SOLO_GCE_DEPLOY_APPROVED:-}" == YES ]] || {
-  echo "FAIL: require SOLO_GCE_DEPLOY_APPROVED=YES for actual deployment" >&2
+[[ "$sha" =~ ^[a-f0-9]{40}$ && "$run_id" =~ ^[0-9]+$ ]] || {
+  echo "FAIL: missing verified CI run provenance (GITHUB_SHA/RUN_ID)" >&2
+  exit 2
+}
+[[ "${GITHUB_REF:-}" == refs/heads/feat/wsklarkc-gce ]] || {
+  echo "FAIL: untrusted deployment branch" >&2
+  exit 2
+}
+[[ "${WSKLARKC_GCE_DEPLOY_APPROVED:-}" == YES ]] || {
+  echo "FAIL: require WSKLARKC_GCE_DEPLOY_APPROVED=YES for actual deployment" >&2
   exit 2
 }
 
@@ -101,14 +109,14 @@ jq -e --arg vm "$vm" '
   ([.[] | select(.disabled != true and .direction == "INGRESS")] | length) == 2
   and (all(.[]; .disabled == true or .direction != "INGRESS" or
     (.sourceRanges == ["35.235.240.0/20"] and
-     (.targetTags == ["solo-workstation-iap"]))))
+     (.targetTags == ["wsklarkc-iap"]))))
 ' "$tmp/vpc.json" >/dev/null || { echo "FAIL: unexpected network ingress rules" >&2; exit 1; }
 
 # Image is built already; no Nix recompilation on Cloud Shell.
 gcloud storage buckets create "gs://$bucket" --project="$project" \
   --location="$region" --default-storage-class=STANDARD \
   --uniform-bucket-level-access --public-access-prevention
-gcloud storage cp --no-user-output-enabled "$archive" "$uri"
+gcloud storage cp --quiet "$archive" "$uri"
 gcloud compute images create "$image" --project="$project" \
   --source-uri="$uri" --storage-location="$region" \
   --guest-os-features=VIRTIO_SCSI_MULTIQUEUE

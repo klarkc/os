@@ -2,7 +2,7 @@
 
 **Evidence date:** 2026-10-27. Source snapshot: [klarkc/dotfiles main at
 `0f2dbfda51d57a0539317a1ef7c1ff084c5513db`](https://github.com/klarkc/dotfiles/tree/0f2dbfda51d57a0539317a1ef7c1ff084c5513db).
-Target: [BuildGCE branch](https://github.com/klarkc/os/tree/feat/solo-gce-workstation-20261026),
+Target: [BuildGCE branch](https://github.com/klarkc/os/tree/feat/wsklarkc-gce),
 `workstations/gcp-workstation.nix`, NixOS x86_64, **no GPU**. Canonical
 IAP interface: [issue #21](https://github.com/klarkc/os/issues/21).
 

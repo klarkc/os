@@ -8,7 +8,7 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 ## Scope and state
 
 - Project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
-- Planned VM: `solo-workstation`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
+- Planned VM: `wsklarkc`, `e2-highmem-4`, 4 vCPU/32 GiB, no GPU.
 - Persistent boot disk candidate: 512 GiB `pd-balanced`, retained on stop.
   The disk is provisioned at 512 GiB even when the VM is stopped; plan for
   full-month block-storage charges and set `autoDelete=false` explicitly.
@@ -75,22 +75,22 @@ https://docs.cloud.google.com/compute/docs/oslogin/set-up-oslogin
 ## VPC firewall: only proxy ingress
 
 First inspect the actual VM network; do not assume it uses `default`.
-The `solo-workstation-iap` network tag must be attached only to the
+The `wsklarkc-iap` network tag must be attached only to the
 intended workstation. After approval, add two INGRESS allow rules on
 that network, targeting only that tag:
 
 ```bash
 # Set NETWORK to the VM's verified network name.
-gcloud compute firewall-rules create solo-workstation-iap-rdp \
+gcloud compute firewall-rules create wsklarkc-iap-rdp \
   --project=argon-surf-472319-b0 --network="$NETWORK" \
   --direction=INGRESS --priority=900 --action=ALLOW \
-  --target-tags=solo-workstation-iap --source-ranges=35.235.240.0/20 \
+  --target-tags=wsklarkc-iap --source-ranges=35.235.240.0/20 \
   --rules=tcp:3389
 
-gcloud compute firewall-rules create solo-workstation-iap-ssh \
+gcloud compute firewall-rules create wsklarkc-iap-ssh \
   --project=argon-surf-472319-b0 --network="$NETWORK" \
   --direction=INGRESS --priority=900 --action=ALLOW \
-  --target-tags=solo-workstation-iap --source-ranges=35.235.240.0/20 \
+  --target-tags=wsklarkc-iap --source-ranges=35.235.240.0/20 \
   --rules=tcp:22
 ```
 
@@ -101,7 +101,7 @@ NixOS firewall also restricts it. Port 51820/UDP must not be opened.
 
 ```bash
 gcloud compute instances network-interfaces get-effective-firewalls \
-  solo-workstation --project=argon-surf-472319-b0 \
+  wsklarkc --project=argon-surf-472319-b0 \
   --zone=southamerica-east1-b --format=json
 bash workstations/scripts/gce-iap-preflight.sh
 ```
@@ -160,11 +160,11 @@ https://cloud.google.com/compute/disks-image-pricing
 Only after authorized provisioning and IAM + firewall verification:
 
 ```bash
-gcloud compute ssh solo-workstation \
+gcloud compute ssh wsklarkc \
   --project=argon-surf-472319-b0 \
   --zone=southamerica-east1-b --tunnel-through-iap
 # From inside the authenticated admin SSH tty:
-sudo solo-xrdp-set-password
+sudo wsklarkc-xrdp-set-password
 ```
 
 This delegates to `passwd klarkc` and refuses non-interactive input.
@@ -186,7 +186,7 @@ The Dell's gcloud auth is BuildClient's responsibility; no auth state,
 tokens or secrets are baked into the ISO, server image or public Git.
 
 ```bash
-gcloud compute start-iap-tunnel solo-workstation 3389 \
+gcloud compute start-iap-tunnel wsklarkc 3389 \
   --project=argon-surf-472319-b0 \
   --zone=southamerica-east1-b \
   --local-host-port=localhost:13389
@@ -246,7 +246,7 @@ Cloud Shell confirmation (owner): GitHub OIDC provider is **ACTIVE** at
 `projects/1009769829445/locations/global/workloadIdentityPools/github-buildgce/providers/github-actions`.
 Provider CEL condition requires immutable GitHub repository ID `639154288`,
 owner ID `724959` and the exact branch
-`refs/heads/feat/solo-gce-workstation-20261026`.
+`refs/heads/feat/wsklarkc-gce`.
 The operator then created `buildgce-auditor@argon-surf-472319-b0.iam.gserviceaccount.com`,
 granted `roles/iam.workloadIdentityUser` **on that service account only**
 to the repository-ID principalSet and assigned these project-scoped
@@ -299,22 +299,22 @@ It verifies SHA256 and archive format before creating resources,
 creates an isolated custom VPC (no default allow rules), regional
 subnet, two IAP-only firewall rules for TCP 22 and 3389, imports the
 image through a **temporary private** Cloud Storage bucket, and
-creates exactly one CPU-only `solo-workstation` with a retained
+creates exactly one CPU-only `wsklarkc` with a retained
 512 GiB `pd-balanced` disk. For defense in depth the VM is **initially provisioned WITHOUT a public
 IP**. After confirming the effective per-instance and hierarchical VPC
 firewall policies are safe, the operator may add a non-static ephemeral
 public IPv4 for outgoing internet traffic via
-`gcloud compute instances add-access-config solo-workstation --project=argon-surf-472319-b0 --zone=southamerica-east1-b --network-interface=nic0`.
+`gcloud compute instances add-access-config wsklarkc --project=argon-surf-472319-b0 --zone=southamerica-east1-b --network-interface=nic0`.
 This is not an RDP endpoint. No Cloud NAT, external reserved IPs, GPU or vLLM
 is provisioned. Until that step, Private Google Access works for Google
 APIs but arbitrary external package downloads may not.
 
 In authorized Cloud Shell after checking `gh auth status`:
 ```bash
-git clone --branch feat/solo-gce-workstation-20261026 --single-branch https://github.com/klarkc/os.git
+git clone --branch feat/wsklarkc-gce --single-branch https://github.com/klarkc/os.git
 cd os
 bash workstations/scripts/gce-provision-approved.sh --preflight
-SOLO_GCE_DEPLOY_APPROVED=YES bash workstations/scripts/gce-provision-approved.sh --deploy
+WSKLARKC_GCE_DEPLOY_APPROVED=YES bash workstations/scripts/gce-provision-approved.sh --deploy
 ```
 
 The script refuses to overwrite pre-existing VM, VPC, bucket or image.

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Post-firewall-review authorization: grant CI E2E account only on
-# solo-workstation; never change the human Dell principal or project Owner.
+# wsklarkc; never change the human Dell principal or project Owner.
 set -euo pipefail
 umask 077
 export CLOUDSDK_CORE_DISABLE_PROMPTS=1
@@ -8,7 +8,7 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 project=argon-surf-472319-b0
 number=1009769829445
 zone=southamerica-east1-b
-vm=solo-workstation
+vm=wsklarkc
 tester="buildgce-e2e@$project.iam.gserviceaccount.com"
 
 # OS Login with sudo is needed only to create/delete a disposable RDP user
@@ -39,7 +39,7 @@ member = "serviceAccount:" + tester
 role = "roles/iap.tunnelResourceAccessor"
 condition = {
     "title": "buildgce-e2e-only-ssh-and-rdp",
-    "description": "CI service account: only TCP 22/3389 on solo-workstation",
+    "description": "CI service account: only TCP 22/3389 on wsklarkc",
     "expression": "destination.port == 22 || destination.port == 3389",
 }
 

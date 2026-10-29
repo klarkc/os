@@ -5,7 +5,7 @@ name: BuildGCE — GCP WIF read-only audit
 on:
   push:
     branches:
-      - "feat/solo-gce-workstation-20261026"
+      - "feat/wsklarkc-gce"
     paths:
       - ".github/workflows/gce-wif-audit.yml"
       - "workstations/scripts/gce-wif-readonly-audit.sh"
@@ -18,7 +18,7 @@ permissions:
 jobs:
   audit:
     name: Authenticate WIF and inspect GCE (read-only)
-    if: github.ref == 'refs/heads/feat/solo-gce-workstation-20261026'
+    if: github.ref == 'refs/heads/feat/wsklarkc-gce'
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     permissions:

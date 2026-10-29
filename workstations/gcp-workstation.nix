@@ -3,10 +3,10 @@
 let
   # Google IAP TCP forwarding source CIDR (IPv4); no VPN is used.
   iapSource = "35.235.240.0/20";
-  xrdpPasswordBootstrap = pkgs.writeShellScriptBin "solo-xrdp-set-password" ''
+  xrdpPasswordBootstrap = pkgs.writeShellScriptBin "wsklarkc-xrdp-set-password" ''
     set -euo pipefail
     if [ "$(id -u)" != 0 ] || [ ! -t 0 ] || [ ! -t 1 ]; then
-      echo "Use an interactive, authenticated IAP/OS Login SSH session: sudo solo-xrdp-set-password" >&2
+      echo "Use an interactive, authenticated IAP/OS Login SSH session: sudo wsklarkc-xrdp-set-password" >&2
       exit 1
     fi
     # Interactive tty input only. No hashes/passwords in Git, the store,
@@ -15,7 +15,7 @@ let
   '';
 in
 {
-  networking.hostName = "solo-workstation";
+  networking.hostName = "wsklarkc";
   time.timeZone = "America/Bahia";
   i18n.defaultLocale = "en_US.UTF-8";
   nix.settings.experimental-features = [ "nix-command" "flakes" ];

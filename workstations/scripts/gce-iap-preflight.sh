@@ -6,8 +6,8 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 
 project=argon-surf-472319-b0
 zone=southamerica-east1-b
-instance=solo-workstation
-tag=solo-workstation-iap
+instance=wsklarkc
+tag=wsklarkc-iap
 iap_cidr=35.235.240.0/20
 status=0
 
@@ -65,7 +65,7 @@ check jq -e --arg tag "$tag" '(.tags.items // []) | index($tag) != null' "$tmp/i
 
 network="$(jq -r '.networkInterfaces[0].network // empty' "$tmp/instance.json")"
 for port in 3389 22; do
-  rule="solo-workstation-iap-$([ "$port" = 3389 ] && echo rdp || echo ssh)"
+  rule="wsklarkc-iap-$([ "$port" = 3389 ] && echo rdp || echo ssh)"
   if ! gcloud compute firewall-rules describe "$rule" --project="$project" --format=json >"$tmp/rule-$port.json" 2>"$tmp/rule-$port.err"; then
     echo "FAIL: missing VPC firewall rule for TCP $port" >&2
     status=1
