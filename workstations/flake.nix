@@ -174,6 +174,11 @@
               timeout=180
             )
             client.succeed("test -e /run/current-system/sw/bin/lpklarkc-iap")
+            client.succeed("test -x /run/current-system/sw/bin/lpklarkc-oauth-session")
+            client.succeed("test -x /run/current-system/sw/bin/lpklarkc-oauth-browser")
+            # Local Google OAuth is mocked; the rootless Xorg startup is
+            # independently verified above. No account or cloud API needed.
+            client.succeed("runuser -u nixos -- ${pkgs.bash}/bin/bash ${./tests/oauth-local-test.sh} ${./scripts/gce-iap.sh} ${./scripts/oauth-session.sh} ${./scripts/oauth-browser.sh}")
             client.succeed("test -e /run/current-system/sw/bin/lpklarkc-peer-watchdog")
             # VM runs mocked GCE lifecycle and conservative watchdog offline,
             # proving none of these tests can start, stop or bill a VM.

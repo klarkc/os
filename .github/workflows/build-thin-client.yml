@@ -78,9 +78,11 @@ jobs:
           # Duplex RDP audio uses PipeWire's PulseAudio protocol shim, not pulseaudio.
           grep -Fq '/sound:sys:pulse /microphone:sys:pulse' scripts/thin-client.sh
           bash tests/iso-size-budget.sh --self-test
-          bash -n scripts/gce-iap.sh scripts/thin-client.sh scripts/client-peer-watchdog.sh
+          bash -n scripts/gce-iap.sh scripts/thin-client.sh scripts/client-peer-watchdog.sh scripts/oauth-session.sh scripts/oauth-browser.sh
+          bash -n tests/oauth-local-test.sh
           bash -n tests/gce-lifecycle.sh tests/client-peer-watchdog-test.sh
           bash tests/gce-lifecycle.sh scripts/gce-iap.sh
+          bash tests/oauth-local-test.sh scripts/gce-iap.sh scripts/oauth-session.sh scripts/oauth-browser.sh
           bash tests/client-peer-watchdog-test.sh scripts/client-peer-watchdog.sh scripts/thin-client.sh
           ! grep -Eq 'compute instances (start|stop|reset|delete)' scripts/gce-iap.sh
           test ! -e ventoy/ventoy.json
@@ -160,7 +162,8 @@ jobs:
           echo "Largest Nix store paths in the client runtime closure (bytes):"
           toplevel="$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.build.toplevel)"
           nix path-info -r --size "$toplevel" | sort -k2nr | sed -n '1,35p'
-          # Previous CI-proven ISO: 1034944512 B (~987 MiB).
+          # Previous browserless ISO: 1034944512 B (~987 MiB). Firefox
+          # must NOT silently bypass the 1024 MiB ISO size gate.
           # 1024 MiB leaves modest headroom for lifecycle regressions.
           MAX_ISO_MIB=1024 bash tests/iso-size-budget.sh "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           test ! -e "$GITHUB_WORKSPACE/dist/ventoy.json"

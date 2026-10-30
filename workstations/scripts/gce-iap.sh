@@ -12,6 +12,7 @@ RDP_PORT=3389
 LOCAL_PORT=13389
 STATE="${LPKLARKC_STATE_TOOL:-/run/current-system/sw/bin/lpklarkc-state}"
 GCLOUD="${LPKLARKC_GCLOUD_BIN:-gcloud}"
+SUDO="${LPKLARKC_SUDO_BIN:-sudo}"
 export CLOUDSDK_CONFIG="${LPKLARKC_GCLOUD_CONFIG:-/home/nixos/.config/lpklarkc-gcloud}"
 export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=1
 
@@ -23,25 +24,37 @@ has_credentials() {
 }
 
 login() {
-  if ! "$STATE" is-ready; then
-    echo "Insert the trusted Ventoy USB before authorizing Google Cloud." >&2
-    return 1
+  # Never fall back to the second-device/code-copy Google auth flow.
+  if [[ -z "${DISPLAY:-}" || -z "${BROWSER:-}" ]]; then
+    echo "OAuth requires Firefox on this Dell in a local Xorg session." >&2
+    return 4
+  fi
+  # Ventoy uses uid=0,umask=077; nixos cannot stat USB block ancestry.
+  # Exactly lpklarkc-state is-ready is allowed via narrowly scoped sudo.
+  if ! "$SUDO" -n "$STATE" is-ready; then
+    echo "Trusted Ventoy USB is not verified or sudo is-ready is unavailable; refusing OAuth." >&2
+    return 5
   fi
   mkdir -p "$CLOUDSDK_CONFIG/configurations"
   chmod 0700 "$CLOUDSDK_CONFIG" "$CLOUDSDK_CONFIG/configurations"
 
-  echo "Google Cloud IAP pairing (first boot or reauthorization)."
-  echo "Open the Google URL shown below on another device with a browser."
-  echo "Copy its verification code back into this Dell terminal."
-  echo "The CLI refresh credential will be saved on the UNENCRYPTED Ventoy USB."
-  # Keep this interaction on the Dell's terminal, not a privileged process.
-  # --no-launch-browser specifically supports using a second device.
-  "$GCLOUD" auth login --no-launch-browser --project="$PROJECT"
+  echo "Google Cloud authorization in Firefox on THIS Dell (no second device)."
+  # The browser and CLI share this host's localhost OAuth callback.
+  "$GCLOUD" auth login --launch-browser --project="$PROJECT"
   if ! has_credentials; then
     echo "Google login did not establish CLI credentials." >&2
     return 1
   fi
-  sudo -n "$STATE" save
+  if [[ ! -s "${LPKLARKC_OAUTH_BROWSER_PROOF:-}" ]]; then
+    echo "Google CLI did not invoke the local OAuth browser. Refusing external fallback." >&2
+    return 1
+  fi
+  if ! "$GCLOUD" auth print-access-token >/dev/null 2>&1; then
+    echo "Google CLI login returned but no valid refreshable token was verified." >&2
+    return 1
+  fi
+  # Save only validated CLI credentials (and the existing Wi-Fi/TLS pins).
+  "$SUDO" -n "$STATE" save
 }
 
 # Read-only; never starts, stops or changes the GCE instance.

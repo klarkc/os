@@ -8,9 +8,12 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
 
 - GCE project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
 - GCE instance **resource name** (not just Linux hostname): `wsklarkc`.
-- A one-time `gcloud auth login --no-launch-browser` opens a Google URL.
-  User authorizes in a browser on another device and enters the returned
-  code on the Dell. Requires no browser or second gcloud installation on Dell.
+- A one-time `gcloud auth login --launch-browser` uses Firefox ESR on
+  the **same Dell**, in a temporary rootless Xorg + Openbox session before
+  starting IAP. Google CLI and Firefox share the localhost callback.
+  No second device, manual verification-code transfer or phone is required.
+  Cookies, cache and browser profile remain in RAM and are destroyed
+  after the session returns to the kiosk.
 - The dedicated `CLOUDSDK_CONFIG` is
   `/home/nixos/.config/lpklarkc-gcloud`, in ephemeral RAM. The SQLite
   `credentials.db` and `configurations/config_default` are backed up to
@@ -20,6 +23,10 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
   certificate pins are also saved and restored (FreeRDP 3 server/*.pem;
   legacy known_hosts2), preventing silent certificate acceptance each boot.
 - Boot restore runs before NetworkManager; Wi-Fi profiles restore from USB.
+- Root-owned Ventoy mounts can block unprivileged USB ancestry checks.
+  The exact read-only `sudo -n lpklarkc-state is-ready` command is
+  NOPASSWD-allowlisted, alongside narrow `ensure/save`, without broad sudo.
+  OAuth refuses a missing/invalid USB before storing any credential.
 - No configuration or secrets are written to internal Dell HDD.
 - Credentials restored on subsequent boots avoid repeated login unless
   authorization is revoked or expires.
@@ -87,7 +94,9 @@ Google login principal only the minimal IAM required for IAP and instance
 discovery; avoid using an owner/admin identity when possible. The user
 explicitly chose a trusted USB without encryption.
 
-No Google credentials or cloud resources are involved in QEMU CI. CI
+No real Google credentials or cloud resources are involved in QEMU CI.
+Offline mock browser/Google login tests cover failure, cancellation and
+USB validation, but physical Firefox/MFA/IAP/XRDP remain `NOT_TESTED`. CI
 proves USB Wi-Fi and CLI SQLite config persistence across a real guest
 reboot and offline IAP command arguments. Real Google login, real IAP
 authorization, actual RDP and Dell firmware/Wi-Fi are separate E2E gates.

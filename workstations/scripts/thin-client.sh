@@ -12,6 +12,8 @@ RDP_ADDRESS="127.0.0.1:13389"
 WATCHDOG="${LPKLARKC_WATCHDOG_TOOL:-/run/current-system/sw/bin/lpklarkc-peer-watchdog}"
 POWEROFF="${LPKLARKC_POWEROFF_TOOL:-/run/current-system/sw/bin/lpklarkc-poweroff}"
 SUDO="${LPKLARKC_SUDO_BIN:-sudo}"
+OAUTH_SESSION="${LPKLARKC_OAUTH_SESSION_TOOL:-/run/current-system/sw/bin/lpklarkc-oauth-session}"
+STARTX="${LPKLARKC_STARTX_BIN:-startx}"
 TUNNEL_PID=""
 TUNNEL_LOG=""
 WATCHDOG_PID=""
@@ -95,6 +97,30 @@ rdp_responding() {
   [[ "$reply" == "0300" ]]
 }
 
+# A separate rootless Xorg session hosts Firefox only during Google OAuth.
+# Xorg returns to tty1 before the normal full-screen FreeRDP session starts.
+local_oauth_login() {
+  if ! "$SUDO" -n "$STATE" is-ready; then
+    echo "USB Ventoy nao validado para OAuth (ou permissao sudo is-ready ausente)." >&2
+    echo "Diagnostico no tty2: lpklarkc-state diagnose" >&2
+    return 5
+  fi
+  if [[ ! -x "$OAUTH_SESSION" ]] || ! command -v "$STARTX" >/dev/null 2>&1; then
+    echo "Navegador OAuth local ou startx ausente da ISO." >&2
+    return 4
+  fi
+  echo "Iniciando Firefox temporario no Dell para autenticar Google..."
+  if ! "$STARTX" "$OAUTH_SESSION" -- :0 vt1 -keeptty -nolisten tcp; then
+    echo "OAuth local cancelado/erro de navegador. Corrija a causa e tente novamente." >&2
+    return 1
+  fi
+  if ! "$IAP" check; then
+    echo "OAuth local nao produziu token Google utilizavel; USB nao foi considerada autenticada." >&2
+    return 1
+  fi
+  return 0
+}
+
 # Regression-test entrypoints; injected IAP reads only, never writes GCE.
 if [[ "${1:-}" == "--check-network" ]]; then
   network_ready
@@ -138,7 +164,7 @@ while true; do
   # A boot-time Ventoy mount failure must be recoverable after live boot.
   # 'ensure' re-discovers the USB and/or VentoyPart on every retry.
   usb_retries=0
-  while ! usb_error="$(sudo -n "$STATE" ensure 2>&1)"; do
+  while ! usb_error="$("$SUDO" -n "$STATE" ensure 2>&1)"; do
     usb_retries=$((usb_retries + 1))
     if (( usb_retries == 1 || usb_retries % 4 == 0 )); then
       printf '\n  Unidade USB de configuracao indisponivel.\n'
@@ -149,15 +175,17 @@ while true; do
     fi
     sleep 6
   done
-  sudo -n "$STATE" save >/dev/null 2>&1 || true
+  "$SUDO" -n "$STATE" save >/dev/null 2>&1 || true
 
   if ! "$IAP" has-credentials; then
     printf '\n  Autorizacao inicial da conta Google necessaria.\n'
     printf '  Siga as instrucoes exibidas a seguir.\n\n'
-    until "$IAP" login; do
-      printf '\n  Autorizacao incompleta. Verifique sua rede.\n'
-      sleep 8
-    done
+    if ! local_oauth_login; then
+      printf '\n  Login Google incompleto; confirme USB, navegador e autenticacao.\n'
+      printf '  Ctrl+Alt+F2 abre o diagnostico. Nova tentativa em 20 segundos.\n'
+      sleep 20
+      continue
+    fi
   fi
 
   # Only one resume phase per Dell boot; never auto-start TERMINATED or
@@ -168,7 +196,7 @@ while true; do
       printf '  Confira status, permissao resume, cota e rede. Sem start automatico.\n'
       if network_ready && ! "$IAP" check; then
         printf '  Sessao Google expirada; autorizacao necessaria.\n'
-        "$IAP" login || true
+        local_oauth_login || true
       fi
       sleep 30
       continue
@@ -216,7 +244,7 @@ while true; do
     printf '  Verifique XRDP, IAM e o tunel IAP.\n'
     if network_ready && ! "$IAP" check; then
       printf '  Sessao Google expirada; autorizacao necessaria.\n'
-      "$IAP" login || true
+      local_oauth_login || true
     fi
   fi
 

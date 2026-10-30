@@ -85,6 +85,9 @@ pkgs.testers.runNixOSTest {
     client.succeed("lpklarkc-state ensure")
     client.succeed("mountpoint -q /run/lpklarkc/ventoy")
     client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/lpklarkc-state ensure")
+    # The Ventoy data partition is root-owned; the narrowly allowlisted
+    # read-only precheck is safe and needed by the graphical OAuth flow.
+    client.succeed("runuser -u nixos -- sudo -n /run/current-system/sw/bin/lpklarkc-state is-ready")
 
 
     # Mimic one user-entered Wi-Fi profile, NOT a real secret. It must survive

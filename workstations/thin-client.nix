@@ -9,6 +9,21 @@ let
     export PATH=${lib.makeBinPath [ pkgs.google-cloud-sdk pkgs.coreutils pkgs.sudo ]}:$PATH
     exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
+  # One-time local Google authorization uses the EXISTING rootless startx
+  # with a temporary Firefox ESR profile in RAM and a minimal window manager.
+  # No display manager or full desktop; Xorg exits before FreeRDP starts.
+  oauthBrowser = pkgs.writeShellScriptBin "lpklarkc-oauth-browser" ''
+    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-esr}"
+    exec ${pkgs.bash}/bin/bash ${./scripts/oauth-browser.sh} "$@"
+  '';
+  oauthSession = pkgs.writeShellScriptBin "lpklarkc-oauth-session" ''
+    export PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.procps pkgs.openbox ]}:$PATH
+    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-esr}"
+    export LPKLARKC_OAUTH_WM_BIN="${lib.getExe pkgs.openbox}"
+    export LPKLARKC_OAUTH_HELPER_BIN="${oauthBrowser}/bin/lpklarkc-oauth-browser"
+    export LPKLARKC_OAUTH_IAP_TOOL="${iapTool}/bin/lpklarkc-iap"
+    exec ${pkgs.bash}/bin/bash ${./scripts/oauth-session.sh} "$@"
+  '';
   # Only exact, immutable shutdown command receives NOPASSWD. The GCE
   # server manages its own graceful termination when the Dell disappears.
   poweroffTool = pkgs.writeShellScriptBin "lpklarkc-poweroff" ''
@@ -19,8 +34,8 @@ let
     exec ${pkgs.bash}/bin/bash ${./scripts/client-peer-watchdog.sh} "$@"
   '';
   thinClient = pkgs.writeShellScriptBin "lpklarkc" ''
-    # Connection/pairing UI runs directly on the trusted local console.
-    # The X11 server is started only when an RDP session is available.
+    # Pairing begins on tty1; rootless Xorg hosts Firefox for OAuth, then
+    # restarts for RDP. All browser storage is ephemeral.
     exec ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh} "$@"
   '';
 in
@@ -73,6 +88,8 @@ in
     commands = [
       { command = "/run/current-system/sw/bin/lpklarkc-state save"; options = [ "NOPASSWD" ]; }
       { command = "/run/current-system/sw/bin/lpklarkc-state ensure"; options = [ "NOPASSWD" ]; }
+      # read-only USB ancestry check needs root on uid=0,umask=077 exFAT.
+      { command = "/run/current-system/sw/bin/lpklarkc-state is-ready"; options = [ "NOPASSWD" ]; }
       # Local power control only. No root shell, guest API permission, or
       # generic systemctl sudo allowed to the kiosk account.
       { command = "/run/current-system/sw/bin/lpklarkc-poweroff"; options = [ "NOPASSWD" ]; }
@@ -116,9 +133,9 @@ in
     path = [ pkgs.util-linux pkgs.coreutils pkgs.findutils pkgs.sqlite ];
   };
 
-  # Rootless Xorg is still needed by xfreerdp. The Dell does NOT need a
-  # display manager, window manager, terminal emulator or desktop session.
-  # Start Xorg with startx only after a valid Google IAP tunnel is ready.
+  # Rootless Xorg runs twice as needed: a temporary Firefox/Openbox OAuth
+  # session BEFORE IAP, then full-screen xfreerdp after IAP is established.
+  # There is no permanent local desktop, display manager or system WM service.
   # Keep the implicit graphical-desktop profile disabled: it drags in
   # speech synthesis, CJK fonts, Mesa and general desktop applications.
   # Explicit PipeWire with PulseAudio *protocol* compatibility gives
@@ -133,6 +150,8 @@ in
   };
   services.pulseaudio.enable = lib.mkForce false;
   fonts.enableDefaultPackages = lib.mkForce false;
+  # Minimal UI font for Firefox ESR; no generic CJK/desktop font bundle.
+  fonts.packages = [ pkgs.dejavu_fonts ];
   # With the generic graphical profile disabled, NixOS' system-path
   # post-build icon-cache hook still expects an icon directory.
   # Link only the already-installed minimal hicolor theme, not a DE.
@@ -156,7 +175,7 @@ in
   '';
 
   environment.systemPackages = with pkgs; [
-    stateTool iapTool thinClient poweroffTool peerWatchdog freerdp networkmanager
+    stateTool iapTool oauthBrowser oauthSession thinClient poweroffTool peerWatchdog freerdp networkmanager
     google-cloud-sdk sqlite netcat-openbsd openssh
     # NixOS' system-path post-build expects share/icons for icon cache
     # generation. Keep only the tiny theme index, not the desktop stack.
