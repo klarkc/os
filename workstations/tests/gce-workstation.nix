@@ -25,7 +25,22 @@ pkgs.testers.runNixOSTest {
     server.succeed("test -r /etc/determinate/config.json")
     server.succeed("grep -F disabled /etc/determinate/config.json")
     server.succeed("systemctl is-enabled nix-gc.timer | grep -Fx enabled")
-    server.succeed("systemctl cat nix-gc.service | grep -F -- '--delete-older-than 30d'")
+    # nix-gc.service uses NixOS systemd.services.<name>.script, which
+    # puts the actual nix-collect-garbage command into a store script.
+    # ExecStart points to that wrapper; the flags are NOT in the unit text.
+    gc_unit = server.succeed("systemctl cat nix-gc.service")
+    gc_execs = [
+        line.split("=", 1)[1].strip().split()[0]
+        for line in gc_unit.splitlines()
+        if line.startswith("ExecStart=")
+    ]
+    assert len(gc_execs) == 1, f"nix-gc has no single ExecStart: {gc_unit}"
+    gc_script = gc_execs[0]
+    assert gc_script.startswith("/nix/store/") and gc_script.endswith("/bin/nix-gc-start"), (
+        f"unexpected nix-gc wrapper: {gc_script}"
+    )
+    server.succeed("test -x " + gc_script)
+    server.succeed("grep -F -- '--delete-older-than 30d' " + gc_script)
     server.succeed("ss -lnt | grep ':3389'")
     server.succeed("ss -lnt | grep ':22'")
 
