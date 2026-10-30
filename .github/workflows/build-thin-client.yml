@@ -36,6 +36,11 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
+            # Signed official Determinate Nix installer cache (NOT FlakeHub paid cache).
+            # The NixOS guest also trusts this exact endpoint/key. The runner
+            # needs it separately before building QEMU tests or raw images.
+            extra-substituters = https://install.determinate.systems
+            extra-trusted-public-keys = cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM=
       - name: Validate IAP audit script syntax (no cloud credentials)
         run: bash -n workstations/scripts/gce-iap-preflight.sh
       - name: Validate WIF read-only audit script syntax
@@ -140,6 +145,11 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
+            # Signed official Determinate Nix installer cache (NOT FlakeHub paid cache).
+            # The NixOS guest also trusts this exact endpoint/key. The runner
+            # needs it separately before building QEMU tests or raw images.
+            extra-substituters = https://install.determinate.systems
+            extra-trusted-public-keys = cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM=
       - name: Test client/server and USB persistence in QEMU
         run: |
           set -euo pipefail
@@ -170,6 +180,11 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
+            # Signed official Determinate Nix installer cache (NOT FlakeHub paid cache).
+            # The NixOS guest also trusts this exact endpoint/key. The runner
+            # needs it separately before building QEMU tests or raw images.
+            extra-substituters = https://install.determinate.systems
+            extra-trusted-public-keys = cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM=
       - name: Build NixOS ISO
         run: |
           set -euo pipefail
@@ -198,6 +213,11 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
+            # Signed official Determinate Nix installer cache (NOT FlakeHub paid cache).
+            # The NixOS guest also trusts this exact endpoint/key. The runner
+            # needs it separately before building QEMU tests or raw images.
+            extra-substituters = https://install.determinate.systems
+            extra-trusted-public-keys = cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM=
       - name: Boot and reboot workstation VM; verify firewall and XRDP
         run: |
           set -euo pipefail
@@ -226,6 +246,11 @@ jobs:
           extra_nix_config: |
             experimental-features = nix-command flakes
             accept-flake-config = false
+            # Signed official Determinate Nix installer cache (NOT FlakeHub paid cache).
+            # The NixOS guest also trusts this exact endpoint/key. The runner
+            # needs it separately before building QEMU tests or raw images.
+            extra-substituters = https://install.determinate.systems
+            extra-trusted-public-keys = cache.flakehub.com-3:hJuILl5sVK4iKm86JzgdXW12Y2Hwd5G07qKtHTOcDCM=
       - name: Build and checksum NixOS GCE image
         run: |
           set -euo pipefail
