@@ -71,13 +71,15 @@ capture() {
   printf 'boot_id=%s\n' "$(cat /proc/sys/kernel/random/boot_id)"
   printf 'uid=%s\n' "$uid"
   printf 'xmonad_pid=%s\n' "$pid"
-  printf 'xmonad_start_ticks=%s\n' "$(process_start_ticks "$pid")"
+  xmonad_ticks="$(process_start_ticks "$pid")" || { echo 'FAIL: XMonad exited during probe' >&2; return 1; }
+  printf 'xmonad_start_ticks=%s\n' "$xmonad_ticks"
   printf 'display=%s\n' "$display"
   printf 'ram_sha256=%s\n' "$ram_hash"
   printf 'sink=xrdp-sink\nsource=xrdp-source\n'
   while IFS= read -r pid; do
     [[ -n "$pid" ]] || continue
-    printf 'tmux=%s:%s\n' "$pid" "$(process_start_ticks "$pid")"
+    tmux_ticks="$(process_start_ticks "$pid")" || { echo 'FAIL: tmux exited during probe' >&2; return 1; }
+    printf 'tmux=%s:%s\n' "$pid" "$tmux_ticks"
     tmux_count=$((tmux_count + 1))
   done < <(pgrep -u "$probe_user" -x tmux | sort -n || true)
   [[ "$tmux_count" -gt 0 ]] || {
