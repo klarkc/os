@@ -76,3 +76,7 @@ Campos temporais do candidato, ledger e eventos devem ser segundos Unix inteiros
 ## Provas booleanas estritas (modelo offline)
 
 `proposal_open`, `veto_state_fresh`, `vetoed_proposal` e `graphical_session_connected` não aceitam coerção implícita de tipos: `1`, `0`, `"false"` e `"true"` são evidências inválidas. Uma sessão gráfica conectada exige `graphical_notice_confirmed is True`; ausência de estado válido implica **DENY**. O controlador externo ainda precisa autenticar as provas, manter estado durável e fazer a rechecagem transacional final. O script não executa `instances.suspend`.
+
+## Escopo da homologação offline após alterações de segurança
+
+A CI por `push` na branch `feat/wsklarkc-gce` deve testar **o próprio commit da HEAD**: regressões de timestamp/geração, evidências booleanas estritas, veto por política de ociosidade e de orçamento, sequência do ledger, janela de 3599/3600 segundos, avaliação NixOS, QEMU workstation/GC, imagem GCE raw e ISO. Artefatos criados em SHA anterior não homologam alterações posteriores. O cache binário assinado do Determinate Nix deve ser observado no runner, mas a existência do cache não significa prova de ganho de desempenho. **Todos os testes permanecem offline e não autorizam deploy, suspensão real ou envio de e-mail.**
