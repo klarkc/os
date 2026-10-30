@@ -10,8 +10,12 @@ export CLOUDSDK_CORE_DISABLE_PROMPTS=1
 export CLOUDSDK_CORE_DISABLE_USAGE_REPORTING=1
 
 mode="${1:-}"
-[[ "$mode" == initial || "$mode" == reconnect || "$mode" == cleanup ]] || {
-  echo "Usage: $0 {initial|reconnect|cleanup}" >&2
+# The old reconnect mode only checked persisted HOME across stop/start and
+# a NEW login. It cannot establish unchanged RAM, XMonad PID or audio session.
+# Do not offer this as a lifecycle acceptance gate under contract v2.
+[[ "$mode" == initial || "$mode" == cleanup ]] || {
+  echo "BLOCKED: legacy reconnect proof is invalid for session preservation" >&2
+  echo "Usage: $0 {initial|cleanup}; resume/reconnect requires approved E2E" >&2
   exit 2
 }
 project=argon-surf-472319-b0
@@ -63,11 +67,6 @@ if [[ "$mode" == cleanup ]]; then
     --tunnel-through-iap --quiet --command="rm -f $guest_path" >/dev/null || true
   echo "PASS: temporary guest account cleaned without touching klarkc"
   exit 0
-fi
-
-# Stop/start must not erase the temporary account's HOME marker.
-if [[ "$mode" == reconnect ]]; then
-  ssh_guest marker
 fi
 
 password="$(openssl rand -hex 24)"
@@ -143,6 +142,3 @@ fi
 }
 echo "PASS: FreeRDP authenticated via TLS+IAP and spawned user-owned XMonad"
 echo "PASS: true RDP graphical session established, not only TCP handshake"
-if [[ "$mode" == reconnect ]]; then
-  echo "PASS: reconnect after GCE stop/start with the same persistent HOME"
-fi

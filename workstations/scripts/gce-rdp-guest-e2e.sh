@@ -29,7 +29,7 @@ case "$mode" in
     printf '%s:%s\n' "$user" "$password" | chpasswd
     unset password
     if [[ ! -e "$marker" ]]; then
-      printf '%s\n' 'wsklarkc-ci-persistence-verified-after-real-stop-start' > "$marker"
+      printf '%s\n' 'wsklarkc-ci-home-marker-only' > "$marker"
       chown "$user:users" "$marker"
       chmod 0600 "$marker"
     fi
@@ -59,7 +59,7 @@ case "$mode" in
   verify)
     id "$user" >/dev/null
     test -f "$marker"
-    grep -Fx 'wsklarkc-ci-persistence-verified-after-real-stop-start' "$marker" >/dev/null
+    grep -Fx 'wsklarkc-ci-home-marker-only' "$marker" >/dev/null
     # One bounded probe per remote invocation. The runner retries while
     # its actual FreeRDP process remains alive; do not block 60 seconds
     # inside SSH for each attempt.
@@ -102,11 +102,10 @@ case "$mode" in
     echo "NOTE: node discovery is NOT proof of physical Dell playback or recording"
     ;;
   marker)
-    id "$user" >/dev/null
-    test -f "$marker"
-    grep -Fx 'wsklarkc-ci-persistence-verified-after-real-stop-start' "$marker" >/dev/null
-    systemctl is-active --quiet xrdp.service xrdp-sesman.service
-    echo "PASS: GCE stop/start retained guest HOME marker and XRDP services"
+    # Preserve this entry point only to FAIL CLOSED for retired workflows.
+    # HOME persistence does NOT prove suspended RAM, XMonad or PipeWire.
+    echo "BLOCKED: marker-only persistence is not session continuity" >&2
+    exit 2
     ;;
   cleanup)
     # Never delete the actual developer account or HOME; this test's
@@ -119,7 +118,7 @@ case "$mode" in
     echo "PASS: disposable E2E user and HOME deleted"
     ;;
   *)
-    echo "Usage: gce-rdp-guest-e2e.sh {setup|verify|marker|cleanup}" >&2
+    echo "Usage: gce-rdp-guest-e2e.sh {setup|verify|cleanup}; marker is retired" >&2
     exit 2
     ;;
 esac

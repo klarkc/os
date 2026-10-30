@@ -49,6 +49,13 @@ jobs:
             echo 'Forbidden GCE stop/start/reset/delete in session-preserving CI' >&2
             exit 1
           fi
+          # Retired RDP post-stop test must fail closed even if invoked.
+          grep -Fq 'BLOCKED: legacy reconnect proof is invalid' workstations/scripts/gce-rdp-client-e2e.sh
+          grep -Fq 'BLOCKED: marker-only persistence is not session continuity' workstations/scripts/gce-rdp-guest-e2e.sh
+          if grep -Fq 'ssh_guest marker' workstations/scripts/gce-rdp-client-e2e.sh; then
+            echo 'Legacy HOME-marker acceptance path reintroduced' >&2
+            exit 1
+          fi
           # Avoid GitHub interpolation of the literal expression inside run:
           # inspect the stop-start job's own if: clause with awk.
           awk '
