@@ -75,9 +75,15 @@ jobs:
             workstations/scripts/gce-ci-stop-start.sh \
             workstations/scripts/gce-rdp-guest-e2e.sh \
             workstations/scripts/gce-rdp-client-e2e.sh \
-            workstations/scripts/xrdp-pipewire-session.sh; do
+            workstations/scripts/xrdp-pipewire-session.sh \
+            workstations/scripts/gce-session-continuity-probe.sh \
+            workstations/tests/test-gce-session-continuity-probe.sh; do
             bash -n "$script"
           done
+      - name: Test XRDP/XMonad continuity evidence comparator offline
+        run: |
+          set -euo pipefail
+          bash workstations/tests/test-gce-session-continuity-probe.sh
       - name: Validate suspend admission gate in offline dry-run (NO cloud credentials)
         run: |
           set -euo pipefail
