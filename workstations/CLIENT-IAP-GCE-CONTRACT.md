@@ -8,7 +8,7 @@ Tailscale entirely. Previous WireGuard handoff is superseded by
 
 - GCE project: `argon-surf-472319-b0`; zone: `southamerica-east1-b`.
 - GCE instance **resource name** (not just Linux hostname): `wsklarkc`.
-- A one-time `gcloud auth login --launch-browser` uses Firefox ESR on
+- A one-time `gcloud auth login --launch-browser` uses Mozilla Firefox (official binary) on
   the **same Dell**, in a temporary rootless Xorg + Openbox session before
   starting IAP. Google CLI and Firefox share the localhost callback.
   No second device, manual verification-code transfer or phone is required.

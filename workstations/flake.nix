@@ -74,6 +74,10 @@
           isoImage.makeEfiBootable = true;
           isoImage.makeUsbBootable = true;
           isoImage.isoName = "lpklarkc-x86_64.iso";
+          # Full local Firefox OAuth increases the closure. Preserve the
+          # 1024 MiB limit by packing the ISO store with XZ instead of the
+          # default zstd. No browser, GCloud, WLAN or USB feature is removed.
+          isoImage.squashfsCompression = "xz -Xdict-size 100%";
           # The NixOS ISO builder names its derivation from image.baseName.
           image.baseName = lib.mkForce "lpklarkc-x86_64";
 

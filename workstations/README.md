@@ -10,7 +10,7 @@ arquivos no HDD do Dell.
 - **Não modificamos configurações, menus, timeouts ou comportamento do Ventoy.**
   O projeto e seus artefatos não incluem `ventoy.json`.
 - Primeiro boot: conectar Wi-Fi por `nmtui`, verificar o USB Ventoy e
-  autorizar Google **no Firefox ESR do proprio Dell**.
+  autorizar Google **no Mozilla Firefox (official binary) do proprio Dell**.
   Uma sessao temporaria rootless Xorg + Openbox abre
   `gcloud auth login --launch-browser` com callback localhost, sem celular,
   segundo computador ou transferencia de codigo. O navegador e o cache
@@ -28,7 +28,7 @@ arquivos no HDD do Dell.
   watchdog local aguarda confirmação repetida de `SUSPENDED` antes de
   desligar o Dell. Erros de Wi-Fi ou permissão GCE não desligam o cliente.
 - Sem XFCE local, Tailscale ou WireGuard. Interface minima com NetworkManager,
-  Xorg sob demanda via `startx`, Firefox ESR e Openbox **somente na fase OAuth**,
+  Xorg sob demanda via `startx`, Mozilla Firefox (official binary) e Openbox **somente na fase OAuth**,
   e FreeRDP. Nao ha LightDM, Xterm, desktop completo nem WM persistente.
 - Áudio bidirecional via PipeWire + WirePlumber no cliente, usando
   `pipewire-pulse` para o backend PulseAudio do FreeRDP:
@@ -74,6 +74,18 @@ GCE nesta branch do cliente. IAM, firewall, XRDP, usuário remoto
 Mais detalhes: [contrato IAP](./CLIENT-IAP-GCE-CONTRACT.md) e
 [uso do Ventoy](./VENTOY-KIOSK.md).
 
+## Empacotamento do navegador e ISO
+
+O primeiro build do OAuth local com Firefox ESR foi **reprovado pelo
+limite da ISO**: 1.215.168.512 bytes (1159 MiB arredondados), contra
+1.073.741.824 bytes (1024 MiB). A alternativa testada nesta branch
+troca o pacote compilado por `firefox-bin` (binario oficial da Mozilla
+com licenca/termos proprios e autorizacao Nix `allowUnfreePredicate`
+estritamente para Firefox) e usa `isoImage.squashfsCompression = "xz -Xdict-size 100%"`.
+Nao aumenta o limite, nao remove funcionalidades e nao configura cloud.
+**O tamanho resultante so pode ser considerado aprovado apos CI build real.**
+XZ pode alongar compilacao e descompressao no Dell, a validar no hardware.
+
 ## Orçamento de tamanho
 
 A ISO usa `iso-image.nix` + `minimal.nix` e não importa o perfil de
@@ -84,7 +96,7 @@ compila a ISO. Nenhum pacote é instalado no Dell durante a execução. BIOS/UEF
 
 O CI mede o **arquivo ISO final**, impondo **1024 MiB (1 GiB)** como
 limite, apos a ISO anterior de 1.034.944.512 bytes (987 MiB arredondados).
-  Firefox ESR e um requisito funcional novo e pode ultrapassar o limite:
+  Mozilla Firefox (official binary) e um requisito funcional novo e pode ultrapassar o limite:
   o CI nao o eleva silenciosamente. Em caso de excesso, reportar o valor
   real ao Coordinator para decisao. `tests/iso-size-budget.sh --self-test` prova que aceita o
 limite exato e rejeita um byte excedente. Compilação e distribuição
@@ -96,7 +108,7 @@ O Ventoy não é configurado nem alterado por este projeto.
 
 O `tty1` faz autologin como `nixos` e abre `lpklarkc`. Wi-Fi e `nmtui`
 ficam no console. Para autorizar Google, `startx` abre uma sessao rootless
-com Firefox ESR e Openbox minimo; `gcloud auth login --launch-browser`
+com Mozilla Firefox (official binary) e Openbox minimo; `gcloud auth login --launch-browser`
 usa callback localhost, sem segundo dispositivo. Ao concluir/cancelar,
 essa sessao Xorg encerra e o console retoma. Apos IAP/XRDP pronto, um
 outro `startx` inicia somente FreeRDP em tela cheia. `Ctrl+Alt+F2`

@@ -10,15 +10,15 @@ let
     exec ${pkgs.bash}/bin/bash ${./scripts/gce-iap.sh} "$@"
   '';
   # One-time local Google authorization uses the EXISTING rootless startx
-  # with a temporary Firefox ESR profile in RAM and a minimal window manager.
+  # with a temporary Mozilla Firefox binary profile in RAM and a minimal window manager.
   # No display manager or full desktop; Xorg exits before FreeRDP starts.
   oauthBrowser = pkgs.writeShellScriptBin "lpklarkc-oauth-browser" ''
-    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-esr}"
+    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-bin}"
     exec ${pkgs.bash}/bin/bash ${./scripts/oauth-browser.sh} "$@"
   '';
   oauthSession = pkgs.writeShellScriptBin "lpklarkc-oauth-session" ''
     export PATH=${lib.makeBinPath [ pkgs.coreutils pkgs.procps pkgs.openbox ]}:$PATH
-    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-esr}"
+    export LPKLARKC_OAUTH_BROWSER_BIN="${lib.getExe pkgs.firefox-bin}"
     export LPKLARKC_OAUTH_WM_BIN="${lib.getExe pkgs.openbox}"
     export LPKLARKC_OAUTH_HELPER_BIN="${oauthBrowser}/bin/lpklarkc-oauth-browser"
     export LPKLARKC_OAUTH_IAP_TOOL="${iapTool}/bin/lpklarkc-iap"
@@ -41,6 +41,11 @@ let
 in
 {
   networking.hostName = "lpklarkc";
+  # Use the official, prebuilt Mozilla release to reduce the ISO closure.
+  # Limit the exception narrowly to Firefox's trademark/terms license;
+  # do not allow unrelated unfree packages or implicit permissions.
+  nixpkgs.config.allowUnfreePredicate =
+    pkg: builtins.elem (lib.getName pkg) [ "firefox-bin" "firefox-bin-unwrapped" ];
   # A removable, disposable RDP appliance does not build or deploy Nix
   # packages at runtime. The Nix daemon and default flake registry retain
   # unnecessary tooling and hundreds of MiB of nixpkgs sources in the ISO.
@@ -150,7 +155,7 @@ in
   };
   services.pulseaudio.enable = lib.mkForce false;
   fonts.enableDefaultPackages = lib.mkForce false;
-  # Minimal UI font for Firefox ESR; no generic CJK/desktop font bundle.
+  # Minimal UI font for Mozilla Firefox binary; no generic CJK/desktop font bundle.
   fonts.packages = [ pkgs.dejavu_fonts ];
   # With the generic graphical profile disabled, NixOS' system-path
   # post-build icon-cache hook still expects an icon directory.

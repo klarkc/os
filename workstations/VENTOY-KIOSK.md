@@ -16,7 +16,7 @@ remova **somente aquelas opções**, preservando outras configurações suas
 ou de outras ISOs.
 
 O cliente nao utiliza LightDM, Xterm nem ambiente desktop completo.
-O Wi-Fi fica no console; Google OAuth usa Firefox ESR e Openbox minimo
+O Wi-Fi fica no console; Google OAuth usa Mozilla Firefox (official binary) e Openbox minimo
 numa sessao rootless `startx` temporaria **antes** do tunel IAP.
 Ao autenticar, Firefox e cache/cookies efemeros sao encerrados, e outra
 sessao rootless Xorg inicia FreeRDP somente apos IAP/XRDP.
