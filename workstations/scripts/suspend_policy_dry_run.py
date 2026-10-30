@@ -140,7 +140,7 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         or not _positive_generation(c.live_generation)
     ):
         return _fail("invalid_time_or_generation")
-    if c.reason not in {"idle", "budget"} or not c.proposal_id or not c.proposal_open:
+    if c.reason not in {"idle", "budget"} or not c.proposal_id or c.proposal_open is not True:
         return _fail("invalid_or_closed_proposal")
     if c.resume_in_progress is not False or c.proposal_generation != c.live_generation:
         return _fail("resume_or_generation_changed")
@@ -152,9 +152,11 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         return _fail("another_session_active")
     if c.human_state != "idle" or c.work_state != "idle" or c.resources_state != "idle":
         return _fail("human_work_or_resources_not_proven_idle")
-    if not c.veto_state_fresh:
+    # Dataclass annotations do not enforce runtime types. Strings like
+    # "false", integers 0/1 and None are NOT trustworthy boolean proofs.
+    if c.veto_state_fresh is not True:
         return _fail("veto_state_not_verified")
-    if c.vetoed_proposal:
+    if c.vetoed_proposal is not False:
         return _fail("proposal_vetoed")
     ledger = c.veto_ledger_read
     required_month = current_month(c.now_s) if c.reason == "budget" else None
@@ -218,7 +220,7 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         or not (0 <= c.proposal_created_at_s <= c.email_accepted_at_s <= c.now_s)
     ):
         return _fail("email_acceptance_not_verified")
-    if c.graphical_session_connected is None:
+    if type(c.graphical_session_connected) is not bool:
         return _fail("graphical_session_state_unknown")
     if c.graphical_session_connected is True and c.graphical_notice_confirmed is not True:
         return _fail("graphical_notice_not_confirmed")

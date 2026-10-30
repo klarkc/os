@@ -72,3 +72,7 @@ Contrato canônico:
 ## Integridade de timestamps e gerações no modelo offline
 
 Campos temporais do candidato, ledger e eventos devem ser segundos Unix inteiros e não negativos (sem floats ou bool). IDs de geração devem ser inteiros positivos, nunca `True`/`False`. Python aceita `bool` como subtipo de `int`, o que poderia falsificar um relógio ou geração sem a validação de tipos. As regressões cobrem avisos e vetos de ambas as políticas, evento do provedor e leitura do ledger. Isto **não** substitui a autenticação, o registro durável ou a rechecagem transacional do controlador externo.
+
+## Provas booleanas estritas (modelo offline)
+
+`proposal_open`, `veto_state_fresh`, `vetoed_proposal` e `graphical_session_connected` não aceitam coerção implícita de tipos: `1`, `0`, `"false"` e `"true"` são evidências inválidas. Uma sessão gráfica conectada exige `graphical_notice_confirmed is True`; ausência de estado válido implica **DENY**. O controlador externo ainda precisa autenticar as provas, manter estado durável e fazer a rechecagem transacional final. O script não executa `instances.suspend`.

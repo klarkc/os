@@ -157,6 +157,40 @@ class SuspendAdmissionTests(unittest.TestCase):
         self.assertTrue(check(replace(c, graphical_session_connected=True,
                                           graphical_notice_confirmed=True)).eligible_for_final_recheck)
 
+    def test_boolean_evidence_rejects_truthy_strings_and_integers(self):
+        # A future controller must not accept JSON-like but UNPARSED string
+        # flags, or Python int 1/0, as independently verified boolean facts.
+        for reason in ("idle", "budget"):
+            c = eligible(reason)
+            for changes in (
+                {"proposal_open": "true"},
+                {"proposal_open": 1},
+                {"proposal_open": None},
+                {"veto_state_fresh": "false"},
+                {"veto_state_fresh": 1},
+                {"veto_state_fresh": None},
+                {"vetoed_proposal": 0},
+                {"vetoed_proposal": None},
+                {"vetoed_proposal": "false"},
+                {"graphical_session_connected": "false"},
+                {"graphical_session_connected": 0},
+                {"graphical_session_connected": 1},
+                {"graphical_session_connected": "true"},
+                {"graphical_session_connected": True,
+                 "graphical_notice_confirmed": "true"},
+                {"graphical_session_connected": True,
+                 "graphical_notice_confirmed": 1},
+            ):
+                with self.subTest(reason=reason, changes=changes):
+                    self.assertFalse(
+                        check(replace(c, **changes)).eligible_for_final_recheck
+                    )
+            self.assertTrue(check(c).eligible_for_final_recheck)
+            self.assertTrue(check(replace(
+                c, graphical_session_connected=True,
+                graphical_notice_confirmed=True
+            )).eligible_for_final_recheck)
+
     def test_authoritative_ledger_read_and_gap_free_barrier(self):
         for reason in ("idle", "budget"):
             c = eligible(reason)
