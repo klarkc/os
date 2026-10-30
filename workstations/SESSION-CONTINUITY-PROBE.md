@@ -36,7 +36,7 @@ bash workstations/tests/test-gce-session-continuity-probe.sh
 
 The tests are hermetic: they compare synthetic evidence, assert rejection of
 changed XMonad start time, RAM marker, microphone, duplicate fields, missing
-tmux and symlinked baselines. They **do not simulate GCE suspend**.
+tmux, contradictory or duplicate tmux PIDs, and symlinked baselines. They **do not simulate GCE suspend**.
 
 ## Future authorized disposable-VM E2E recipe (not executed)
 

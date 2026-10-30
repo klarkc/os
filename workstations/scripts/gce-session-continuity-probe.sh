@@ -98,7 +98,15 @@ validate_file() {
     }
     NF != 2 { bad=1; next }
     $1 == "tmux" {
-      if ($2 !~ /^[1-9][0-9]*:[1-9][0-9]*$/) bad=1;
+      if ($2 !~ /^[1-9][0-9]*:[1-9][0-9]*$/) {
+        bad=1;
+        next
+      }
+      split($2, fields, ":");
+      # A process cannot have two distinct start times in one observation.
+      # Identical duplicate records must be rejected too, even when both
+      # trusted baseline and reconnect sample repeat the same bad line.
+      if (seen_tmux_pid[fields[1]]++) bad=1;
       tmux_count++;
       next
     }

@@ -34,4 +34,18 @@ if bash "$script" compare "$tmp/before" "$tmp/after" >/dev/null 2>&1; then echo 
 ln -s "$tmp/before" "$tmp/link"
 if bash "$script" compare "$tmp/link" "$tmp/before" >/dev/null 2>&1; then echo 'FAIL: symlink accepted' >&2; exit 1; fi
 if bash "$script" capture dummy /run/marker >/dev/null 2>&1; then echo 'FAIL: unprivileged/no XRDP capture accepted' >&2; exit 1; fi
-echo 'PASS: 7 offline continuity comparator scenarios'
+# Reject duplicated tmux identity even when BOTH files are byte-identical.
+# A pure cmp() would report success; the evidence parser must fail closed.
+cp "$tmp/before" "$tmp/invalid-a"
+printf 'tmux=700:910005\n' >>"$tmp/invalid-a"
+cp "$tmp/invalid-a" "$tmp/invalid-b"
+if bash "$script" compare "$tmp/invalid-a" "$tmp/invalid-b" >/dev/null 2>&1; then
+  echo 'FAIL: duplicate tmux process accepted in identical evidence' >&2; exit 1
+fi
+cp "$tmp/before" "$tmp/invalid-a"
+printf 'tmux=700:910006\n' >>"$tmp/invalid-a"
+cp "$tmp/invalid-a" "$tmp/invalid-b"
+if bash "$script" compare "$tmp/invalid-a" "$tmp/invalid-b" >/dev/null 2>&1; then
+  echo 'FAIL: contradictory tmux start ticks accepted' >&2; exit 1
+fi
+echo 'PASS: 9 offline continuity comparator scenarios'
