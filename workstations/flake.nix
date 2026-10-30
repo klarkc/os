@@ -5,7 +5,15 @@
   outputs = { self, nixpkgs }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
+      # The test harness supplies an already-imported, read-only pkgs.
+      # Whitelist ONLY official Firefox at import time, never by setting
+      # nixpkgs.config in thin-client.nix (which conflicts in QEMU).
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate =
+          pkg: builtins.elem (nixpkgs.lib.getName pkg)
+            [ "firefox-bin" "firefox-bin-unwrapped" ];
+      };
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
       # The Dell Inspiron i14-5458-D08P shipped with Qualcomm 9565 /
       # Dell Wireless 1707 (ath9k), while some Inspiron 5458 variants
@@ -105,7 +113,12 @@
       };
     in
     {
-      nixosConfigurations.lpklarkc = mk [ isoModule ./thin-client.nix ];
+      # Production ISO and QEMU test nodes share the exact same configured
+      # pkgs so Firefox licensing does not redefine read-only nixpkgs.config.
+      nixosConfigurations.lpklarkc = nixpkgs.lib.nixosSystem {
+        inherit system pkgs;
+        modules = [ isoModule ./thin-client.nix ];
+      };
       nixosConfigurations.gcp-workstation = mk [ gceModule ./gcp-workstation.nix ];
 
       packages.${system} = {

@@ -41,11 +41,8 @@ let
 in
 {
   networking.hostName = "lpklarkc";
-  # Use the official, prebuilt Mozilla release to reduce the ISO closure.
-  # Limit the exception narrowly to Firefox's trademark/terms license;
-  # do not allow unrelated unfree packages or implicit permissions.
-  nixpkgs.config.allowUnfreePredicate =
-    pkg: builtins.elem (lib.getName pkg) [ "firefox-bin" "firefox-bin-unwrapped" ];
+  # Firefox binary license whitelist is defined once at pkgs import
+  # in flake.nix; per-node nixpkgs.config is read-only in CI VM tests.
   # A removable, disposable RDP appliance does not build or deploy Nix
   # packages at runtime. The Nix daemon and default flake registry retain
   # unnecessary tooling and hundreds of MiB of nixpkgs sources in the ISO.
