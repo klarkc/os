@@ -81,7 +81,7 @@ jobs:
           bash -n scripts/gce-iap.sh scripts/thin-client.sh scripts/client-peer-watchdog.sh
           bash -n tests/gce-lifecycle.sh tests/client-peer-watchdog-test.sh
           bash tests/gce-lifecycle.sh scripts/gce-iap.sh
-          bash tests/client-peer-watchdog-test.sh scripts/client-peer-watchdog.sh
+          bash tests/client-peer-watchdog-test.sh scripts/client-peer-watchdog.sh scripts/thin-client.sh
           ! grep -Eq 'compute instances (start|stop|reset|delete)' scripts/gce-iap.sh
           test ! -e ventoy/ventoy.json
           # Catch obsolete identity strings in client-only sources and docs.

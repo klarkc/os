@@ -55,7 +55,8 @@ request_local_shutdown() {
 peer_stopped() {
   local status
   # Failure to consult GCE is NOT proof that the VM has stopped.
-  # The independent watchdog also checks the actual XRDP response.
+  # The watchdog starts only after XRDP initially answers, and then
+  # independently validates consecutive final GCE states.
   status="$(timeout 15 "$IAP" instance-status 2>/dev/null)" || return 1
   case "$status" in
     TERMINATED|SUSPENDED)
@@ -94,13 +95,17 @@ rdp_responding() {
   [[ "$reply" == "0300" ]]
 }
 
-# Regression-test entrypoint; no credentials or remote service required.
+# Regression-test entrypoints; injected IAP reads only, never writes GCE.
 if [[ "${1:-}" == "--check-network" ]]; then
   network_ready
   exit $?
 fi
 if [[ "${1:-}" == "--check-rdp" ]]; then
   rdp_responding "${2:-127.0.0.1}" "${3:-13389}"
+  exit $?
+fi
+if [[ "${1:-}" == "--check-peer-stopped" ]]; then
+  peer_stopped
   exit $?
 fi
 
@@ -118,7 +123,8 @@ while true; do
   while ! network_ready; do
     if [[ "$RDP_READY_ONCE" == true ]]; then
       # Once paired, do not wait indefinitely in an interactive nmtui.
-      # The watchdog powers off after a sustained peer/network outage.
+      # The watchdog never powers off due to network loss; only repeated,
+      # matching GCE SUSPENDED/TERMINATED responses permit local shutdown.
       printf '\n  Rede indisponivel; aguardando reconexao automatica...\n'
       sleep 5
       continue
