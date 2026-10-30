@@ -108,6 +108,16 @@ def _fail(reason: str) -> Verdict:
     return Verdict(False, reason)
 
 
+def _epoch_seconds(value: object) -> bool:
+    # Python bool subclasses int. Reject True/False and floating-point clocks
+    # before applying deadlines; only integer, non-negative UNIX seconds count.
+    return type(value) is int and value >= 0
+
+
+def _positive_generation(value: object) -> bool:
+    return type(value) is int and value > 0
+
+
 def current_month(now_s: int) -> str:
     return datetime.fromtimestamp(now_s, BAHIA).strftime("%Y-%m")
 
@@ -123,6 +133,13 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         return _fail("vm_not_allowlisted")
     if c.vm_status != "RUNNING":
         return _fail("vm_not_running")
+    if (
+        not _epoch_seconds(c.now_s)
+        or not _epoch_seconds(c.observed_at_s)
+        or not _positive_generation(c.proposal_generation)
+        or not _positive_generation(c.live_generation)
+    ):
+        return _fail("invalid_time_or_generation")
     if c.reason not in {"idle", "budget"} or not c.proposal_id or not c.proposal_open:
         return _fail("invalid_or_closed_proposal")
     if c.resume_in_progress is not False or c.proposal_generation != c.live_generation:
@@ -149,6 +166,7 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         or ledger.proposal_id != c.proposal_id
         or ledger.reason != c.reason
         or ledger.month != required_month
+        or not _positive_generation(ledger.generation)
         or ledger.generation != c.live_generation
         or ledger.vetoed is not False or ledger.closed is not False
         or not isinstance(ledger.committed_sequence, int)
@@ -157,8 +175,7 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         or not isinstance(ledger.contiguous_sequence, int)
         or isinstance(ledger.contiguous_sequence, bool)
         or ledger.contiguous_sequence != ledger.committed_sequence
-        or not isinstance(ledger.read_at_s, int)
-        or isinstance(ledger.read_at_s, bool)
+        or not _epoch_seconds(ledger.read_at_s)
         or ledger.read_at_s < c.observed_at_s
         or not (0 <= c.now_s - ledger.read_at_s <= MAX_OBSERVATION_AGE_SECONDS)
     ):
@@ -168,7 +185,7 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
     if c.reason == "idle":
         if c.proposal_id in c.idle_vetoed_proposals:
             return _fail("idle_proposal_vetoed")
-        if c.human_idle_since_s is None or c.resources_idle_since_s is None or (
+        if not _epoch_seconds(c.human_idle_since_s) or not _epoch_seconds(c.resources_idle_since_s) or (
             c.human_idle_since_s > c.now_s - IDLE_WINDOW_SECONDS
             or c.resources_idle_since_s > c.now_s - IDLE_WINDOW_SECONDS
         ):
@@ -194,15 +211,16 @@ def evaluate(c: Candidate, config: TrustedConfig) -> Verdict:
         ):
             return _fail("budget_event_not_verified_above_limit")
     if (
-        c.email_state != "accepted" or not c.email_provider_id
-        or not c.email_recipient_verified or c.email_accepted_at_s is None
-        or c.proposal_created_at_s is None
+        c.email_state != "accepted" or not isinstance(c.email_provider_id, str)
+        or not c.email_provider_id or c.email_recipient_verified is not True
+        or not _epoch_seconds(c.email_accepted_at_s)
+        or not _epoch_seconds(c.proposal_created_at_s)
         or not (0 <= c.proposal_created_at_s <= c.email_accepted_at_s <= c.now_s)
     ):
         return _fail("email_acceptance_not_verified")
     if c.graphical_session_connected is None:
         return _fail("graphical_session_state_unknown")
-    if c.graphical_session_connected and not c.graphical_notice_confirmed:
+    if c.graphical_session_connected is True and c.graphical_notice_confirmed is not True:
         return _fail("graphical_notice_not_confirmed")
     if c.reason == "budget" and (
         current_month(c.proposal_created_at_s) != current_month(c.now_s)
@@ -257,13 +275,16 @@ def reduce_proposal_event(state: ProposalLedger, event: ProposalEvent) -> Propos
     Delayed veto/resume/close MUST NOT be dropped on arrival.
     """
     if (
-        state.closed or not event.event_id or not event.source_authenticated
+        state.closed or not isinstance(event.event_id, str) or not event.event_id
+        or event.source_authenticated is not True
+        or not _positive_generation(state.generation)
+        or not _positive_generation(event.generation)
         or not state.proposal_id or state.reason not in {"idle", "budget"}
         or event.proposal_id != state.proposal_id or event.reason != state.reason
         or event.month != state.month or event.generation != state.generation
         or not isinstance(event.sequence, int) or isinstance(event.sequence, bool)
         or event.sequence < 1 or event.event_id in state.processed_ids
-        or event.timestamp_s < 0 or event.event_type not in {
+        or not _epoch_seconds(event.timestamp_s) or event.event_type not in {
             "provider_accepted", "veto", "close", "resume"
         }
     ):
@@ -280,7 +301,9 @@ def reduce_proposal_event(state: ProposalLedger, event: ProposalEvent) -> Propos
 
     # Never accept an unverified receipt and advance the gap-free cursor.
     if event.event_type == "provider_accepted" and (
-        not event.recipient_verified or not event.email_provider_id
+        event.recipient_verified is not True
+        or not isinstance(event.email_provider_id, str)
+        or not event.email_provider_id
     ):
         return state
 

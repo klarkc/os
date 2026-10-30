@@ -192,6 +192,39 @@ class SuspendAdmissionTests(unittest.TestCase):
         old = replace(c.veto_ledger_read, read_at_s=NOW-1)
         self.assertFalse(check(replace(c, veto_ledger_read=old)).eligible_for_final_recheck)
 
+    def test_epoch_seconds_and_generation_reject_bool_and_float(self):
+        # Dataclasses validate no runtime types: bool == 1 in Python, and a
+        # float UNIX timestamp can wrongly satisfy the 3600-second window.
+        for reason in ("idle", "budget"):
+            c = eligible(reason)
+            cases = (
+                ("now_s", float(NOW)), ("now_s", True),
+                ("observed_at_s", float(NOW)), ("observed_at_s", True),
+                ("proposal_created_at_s", float(NOW - 5000)),
+                ("proposal_created_at_s", True),
+                ("email_accepted_at_s", float(NOW - 3600)),
+                ("email_accepted_at_s", True),
+                ("proposal_generation", True), ("live_generation", True),
+            )
+            for attribute, value in cases:
+                with self.subTest(reason=reason, attribute=attribute, value=value):
+                    self.assertFalse(
+                        check(replace(c, **{attribute: value})).eligible_for_final_recheck
+                    )
+            for attribute in ("generation", "read_at_s"):
+                ledger = c.veto_ledger_read
+                value = True if attribute == "generation" else float(NOW)
+                self.assertFalse(
+                    check(replace(c, veto_ledger_read=replace(ledger, **{attribute: value})))
+                    .eligible_for_final_recheck
+                )
+            if reason == "idle":
+                for attribute in ("human_idle_since_s", "resources_idle_since_s"):
+                    self.assertFalse(
+                        check(replace(c, **{attribute: float(NOW - 8000)}))
+                        .eligible_for_final_recheck
+                    )
+
     def test_budget_month_rollover_rejects_old_notice(self):
         nov = int(datetime(2026,11,1,0,0,tzinfo=ZoneInfo("America/Bahia")).timestamp())
         c = replace(eligible("budget"), now_s=nov, observed_at_s=nov,
@@ -361,6 +394,20 @@ class ReplayReducerTests(unittest.TestCase):
             s=reduce_proposal_event(self.state(),self.event(kind,1))
             self.assertTrue(s.closed)
             self.assertEqual(reduce_proposal_event(s,self.event("provider_accepted",2)),s)
+
+    def test_provider_receipt_rejects_untyped_timestamp_and_fake_booleans(self):
+        s = self.state()
+        for value in (True, False, float(NOW - 3600), "1793307600", -1):
+            with self.subTest(timestamp=value):
+                e = replace(self.event("provider_accepted", 1), timestamp_s=value)
+                self.assertEqual(reduce_proposal_event(s, e), s)
+        for event in (
+            replace(self.event("provider_accepted", 1), generation=True),
+            replace(self.event("provider_accepted", 1), source_authenticated="true"),
+            replace(self.event("provider_accepted", 1), recipient_verified="yes"),
+            replace(self.event("provider_accepted", 1), email_provider_id=True),
+        ):
+            self.assertEqual(reduce_proposal_event(s, event), s)
 
     def test_budget_period_is_part_of_proposal_identity(self):
         s=ProposalLedger(proposal_id="budget-proposal",reason="budget",

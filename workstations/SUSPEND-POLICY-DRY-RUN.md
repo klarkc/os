@@ -68,3 +68,7 @@ desabilitado. Incerteza => deixar RUNNING e registrar incidente.
 
 Contrato canônico:
 `klarkc/broker/contracts/2026-10-29-session-preserving-lifecycle-v2.md`.
+
+## Integridade de timestamps e gerações no modelo offline
+
+Campos temporais do candidato, ledger e eventos devem ser segundos Unix inteiros e não negativos (sem floats ou bool). IDs de geração devem ser inteiros positivos, nunca `True`/`False`. Python aceita `bool` como subtipo de `int`, o que poderia falsificar um relógio ou geração sem a validação de tipos. As regressões cobrem avisos e vetos de ambas as políticas, evento do provedor e leitura do ledger. Isto **não** substitui a autenticação, o registro durável ou a rechecagem transacional do controlador externo.
