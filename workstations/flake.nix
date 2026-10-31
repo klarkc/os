@@ -85,7 +85,10 @@
           # Full local Firefox OAuth increases the closure. Preserve the
           # 1024 MiB limit by packing the ISO store with XZ instead of the
           # default zstd. No browser, GCloud, WLAN or USB feature is removed.
-          isoImage.squashfsCompression = "xz -Xdict-size 100%";
+          # The x86 BCJ filter improves compression of machine-code streams
+          # without removing Firefox, GCloud, WLAN firmware, USB or IAP.
+          # Size benefit is a hypothesis until a fresh CI ISO is measured.
+          isoImage.squashfsCompression = "xz -Xdict-size 100% -Xbcj x86";
           # The NixOS ISO builder names its derivation from image.baseName.
           image.baseName = lib.mkForce "lpklarkc-x86_64";
 
