@@ -158,10 +158,19 @@ in
   # post-build icon-cache hook still expects an icon directory.
   # Link only the already-installed minimal hicolor theme, not a DE.
   environment.pathsToLink = [ "/share/icons" ];
-  # FreeRDP 2D and the modesetting driver should not need Mesa/LLVM DRI.
-  # QEMU tests the actual Xorg startx path before any ISO is published.
-  hardware.graphics.enable = lib.mkForce false;
+  # Generic x86_64 live-CD graphics: Mesa/DRM KMS is needed on Intel,
+  # AMD and many modern NVIDIA/virtual GPUs. Do not disable it just to
+  # shrink the Dell image: the real laptop had no /dev/dri/card0 and
+  # Xorg exited with "no screens found" when the stripped profile booted.
+  hardware.graphics.enable = lib.mkForce true;
   services.xserver.enable = true;
+  # Generic Xorg auto-detection with older Intel and legacy BIOS fallbacks.
+  # Avoid the incompatible fbdev Xorg module observed on the real Dell;
+  # VESA is useful only on legacy BIOS hardware, while KMS is preferred.
+  services.xserver.videoDrivers = [
+    "modesetting" "amdgpu" "nouveau" "intel" "vesa"
+  ];
+  services.libinput.enable = true;
   services.xserver.xkb.layout = "br";
   services.xserver.displayManager.startx.enable = true;
   services.xserver.windowManager.openbox.enable = lib.mkForce false;
