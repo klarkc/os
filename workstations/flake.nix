@@ -15,43 +15,10 @@
             [ "firefox-bin" "firefox-bin-unwrapped" ];
       };
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
-      # The Dell Inspiron i14-5458-D08P shipped with Qualcomm 9565 /
-      # Dell Wireless 1707 (ath9k), while some Inspiron 5458 variants
-      # use Intel 3160/7265. Keep Broadcom/Realtek/older QCA fallbacks
-      # for exchanged cards and USB adapters, but not 2020s Wi-Fi/GPU
-      # payloads unrelated to the Broadwell Dell.
-      # References: Dell Wireless 1707/Qualcomm 9565 driver 46G81 and
-      # Dell Intel Dual Band Wireless AC 3160/7265 driver WRRMC.
-      slimFirmware = pkgs.runCommand "lpklarkc-essential-firmware" { } ''
-        set -eu
-        mkdir -p "$out/lib/firmware/i915"
-        source="${pkgs.linux-firmware}/lib/firmware"
-        # Broadwell i3-5005U/Intel HD Graphics 5500: retain firmware
-        # for Haswell/Broadwell and adjacent Skylake only.
-        for item in "$source"/i915/hsw* "$source"/i915/bdw* "$source"/i915/skl*; do
-          [ -e "$item" ] || continue
-          cp -aL -- "$item" "$out/lib/firmware/i915/"
-        done
-        # WLAN model variations and 2015-era replacement cards.
-        for item in \
-          "$source"/iwlwifi-3160-* "$source"/iwlwifi-3165-* \
-          "$source"/iwlwifi-7260-* "$source"/iwlwifi-7265* \
-          "$source"/iwlwifi-8000C-* "$source"/iwlwifi-8265-* \
-          "$source"/brcm "$source"/rtlwifi "$source"/rtl_bt \
-          "$source"/rtl_nic "$source"/ath9k_htc "$source"/ath10k \
-          "$source"/qca "$source"/ar3k "$source"/intel \
-          "$source"/LICENCE* "$source"/LICENSE*; do
-          [ -e "$item" ] || continue
-          cp -aL -- "$item" "$out/lib/firmware/"
-        done
-        # Fail the build rather than silently lose the Intel WLAN fallback
-        # or proprietary firmware for frequently installed Dell adapters.
-        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-3160-*' -print -quit)"
-        test -n "$(find "$out/lib/firmware" -maxdepth 1 -name 'iwlwifi-7265*' -print -quit)"
-        test -d "$out/lib/firmware/brcm"
-        test -d "$out/lib/firmware/qca"
-        test ! -e "$out/lib/firmware/ath12k"
-      '';
+      # General-purpose live boot: use the supported NixOS hardware profile
+      # instead of a Dell-specific, manually curated firmware derivation.
+      # This includes modern Intel/AMD/NVIDIA-open GPU firmware, Wi-Fi
+      # adapters and storage controllers where redistribution is allowed.
       isoModule = { modulesPath, lib, ... }:
         let
           # Only a build dependency. No splash daemon or image editor is
@@ -68,26 +35,19 @@
             (modulesPath + "/profiles/minimal.nix")
           ];
 
-          # Only modules required for USB/ISO boot, SATA/NVMe and QEMU.
-          # The generic installer embeds firmware for hundreds of devices.
-          hardware.enableAllHardware = false;
-          hardware.enableRedistributableFirmware = false;
+          # Generic x86_64 live CD: NixOS' all-hardware profile includes
+          # broad boot-controller drivers and redistributable firmware for
+          # different generations/vendors of laptops. No internal install.
+          hardware.enableAllHardware = true;
+          hardware.enableRedistributableFirmware = true;
           hardware.wirelessRegulatoryDatabase = true;
-          hardware.firmware = [ slimFirmware ];
-          boot.initrd.availableKernelModules = [
-            "xhci_pci" "ehci_pci" "usb_storage" "uas" "sd_mod"
-            "ahci" "nvme" "virtio_pci" "virtio_blk" "virtio_scsi"
-          ];
           isoImage.makeBiosBootable = true;
           isoImage.makeEfiBootable = true;
           isoImage.makeUsbBootable = true;
           isoImage.isoName = "lpklarkc-x86_64.iso";
-          # Full local Firefox OAuth increases the closure. Preserve the
-          # 1024 MiB limit by packing the ISO store with XZ instead of the
-          # default zstd. No browser, GCloud, WLAN or USB feature is removed.
-          # The x86 BCJ filter improves compression of machine-code streams
-          # without removing Firefox, GCloud, WLAN firmware, USB or IAP.
-          # Size benefit is a hypothesis until a fresh CI ISO is measured.
+          # Keep XZ compression for a portable, non-installing live image.
+          # Generic redistributable firmware + Mesa can increase the ISO;
+          # the existing CI size gate remains explicit and measurable.
           isoImage.squashfsCompression = "xz -Xdict-size 100% -Xbcj x86";
           # The NixOS ISO builder names its derivation from image.baseName.
           image.baseName = lib.mkForce "lpklarkc-x86_64";
