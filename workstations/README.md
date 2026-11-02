@@ -2,7 +2,7 @@
 
 Esta flake isolada permite construir o cliente portátil `lpklarkc` e
 testar a integração com o Google Compute Engine. Não instala nem grava
-arquivos no HDD do Dell.
+arquivos no disco interno do notebook.
 
 ## Cliente: lpklarkc
 
@@ -10,7 +10,7 @@ arquivos no HDD do Dell.
 - **Não modificamos configurações, menus, timeouts ou comportamento do Ventoy.**
   O projeto e seus artefatos não incluem `ventoy.json`.
 - Primeiro boot: conectar Wi-Fi por `nmtui`, verificar o USB Ventoy e
-  autorizar Google **no Mozilla Firefox (official binary) do proprio Dell**.
+  autorizar Google **no Mozilla Firefox (official binary) do proprio notebook**.
   Uma sessao temporaria rootless Xorg + Openbox abre
   `gcloud auth login --launch-browser` com callback localhost, sem celular,
   segundo computador ou transferencia de codigo. O navegador e o cache
@@ -18,15 +18,15 @@ arquivos no HDD do Dell.
 - Túnel Google IAP para o recurso GCE `wsklarkc` no projeto
   `argon-surf-472319-b0`, zona `southamerica-east1-b`, porta TCP 3389.
   FreeRDP conecta exclusivamente a `127.0.0.1:13389`.
-- Dell sem suspensão/hibernação automática: o logind ignora fechamento
+- Notebook sem suspensão/hibernação automática: o logind ignora fechamento
   da tampa e teclas de suspensão; as operações de sleep estão desabilitadas.
   A tecla física de energia mantém o desligamento normal. Boot por Ventoy. Se VM `SUSPENDED`, cliente executa `instances.resume` e
   reanexa XRDP; se `RUNNING`, conecta; se `TERMINATED`, informa
   que a RAM anterior não existe e **não inicia** a VM automaticamente.
-- Desligar Dell não encerra agentes, builds ou aplicativos remotos.
+- Desligar o notebook não encerra agentes, builds ou aplicativos remotos.
   Quando o controlador do servidor decidir suspender com segurança,
   watchdog local aguarda confirmação repetida de `SUSPENDED` antes de
-  desligar o Dell. Erros de Wi-Fi ou permissão GCE não desligam o cliente.
+  desligar o notebook. Erros de Wi-Fi ou permissão GCE não desligam o cliente.
 - Sem XFCE local, Tailscale ou WireGuard. Interface minima com NetworkManager,
   Xorg sob demanda via `startx`, Mozilla Firefox (official binary) e Openbox **somente na fase OAuth**,
   e FreeRDP. Nao ha LightDM, Xterm, desktop completo nem WM persistente.
@@ -76,31 +76,28 @@ Mais detalhes: [contrato IAP](./CLIENT-IAP-GCE-CONTRACT.md) e
 
 ## Empacotamento do navegador e ISO
 
-O primeiro build do OAuth local com Firefox ESR foi **reprovado pelo
-limite da ISO**: 1.215.168.512 bytes (1159 MiB arredondados), contra
-1.073.741.824 bytes (1024 MiB). A alternativa testada nesta branch
-troca o pacote compilado por `firefox-bin` (binario oficial da Mozilla
-com licenca/termos proprios e autorizacao Nix `allowUnfreePredicate`
-estritamente para Firefox) e usa `isoImage.squashfsCompression = "xz -Xdict-size 100%"`.
-Nao aumenta o limite, nao remove funcionalidades e nao configura cloud.
-**O tamanho resultante so pode ser considerado aprovado apos CI build real.**
-XZ pode alongar compilacao e descompressao no Dell, a validar no hardware.
+A ISO é um **live CD x86-64 portátil**, para notebooks de vários fabricantes,
+não uma imagem de instalação no disco. O navegador Google OAuth continua sendo
+`firefox-bin` (binário oficial da Mozilla, única exceção permitida na política
+de pacotes não livres). O cliente conserva Google Cloud CLI, IAP, FreeRDP,
+PipeWire, Ventoy e configuração temporária em RAM.
 
-## Orçamento de tamanho
+A compressão do SquashFS é `xz -Xdict-size 100% -Xbcj x86`. Não removemos
+firmware de Wi-Fi nem drivers gráficos essenciais somente para reduzir bytes.
 
-A ISO usa `iso-image.nix` + `minimal.nix` e não importa o perfil de
-instalação, Nixpkgs channel, ferramentas de particionamento/recuperação
-ou manual. Também desativa o daemon Nix e o registro de flakes **no
-cliente**, mantendo o Nix normalmente disponível no ambiente CI que
-compila a ISO. Nenhum pacote é instalado no Dell durante a execução. BIOS/UEFI, drivers e firmware continuam disponíveis para o Dell.
+## Orçamento de tamanho e verificação
 
-O CI mede o **arquivo ISO final**, impondo **1024 MiB (1 GiB)** como
-limite, apos a ISO anterior de 1.034.944.512 bytes (987 MiB arredondados).
-  Mozilla Firefox (official binary) e um requisito funcional novo e pode ultrapassar o limite:
-  o CI nao o eleva silenciosamente. Em caso de excesso, reportar o valor
-  real ao Coordinator para decisao. `tests/iso-size-budget.sh --self-test` prova que aceita o
-limite exato e rejeita um byte excedente. Compilação e distribuição
-continuam condicionadas aos testes QEMU.
+O CI mede o arquivo ISO final. O limite aprovado anteriormente foi **1152 MiB**
+para a versão enxuta do Dell. O perfil genérico usa **firmware redistribuível
+amplo e Mesa**; portanto pode ficar maior. O CI continua bloqueando a publicação
+se ultrapassar o limite efetivo e registra o tamanho medido. Não confundir
+`nix flake check` com boot real: o workflow também inicializa VMs QEMU e testa
+Ventoy e o ambiente gráfico antes da publicação.
+
+A imagem inclui boot USB/CD para BIOS e UEFI, mas não substitui uma imagem
+ARM64 ou uma ISO assinada para Secure Boot. Em equipamentos com Secure Boot
+que não aceitam esta ISO, a configuração de firmware/boot precisará ser
+ajustada pelo operador.
 
 O Ventoy não é configurado nem alterado por este projeto.
 
@@ -116,11 +113,19 @@ permanece como recuperacao local.
 
 ### Firmware e hardware
 
-A ISO contém drivers de boot USB/ISO e firmware direcionado ao Dell Inspiron
-i14-5458-D08P: vídeo Intel HD Graphics 5500/Broadwell e WLAN Qualcomm 9565 /
-Dell Wireless 1707, com fallback Intel 3160/7265, Broadcom, Realtek e QCA
-de geração próxima. Não embute firmware de Wi-Fi 6E/7 e GPUs modernas que
-não pertencem a esse notebook. O Google CLI e o FreeRDP permanecem completos.
-A PCI ID real do adaptador do Dell e o áudio físico ainda exigem teste de
-aceitação; substituições posteriores da placa Wi-Fi podem exigir firmware
-adicional. Não utilizar esta ISO enxuta como imagem genérica para outros PCs.
+O perfil usa `hardware.enableAllHardware` e
+`hardware.enableRedistributableFirmware`, que incluem drivers para vários
+controladores de armazenamento, Wi-Fi e GPUs, em vez de selecionar arquivos
+específicos do Dell. A pilha Mesa/DRM-KMS está ativa e o Xorg detecta
+`modesetting`, `amdgpu`, `nouveau` (NVIDIA aberto), `intel` e `vesa`
+(fallback para BIOS legado). O módulo Xorg `fbdev` problemático observado
+no Dell não é uma dependência obrigatória.
+
+O objetivo é **máxima compatibilidade razoável em notebooks x86-64**, e não
+garantia literal de todos os equipamentos: firmware proprietário não
+redistribuível, drivers NVIDIA proprietários, arquiteturas ARM64,
+Secure Boot e GPUs/placas Wi-Fi ainda sem suporte no kernel exigem soluções
+específicas. O primeiro teste Dell reportou `/dev/dri/card0` ausente,
+`fbdevHWSave` incompatível e `no screens found`. A regressão
+`tests/generic-live-hardware.sh` verifica que a imagem produzida não
+volta a desativar o suporte amplo de hardware.
