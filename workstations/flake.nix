@@ -109,7 +109,8 @@
               # fail closed instead of touching an internal VM disk.
               virtualisation.memorySize = 2048;
               virtualisation.graphics = true;
-              services.xserver.videoDrivers = [ "modesetting" ];
+              # Exercise the SAME auto-detected Xorg driver list as the actual
+              # portable live ISO. Do not force modesetting in the QEMU test.
               # Exercise rootless Xorg via getty@tty1 and startx without any
               # display manager or WM. Production launches xfreerdp only
               # after IAP; here use a local no-network X11 probe.
