@@ -59,11 +59,7 @@ if [[ "$mode" == "--iso" ]]; then
   # Match each Linux line to its *selectable menuentry*, rather than
   # accepting unrelated kernel lines in a nested submenu (QA gap).
   if grep -Eq '^[[:space:]]*set[[:space:]]+default[[:space:]]*=' "$tmp/uefi.cfg"; then
-    grep -Eq '^[[:space:]]*set[[:space:]]+default[[:space:]]*=[[:space:]]*"?0"?[[:space:]]*
-fi
-
-echo "PASS: generic default preserves keyboards; Dell-only i8042.nokbd evaluated and BIOS/EFI verified"
- "$tmp/uefi.cfg" ||
+    grep -Eq '^[[:space:]]*set[[:space:]]+default[[:space:]]*=[[:space:]]*"?0"?([[:space:]]|$)' "$tmp/uefi.cfg" ||
       fail "EFI menu overrides the generic first/default entry"
   fi
   awk '
