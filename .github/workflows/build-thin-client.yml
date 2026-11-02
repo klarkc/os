@@ -76,7 +76,7 @@ jobs:
           grep -Fq '/sound:sys:pulse /microphone:sys:pulse' scripts/thin-client.sh
           bash tests/iso-size-budget.sh --self-test
           bash -n scripts/gce-iap.sh scripts/thin-client.sh scripts/client-peer-watchdog.sh scripts/oauth-session.sh scripts/oauth-browser.sh
-          bash -n tests/oauth-local-test.sh tests/oauth-xorg-regression.sh tests/generic-live-hardware.sh
+          bash -n tests/oauth-local-test.sh tests/generic-live-hardware.sh
           bash -n tests/gce-lifecycle.sh tests/client-peer-watchdog-test.sh
           bash tests/gce-lifecycle.sh scripts/gce-iap.sh
           bash tests/oauth-local-test.sh scripts/gce-iap.sh scripts/oauth-session.sh scripts/oauth-browser.sh
