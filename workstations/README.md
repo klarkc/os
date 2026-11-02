@@ -87,10 +87,11 @@ firmware de Wi-Fi nem drivers gráficos essenciais somente para reduzir bytes.
 
 ## Orçamento de tamanho e verificação
 
-O CI mede o arquivo ISO final. O limite aprovado anteriormente foi **1152 MiB**
-para a versão enxuta do Dell. O perfil genérico usa **firmware redistribuível
-amplo e Mesa**; portanto pode ficar maior. O CI continua bloqueando a publicação
-se ultrapassar o limite efetivo e registra o tamanho medido. Não confundir
+O CI mede o arquivo ISO final. O antigo limite de **1152 MiB** da versão
+restrita ao Dell foi substituído pelo teto rígido de **3072 MiB (3 GiB)** do
+perfil genérico, que inclui firmware redistribuível amplo e Mesa. Esse teto
+não é o tamanho efetivo: o CI continua bloqueando a publicação se a imagem
+ultrapassar o limite e registra o tamanho medido. Não confundir
 `nix flake check` com boot real: o workflow também inicializa VMs QEMU e testa
 Ventoy e o ambiente gráfico antes da publicação.
 
