@@ -72,6 +72,14 @@
           isoImage.splashImage = splash;
           isoImage.efiSplashImage = splash;
           isoImage.appendToMenuLabel = "";
+          # The default generic live image MUST continue accepting internal
+          # keyboards on other laptops. Only this explicitly selected Dell
+          # BIOS/EFI boot option bypasses the broken internal PS/2 keyboard.
+          # i8042.nokbd does not disable USB HID/xHCI and does not cover I2C.
+          specialisation.dell-internal-keyboard-off.configuration = {
+            boot.kernelParams = [ "i8042.nokbd" ];
+            isoImage.configurationName = "Dell internal keyboard OFF (USB required)";
+          };
           system.nixos.distroName = lib.mkForce "lpklarkc";
           # BIOS syslinux TIMEOUT 0 means *no* timeout; use 1 second for
           # reliable automatic boot on both legacy BIOS and UEFI machines.

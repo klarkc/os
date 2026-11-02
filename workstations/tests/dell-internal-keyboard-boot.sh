@@ -54,13 +54,40 @@ if [[ "$mode" == "--iso" ]]; then
     dell && $1=="APPEND" && $0 ~ /i8042\.nokbd/ {dell_ok=1}
     END {exit !(found_dell && generic_ok && dell_ok)}
   ' "$tmp/bios.cfg" || fail "BIOS ISO lacks distinct generic and Dell kernel command lines"
+  # NixOS' pinned iso-image.nix emits the generic installer menuentry
+  # first, followed by the explicitly named Dell specialisation entry.
+  # Match each Linux line to its *selectable menuentry*, rather than
+  # accepting unrelated kernel lines in a nested submenu (QA gap).
+  if grep -Eq '^[[:space:]]*set[[:space:]]+default[[:space:]]*=' "$tmp/uefi.cfg"; then
+    grep -Eq '^[[:space:]]*set[[:space:]]+default[[:space:]]*=[[:space:]]*"?0"?[[:space:]]*
+fi
+
+echo "PASS: generic default preserves keyboards; Dell-only i8042.nokbd evaluated and BIOS/EFI verified"
+ "$tmp/uefi.cfg" ||
+      fail "EFI menu overrides the generic first/default entry"
+  fi
   awk '
-    /^[[:space:]]*linux[[:space:]]/ && /init=/ {
-      if ($0 ~ /i8042\.nokbd/) dell=1
-      else generic=1
+    /^[[:space:]]*menuentry[[:space:]]/ && /--class installer/ {
+      entry++
+      if (entry == 1) {
+        if ($0 ~ /Dell internal keyboard OFF/) bad=1
+        generic_menu=1
+      } else if (entry == 2) {
+        if ($0 !~ /Dell internal keyboard OFF \(USB required\)/) bad=1
+        dell_menu=1
+      }
+      next
     }
-    END {exit !(generic && dell)}
-  ' "$tmp/uefi.cfg" || fail "EFI ISO lacks distinct generic and Dell kernel command lines"
+    entry == 1 && /^[[:space:]]*linux[[:space:]]/ && /init=/ {
+      if ($0 ~ /i8042\.nokbd/) bad=1
+      else generic_args=1
+    }
+    entry == 2 && /^[[:space:]]*linux[[:space:]]/ && /init=/ {
+      if ($0 !~ /i8042\.nokbd/) bad=1
+      else dell_args=1
+    }
+    END {exit !(generic_menu && dell_menu && generic_args && dell_args && !bad)}
+  ' "$tmp/uefi.cfg" || fail "EFI ISO lacks correctly labelled generic-default and Dell-only boot entries"
 fi
 
 echo "PASS: generic default preserves keyboards; Dell-only i8042.nokbd evaluated and BIOS/EFI verified"
