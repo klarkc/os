@@ -76,7 +76,7 @@ jobs:
           grep -Fq '/sound:sys:pulse /microphone:sys:pulse' scripts/thin-client.sh
           bash tests/iso-size-budget.sh --self-test
           bash -n scripts/gce-iap.sh scripts/thin-client.sh scripts/client-peer-watchdog.sh scripts/oauth-session.sh scripts/oauth-browser.sh
-          bash -n tests/oauth-local-test.sh tests/generic-live-hardware.sh
+          bash -n tests/oauth-local-test.sh tests/generic-live-hardware.sh tests/dell-internal-keyboard-boot.sh
           bash -n tests/gce-lifecycle.sh tests/client-peer-watchdog-test.sh
           bash tests/gce-lifecycle.sh scripts/gce-iap.sh
           bash tests/oauth-local-test.sh scripts/gce-iap.sh scripts/oauth-session.sh scripts/oauth-browser.sh
@@ -84,6 +84,8 @@ jobs:
           # This gate is deliberately RED before relaxing the Dell-specific
           # firmware/graphics profile: verify the actual live ISO options.
           bash tests/generic-live-hardware.sh
+          # Intentionally RED before Dell-specific boot configuration is implemented.
+          bash tests/dell-internal-keyboard-boot.sh --eval
           bash tests/client-peer-watchdog-test.sh scripts/client-peer-watchdog.sh scripts/thin-client.sh
           ! grep -Eq 'compute instances (start|stop|reset|delete)' scripts/gce-iap.sh
           test ! -e ventoy/ventoy.json
@@ -159,6 +161,8 @@ jobs:
           fi
           install -m 0644 -- "${iso_files[0]}" "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           test -s "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
+          # Verify built BIOS and EFI kernel command lines, not only source text.
+          nix shell --inputs-from . nixpkgs#xorriso -c bash tests/dell-internal-keyboard-boot.sh --iso "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           # Diagnose the actual closure BEFORE gating, even when over budget.
           echo "Largest Nix store paths in the client runtime closure (bytes):"
           toplevel="$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.build.toplevel)"
