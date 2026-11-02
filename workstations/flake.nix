@@ -41,6 +41,12 @@
           hardware.enableAllHardware = true;
           hardware.enableRedistributableFirmware = true;
           hardware.wirelessRegulatoryDatabase = true;
+          # Explicit baseline USB modules for a Ventoy live boot; the broad
+          # all-hardware profile ADDITIVELY supplies many more controllers.
+          boot.initrd.availableKernelModules = [
+            "xhci_pci" "ehci_pci" "usb_storage" "uas" "sd_mod"
+            "ahci" "nvme" "virtio_pci" "virtio_blk" "virtio_scsi"
+          ];
           isoImage.makeBiosBootable = true;
           isoImage.makeEfiBootable = true;
           isoImage.makeUsbBootable = true;
