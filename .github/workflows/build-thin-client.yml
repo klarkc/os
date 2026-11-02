@@ -163,11 +163,12 @@ jobs:
           echo "Largest Nix store paths in the client runtime closure (bytes):"
           toplevel="$(nix eval --raw .#nixosConfigurations.lpklarkc.config.system.build.toplevel)"
           nix path-info -r --size "$toplevel" | sort -k2nr | sed -n '1,35p'
-          # Operator approved increasing the ISO ceiling from 1024 to 1152 MiB
-          # on 2026-11-02 to ship the local Firefox OAuth-capable Dell image.
-          # Keep the strict, pre-upload size gate and the QEMU/USB boot tests;
-          # this does not reduce required browser, firmware, security or IAP.
-          MAX_ISO_MIB=1152 bash tests/iso-size-budget.sh "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
+          # Generic live ISO (2026-11-02 operator direction) supersedes the
+          # earlier 1152 MiB Dell-only packaging target. Firmware and Mesa
+          # must NOT be stripped to squeeze into the old size. Still impose
+          # an explicit 3 GiB cap after real build and BEFORE publication.
+          # The exact artifact size remains measured and logged.
+          MAX_ISO_MIB=3072 bash tests/iso-size-budget.sh "$GITHUB_WORKSPACE/dist/lpklarkc-x86_64.iso"
           test ! -e "$GITHUB_WORKSPACE/dist/ventoy.json"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum lpklarkc-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
           test "$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -type f | wc -l)" -eq 2
