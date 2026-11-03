@@ -179,6 +179,28 @@
             client.wait_until_succeeds("test -s /home/nixos/.local/share/xorg/Xorg.0.log", timeout=180)
             client.succeed("grep -Eq 'LoadModule: \"(modesetting|intel|amdgpu|nouveau|vesa)\"' /home/nixos/.local/share/xorg/Xorg.0.log")
             client.succeed("! grep -Eiq 'undefined symbol|no screens found' /home/nixos/.local/share/xorg/Xorg.0.log")
+            # Xorg protocol success alone cannot prove DRM/KMS device creation.
+            # Probe live guest cardN (not a fixed card0 ordinal) and its bound
+            # kernel driver. QEMU virtio DRM is NOT physical Dell Intel i915.
+            drm_binding = client.succeed("""
+              bash -e -c '
+                for node in /dev/dri/card[0-9]*; do
+                  [ -c "$node" ] || continue
+                  card="$(basename "$node")"
+                  sys="/sys/class/drm/$card"
+                  [ -r "$sys/dev" ] || continue
+                  major="$(cut -d: -f1 "$sys/dev")"
+                  [ "$major" = 226 ] || continue
+                  driver="$(readlink -e "$sys/device/driver" 2>/dev/null)" || continue
+                  [ -n "$driver" ] || continue
+                  printf "card=%s major=%s driver=%s" "$card" "$major" "$driver"
+                  exit 0
+                done
+                echo "No major-226 DRM cardN with kernel driver binding" >&2
+                exit 1
+              '
+            """)
+            print("QEMU DRM/KMS device evidence: " + drm_binding)
             # User PipeWire runs with tty1 autologin; no physical audio card
             # is needed to assert an active PipeWire/Pulse-compatible socket.
             client.succeed("test -d /run/current-system/sw/share/icons")
