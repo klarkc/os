@@ -111,8 +111,20 @@
         boot-and-network-vm = pkgs.testers.runNixOSTest {
           name = "lpklarkc-and-workstation";
           nodes = {
-            client = { lib, ... }: {
+            client = { config, lib, ... }: {
               imports = [ ./thin-client.nix ];
+              # qemu-vm.nix normally uses mkVMOverride (priority 10) to
+              # reduce videoDrivers to modesetting. In this test ONLY, use
+              # priority 9 so the VM exercises the *evaluated* driver list
+              # of the real generic ISO, including optional legacy DDX.
+              # A failing full-list QEMU test is evidence, not a release.
+              services.xserver.videoDrivers = lib.mkOverride 9
+                self.nixosConfigurations.lpklarkc.config.services.xserver.videoDrivers;
+              assertions = [{
+                assertion = config.services.xserver.videoDrivers ==
+                  self.nixosConfigurations.lpklarkc.config.services.xserver.videoDrivers;
+                message = "QEMU Xorg videoDrivers differ from production generic ISO";
+              }];
               users.users.nixos = {
                 isNormalUser = true;
                 extraGroups = [ "wheel" "networkmanager" "video" ];
