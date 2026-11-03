@@ -145,6 +145,9 @@
                    [ ! -e /tmp/lpklarkc-graphics-ok ]; then
                   ${pkgs.xinit}/bin/startx ${pkgs.writeShellScript "lpklarkc-x11-probe" ''
                     test -n "$DISPLAY" || exit 1
+                    # Prove a real X11 server exposes a screen, not just DISPLAY.
+                    ${pkgs.xdpyinfo}/bin/xdpyinfo -display "$DISPLAY" > /tmp/lpklarkc-xdpyinfo.txt || exit 1
+                    ${pkgs.gnugrep}/bin/grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt || exit 1
                     ${pkgs.coreutils}/bin/printf '%s\n' "$DISPLAY" > /tmp/lpklarkc-graphics-ok
                     ${pkgs.coreutils}/bin/sleep 5
                   ''} -- :0 vt1 -keeptty -nolisten tcp
@@ -171,6 +174,11 @@
             # The login TTY must actually launch a rootless Xorg screen.
             client.wait_until_succeeds("test -s /tmp/lpklarkc-graphics-ok", timeout=180)
             client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
+            # Real X11 protocol/screen proof and actual rootless driver loader log.
+            client.succeed("grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt")
+            client.wait_until_succeeds("test -s /home/nixos/.local/share/xorg/Xorg.0.log", timeout=180)
+            client.succeed("grep -Eq 'LoadModule: \"(modesetting|intel|amdgpu|nouveau|vesa)\"' /home/nixos/.local/share/xorg/Xorg.0.log")
+            client.succeed("! grep -Eiq 'undefined symbol|no screens found' /home/nixos/.local/share/xorg/Xorg.0.log")
             # User PipeWire runs with tty1 autologin; no physical audio card
             # is needed to assert an active PipeWire/Pulse-compatible socket.
             client.succeed("test -d /run/current-system/sw/share/icons")
