@@ -178,22 +178,6 @@
             client.succeed("grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt")
             client.wait_until_succeeds("test -s /home/nixos/.local/share/xorg/Xorg.0.log", timeout=180)
             client.succeed("grep -Eq 'LoadModule: \"(modesetting|intel|amdgpu|nouveau|vesa)\"' /home/nixos/.local/share/xorg/Xorg.0.log")
-            # Preserve the negative DDX ABI/no-screens gate. On failure
-            # capture the *actual* matching lines and related loader context
-            # before returning nonzero, so CI distinguishes a rejected
-            # fallback module from a fatal active-screen regression.
-            client.succeed("""
-              bash -c '
-                log=/home/nixos/.local/share/xorg/Xorg.0.log
-                if grep -Eiq "undefined symbol|no screens found" "$log"; then
-                  echo "XORG_DDX_NEGATIVE_GATE_FAILED: matching log lines:"
-                  grep -Ein -B 6 -A 6 "undefined symbol|no screens found" "$log" | head -n 160 || true
-                  echo "XORG_DDX_LOADER_AND_SCREEN_CONTEXT:"
-                  grep -Ein "LoadModule:|Loading /|UnloadModule:|module ABI|modesetting|intel|nouveau|amdgpu|vesa|drm|screen" "$log" | tail -n 120 || true
-                  exit 1
-                fi
-              '
-            """)
             # Xorg protocol success alone cannot prove DRM/KMS device creation.
             # Probe live guest cardN (not a fixed card0 ordinal) and its bound
             # kernel driver. QEMU virtio DRM is NOT physical Dell Intel i915.
@@ -216,6 +200,22 @@
               '
             """)
             print("QEMU DRM/KMS device evidence: " + drm_binding)
+            # Preserve the negative DDX ABI/no-screens gate. On failure
+            # capture the *actual* matching lines and related loader context
+            # before returning nonzero, so CI distinguishes a rejected
+            # fallback module from a fatal active-screen regression.
+            client.succeed("""
+              bash -c '
+                log=/home/nixos/.local/share/xorg/Xorg.0.log
+                if grep -Eiq "undefined symbol|no screens found" "$log"; then
+                  echo "XORG_DDX_NEGATIVE_GATE_FAILED: matching log lines:"
+                  grep -Ein -B 6 -A 6 "undefined symbol|no screens found" "$log" | head -n 160 || true
+                  echo "XORG_DDX_LOADER_AND_SCREEN_CONTEXT:"
+                  grep -Ein "LoadModule:|Loading /|UnloadModule:|module ABI|modesetting|intel|nouveau|amdgpu|vesa|drm|screen" "$log" | tail -n 120 || true
+                  exit 1
+                fi
+              '
+            """)
             # User PipeWire runs with tty1 autologin; no physical audio card
             # is needed to assert an active PipeWire/Pulse-compatible socket.
             client.succeed("test -d /run/current-system/sw/share/icons")
