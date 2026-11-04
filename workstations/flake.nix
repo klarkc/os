@@ -177,6 +177,21 @@
             # Real X11 protocol/screen proof and actual rootless driver loader log.
             client.succeed("grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt")
             client.wait_until_succeeds("test -s /home/nixos/.local/share/xorg/Xorg.0.log", timeout=180)
+            # Capture the real guest log BEFORE any later Xorg/DRM assert
+            # can abort the VM test. This reaches the existing failure ZIP
+            # through the outer nixos-vm-tests.log when CI executes.
+            # Diagnostics do NOT replace the positive/negative release gates.
+            xorg_preflight_log = client.succeed("""
+              bash -c '
+                log=/home/nixos/.local/share/xorg/Xorg.0.log
+                echo "XORG_DDX_PREFLIGHT_ERRORS_BEGIN"
+                grep -Ein -B 5 -A 5 "undefined symbol|no screens found" "$log" | head -n 160 || true
+                echo "XORG_DDX_PREFLIGHT_LOADER_CONTEXT"
+                grep -Ein "LoadModule:|Loading /|UnloadModule:|module ABI|modesetting|intel|nouveau|amdgpu|vesa|fbdev|drm|screen" "$log" | tail -n 100 || true
+                echo "XORG_DDX_PREFLIGHT_END"
+              '
+            """)
+            print(xorg_preflight_log)
             client.succeed("grep -Eq 'LoadModule: \"(modesetting|intel|amdgpu|nouveau|vesa)\"' /home/nixos/.local/share/xorg/Xorg.0.log")
             # Xorg protocol success alone cannot prove DRM/KMS device creation.
             # Probe live guest cardN (not a fixed card0 ordinal) and its bound
