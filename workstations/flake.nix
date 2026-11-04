@@ -172,7 +172,31 @@
             client.succeed("! systemctl is-active --quiet display-manager.service")
             client.succeed("test -e /run/current-system/sw/bin/startx")
             # The login TTY must actually launch a rootless Xorg screen.
-            client.wait_until_succeeds("test -s /tmp/lpklarkc-graphics-ok", timeout=180)
+            # Preserve a failure when no screen appears, but print the guest
+            # Xorg loader errors BEFORE this assertion aborts the VM test.
+            try:
+              client.wait_until_succeeds("test -s /tmp/lpklarkc-graphics-ok", timeout=180)
+            except Exception:
+              try:
+                diagnostic_rc, diagnostic_log = client.execute("""
+                  bash -c '
+                    log=/home/nixos/.local/share/xorg/Xorg.0.log
+                    echo "XORG_STARTUP_FAILURE_BEGIN"
+                    if [ -r "$log" ]; then
+                      grep -Ein -B 5 -A 5 "undefined symbol|no screens found" "$log" | head -n 160 || true
+                      echo "XORG_STARTUP_FAILURE_LOADER_CONTEXT"
+                      grep -Ein "LoadModule:|Loading /|UnloadModule:|module ABI|modesetting|intel|nouveau|amdgpu|vesa|fbdev|drm|screen" "$log" | tail -n 100 || true
+                    else
+                      echo "XORG_STARTUP_FAILURE_LOG_MISSING"
+                    fi
+                    echo "XORG_STARTUP_FAILURE_END"
+                  '
+                """)
+                print("XORG_STARTUP_DIAGNOSTIC_RC=" + str(diagnostic_rc))
+                print(diagnostic_log)
+              except Exception as diagnostic_error:
+                print("XORG_STARTUP_DIAGNOSTIC_UNAVAILABLE: " + str(diagnostic_error))
+              raise
             client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
             # Real X11 protocol/screen proof and actual rootless driver loader log.
             client.succeed("grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt")
