@@ -130,6 +130,17 @@ jobs:
           path: vm-logs/
           if-no-files-found: error
           retention-days: 7
+      # Preserve the existing failure artifact unchanged, and expose the
+      # exact same QEMU/Xorg/DRM run log on success for independent QA.
+      # These conditions are disjoint: no duplicate upload on a failed VM.
+      - name: Upload successful QEMU Xorg and DRM QA evidence
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: nixos-vm-success-qa-logs
+          path: vm-logs/
+          if-no-files-found: error
+          retention-days: 7
 
   iso:
     name: Build Ventoy ISO
