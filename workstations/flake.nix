@@ -170,6 +170,26 @@
               environment.loginShellInit = lib.mkForce ''
                 if [ "$(id -un)" = "nixos" ] && [ "$(tty)" = "/dev/tty1" ] &&
                    [ ! -e /tmp/lpklarkc-graphics-ok ]; then
+                  # Exercise production kiosk seat guard in an ACTUAL getty@tty1
+                  # logind session, not only via the mocked shell tests.
+                  snapshot="$(${pkgs.systemd}/bin/loginctl show-session self --property=Active --property=VTNr --no-pager)" || {
+                    echo 'QEMU_REAL_LOGIND_QUERY_FAILED' >&2
+                    exit 1
+                  }
+                  printf '%s\n' "$snapshot" > /tmp/lpklarkc-real-logind-tty1.txt
+                  printf '%s\n' "$snapshot" | ${pkgs.gnugrep}/bin/grep -Fxq 'Active=yes' || {
+                    echo 'QEMU_REAL_LOGIND_INACTIVE_ON_TTY1' >&2
+                    exit 1
+                  }
+                  printf '%s\n' "$snapshot" | ${pkgs.gnugrep}/bin/grep -Fxq 'VTNr=1' || {
+                    echo 'QEMU_REAL_LOGIND_WRONG_VT' >&2
+                    exit 1
+                  }
+                  LPKLARKC_LOGINCTL_BIN=${pkgs.systemd}/bin/loginctl ${pkgs.bash}/bin/bash ${./scripts/thin-client.sh} --check-xorg-seat || {
+                    echo 'QEMU_PRODUCTION_KIOSK_LOGIND_SEAT_GUARD_DENIED' >&2
+                    exit 1
+                  }
+                  echo QEMU_REAL_LOGIND_TTY1_KIOSK_GUARD_PASS > /tmp/lpklarkc-real-logind-guard-ok
                   ${pkgs.xinit}/bin/startx ${pkgs.writeShellScript "lpklarkc-x11-probe" ''
                     test -n "$DISPLAY" || exit 1
                     # Prove a real X11 server exposes a screen, not just DISPLAY.
@@ -224,6 +244,13 @@
               except Exception as diagnostic_error:
                 print("XORG_STARTUP_DIAGNOSTIC_UNAVAILABLE: " + str(diagnostic_error))
               raise
+            # A real logind getty@tty1 session must pass the same guard as
+            # production kiosk before the Xorg :0 screen proof. The earlier
+            # standalone regression only mocked Active/VTNr responses.
+            client.succeed("grep -Fx QEMU_REAL_LOGIND_TTY1_KIOSK_GUARD_PASS /tmp/lpklarkc-real-logind-guard-ok")
+            client.succeed("grep -Fx Active=yes /tmp/lpklarkc-real-logind-tty1.txt")
+            client.succeed("grep -Fx VTNr=1 /tmp/lpklarkc-real-logind-tty1.txt")
+            print("QEMU_REAL_LOGIND_TTY1_KIOSK_GUARD_PASS", flush=True)
             client.succeed("grep -Fx :0 /tmp/lpklarkc-graphics-ok")
             # Real X11 protocol/screen proof and actual rootless driver loader log.
             client.succeed("grep -Eq '^screen #0:' /tmp/lpklarkc-xdpyinfo.txt")
