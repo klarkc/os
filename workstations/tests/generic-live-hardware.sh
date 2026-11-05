@@ -26,7 +26,15 @@ require_xdriver() {
   local driver="$1"
   if ! nix_opt services.xserver.videoDrivers |
       jq -e --arg driver "$driver" 'index($driver) != null' >/dev/null; then
-    printf 'FAIL: generic Xorg fallback driver %s not available\n' "$driver" >&2
+    printf 'FAIL: generic Xorg KMS driver %s not available\n' "$driver" >&2
+    exit 1
+  fi
+}
+reject_legacy_xdriver() {
+  local driver="$1"
+  if nix_opt services.xserver.videoDrivers |
+      jq -e --arg driver "$driver" 'index($driver) != null' >/dev/null; then
+    printf 'FAIL: incompatible legacy Xorg DDX %s was reintroduced\n' "$driver" >&2
     exit 1
   fi
 }
@@ -39,10 +47,16 @@ require_true hardware.graphics.enable
 require_true services.xserver.enable
 require_true services.xserver.displayManager.startx.enable
 
-# Modern KMS; AMD/Nouveau; old Intel integrated; BIOS framebuffer if DRM
-# cannot make /dev/dri/card0. No claim this is a universal UEFI fallback.
-for driver in modesetting amdgpu nouveau intel vesa; do
+# Require the production Xorg DDX path that actually loaded with real
+# QEMU DRM/KMS (CI 42054451544), not optional DDX that failed to dlopen.
+# This asserts the Xorg module list only; generic Intel/Nouveau kernel
+# DRM/KMS and redistributable firmware remain governed by the all-hardware
+# profile and must still pass the real QEMU + physical-release gates.
+for driver in modesetting amdgpu; do
   require_xdriver "$driver"
+done
+for driver in nouveau intel vesa; do
+  reject_legacy_xdriver "$driver"
 done
 # A generic live image must retain both legacy BIOS and EFI boot.
 require_true isoImage.makeBiosBootable
