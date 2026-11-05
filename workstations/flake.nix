@@ -285,7 +285,10 @@
             # RED: execute the real Xorg loader against a test-only ELF
             # module with an unresolved symbol. The primary :0 positive
             # Xorg/DRM checks above remain independent of this negative :2.
-            client.succeed("""
+            # Capture stdout of the real guest :2 Xorg loader probe. The
+            # original Xorg.2.log match must reach the CI log, not just the
+            # echoed guest command and its successful exit status.
+            negative_xorg_log_line = client.succeed("""
               bash -e -c '
                 fixture=${xorgAbiNegativeModule}/lib/xorg/modules/liblpklarkcabinegative.so
                 test -r "$fixture"
@@ -306,7 +309,9 @@
                 fi
                 grep -Ei "undefined symbol.*lpklarkc_missing_xorg_abi_symbol" "$log"
               '
-            """)
+            """).strip()
+            assert "lpklarkc_missing_xorg_abi_symbol" in negative_xorg_log_line, "Xorg :2 raw negative-control log line was not captured"
+            print("XORG_ABI_NEGATIVE_RAW_LOG_LINE: " + negative_xorg_log_line, flush=True)
             # User PipeWire runs with tty1 autologin; no physical audio card
             # is needed to assert an active PipeWire/Pulse-compatible socket.
             client.succeed("test -d /run/current-system/sw/share/icons")
