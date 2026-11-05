@@ -164,12 +164,15 @@ in
   # Xorg exited with "no screens found" when the stripped profile booted.
   hardware.graphics.enable = lib.mkForce true;
   services.xserver.enable = true;
-  # Generic Xorg auto-detection with older Intel and legacy BIOS fallbacks.
-  # Avoid the incompatible fbdev Xorg module observed on the real Dell;
-  # VESA is useful only on legacy BIOS hardware, while KMS is preferred.
-  services.xserver.videoDrivers = [
-    "modesetting" "amdgpu" "nouveau" "intel" "vesa"
-  ];
+  # Generic KMS path: prefer the in-tree Xorg modesetting DDX, and keep
+  # AMDGPU's driver where usable. The optional legacy nouveau/intel/vesa DDX
+  # modules failed to load with undefined symbols in real QEMU Xorg logs
+  # (CI 42054451544) even though modesetting opened screen :0 on bochs-drm.
+  # Do not load those failing DDX modules merely as autoprobed fallbacks.
+  # Kernel DRM/KMS, generic hardware discovery and redistributable firmware
+  # remain enabled separately in the live ISO profile. This is NOT evidence
+  # that an untested physical Dell i915 adapter has passed.
+  services.xserver.videoDrivers = [ "modesetting" "amdgpu" ];
   services.libinput.enable = true;
   services.xserver.xkb.layout = "br";
   services.xserver.displayManager.startx.enable = true;
