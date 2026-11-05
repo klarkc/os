@@ -18,10 +18,12 @@
       xorgAbiNegativeModule = pkgs.runCommand "lpklarkc-xorg-abi-negative" {} ''
         mkdir -p "$out/lib/xorg/modules"
         cat > broken.c <<'EOF'
+        /* A data relocation MUST resolve at dlopen time even for an Xorg
+           loader using RTLD_LAZY; an uncalled function's PLT relocation
+           could otherwise remain unresolved without an error. */
         extern void lpklarkc_missing_xorg_abi_symbol(void);
-        void lpklarkc_require_missing_xorg_abi(void) {
-          lpklarkc_missing_xorg_abi_symbol();
-        }
+        void (*lpklarkc_force_abi_relocation)(void) =
+          lpklarkc_missing_xorg_abi_symbol;
         EOF
         $CC -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
       '';
@@ -287,6 +289,9 @@
                 test -r "$fixture"
                 ${pkgs.binutils}/bin/readelf -Ws "$fixture" |
                   grep -Eq "UND.*lpklarkc_missing_xorg_abi_symbol"
+                # Require an eager DATA relocation, not an uncalled PLT thunk.
+                ${pkgs.binutils}/bin/readelf -rW "$fixture" |
+                  grep -Eq "R_X86_64_(64|GLOB_DAT).*lpklarkc_missing_xorg_abi_symbol"
                 mkdir -p /tmp/lpklarkc-xorg-negative
                 ${pkgs.coreutils}/bin/timeout 20s ${pkgs.xorg.xorgserver}/bin/Xorg :2 -config ${xorgAbiNegativeConfig} -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
                 log=/tmp/lpklarkc-xorg-negative/Xorg.2.log
