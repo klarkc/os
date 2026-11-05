@@ -187,9 +187,22 @@ jobs:
           test ! -e "$GITHUB_WORKSPACE/dist/ventoy.json"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum lpklarkc-x86_64.iso > SHA256SUMS && sha256sum -c SHA256SUMS)
           test "$(find "$GITHUB_WORKSPACE/dist" -maxdepth 1 -type f | wc -l)" -eq 2
+          # Record the raw ISO digest in the job log so release verification
+          # does not require downloading the nearly 2 GiB ISO artifact ZIP.
+          echo "Raw ISO SHA256SUMS (lpklarkc-x86_64.iso):"
+          cat "$GITHUB_WORKSPACE/dist/SHA256SUMS"
       - uses: actions/upload-artifact@v4
         with:
           name: lpklarkc-iso
           path: dist/
+          if-no-files-found: error
+          retention-days: 7
+      # Publish the text-only checksum independently. This adds no ISO bytes
+      # to the handoff and keeps the original ISO ZIP release path intact.
+      - name: Upload raw ISO SHA256SUMS manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: lpklarkc-iso-sha256sums
+          path: dist/SHA256SUMS
           if-no-files-found: error
           retention-days: 7
