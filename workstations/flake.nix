@@ -15,7 +15,9 @@
             [ "firefox-bin" "firefox-bin-unwrapped" ];
       };
       # Test-only broken ELF module; never part of the published ISO.
-      xorgAbiNegativeModule = pkgs.runCommand "lpklarkc-xorg-abi-negative" {} ''
+      xorgAbiNegativeModule = pkgs.runCommand "lpklarkc-xorg-abi-negative" {
+        nativeBuildInputs = [ pkgs.stdenv.cc ];
+      } ''
         mkdir -p "$out/lib/xorg/modules"
         cat > broken.c <<'EOF'
         /* A data relocation MUST resolve at dlopen time even for an Xorg
@@ -25,7 +27,7 @@
         void (*lpklarkc_force_abi_relocation)(void) =
           lpklarkc_missing_xorg_abi_symbol;
         EOF
-        $CC -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
+        cc -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
       '';
       # Explicit test-only Xorg configuration for the negative ELF loader.
       xorgAbiNegativeConfig = pkgs.writeText "lpklarkc-xorg-abi-negative.conf" ''
