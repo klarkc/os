@@ -71,4 +71,33 @@ if grep -Eq 'hardware\.enableAllHardware[[:space:]]*=[[:space:]]*false|hardware\
   exit 1
 fi
 
-echo 'PASS: generic live-ISO hardware, firmware, GPU/Xorg fallback and BIOS/UEFI evaluation'
+# BROKER-013 physical i915/card1 logind paused-fd regression.
+# The check is read-only, never hardcodes /dev/dri/card0 or switches VTs.
+# It must refuse an explicitly inactive tty1 or wrong VT while allowing
+# an active tty1 and a transiently unqueryable logind to reach existing Xorg.
+mock_loginctl="$(mktemp)"
+trap 'rm -f "$mock_loginctl"' EXIT
+cat > "$mock_loginctl" <<'MOCK'
+#!/bin/sh
+[ "${LPKLARKC_TEST_LOGINCTL_FAIL:-0}" != "1" ] || exit 1
+printf 'Active=%s\nVTNr=%s\n' "${LPKLARKC_TEST_ACTIVE:-yes}" "${LPKLARKC_TEST_VTNR:-1}"
+MOCK
+chmod +x "$mock_loginctl"
+if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=yes LPKLARKC_TEST_VTNR=1 bash scripts/thin-client.sh --check-xorg-seat; then
+  echo 'FAIL: active tty1 logind session blocked' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=no LPKLARKC_TEST_VTNR=1 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: inactive tty1 was allowed to launch rootless Xorg' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=yes LPKLARKC_TEST_VTNR=2 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: wrong VT was allowed to launch vt1 Xorg' >&2
+  exit 1
+fi
+if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_LOGINCTL_FAIL=1 bash scripts/thin-client.sh --check-xorg-seat; then
+  echo 'FAIL: transient logind read error deadlocked kiosk' >&2
+  exit 1
+fi
+
+echo 'PASS: generic live-ISO hardware, firmware, GPU/Xorg fallback and BIOS/UEFI evaluation and rootless logind seat guards'

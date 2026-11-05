@@ -14,6 +14,7 @@ POWEROFF="${LPKLARKC_POWEROFF_TOOL:-/run/current-system/sw/bin/lpklarkc-poweroff
 SUDO="${LPKLARKC_SUDO_BIN:-sudo}"
 OAUTH_SESSION="${LPKLARKC_OAUTH_SESSION_TOOL:-/run/current-system/sw/bin/lpklarkc-oauth-session}"
 STARTX="${LPKLARKC_STARTX_BIN:-startx}"
+LOGINCTL="${LPKLARKC_LOGINCTL_BIN:-loginctl}"
 TUNNEL_PID=""
 TUNNEL_LOG=""
 WATCHDOG_PID=""
@@ -97,6 +98,33 @@ rdp_responding() {
   [[ "$reply" == "0300" ]]
 }
 
+# The real Dell has i915 on /dev/dri/card1; naming and firmware alone
+# cannot prove logind's DRM lease is active. Avoid launching Xorg when
+# logind EXPLICITLY reports an inactive tty1 session or another VT.
+# A failed/unavailable read remains diagnostic-only, not a hard kiosk lock.
+xorg_tty1_seat_ready() {
+  local snapshot active="" vtnr="" key value
+  if ! snapshot="$("$LOGINCTL" show-session self --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
+    echo "Aviso: estado logind indisponivel; tentando Xorg sem inferir DRM ativo." >&2
+    return 0
+  fi
+  while IFS='=' read -r key value; do
+    case "$key" in
+      Active) active="$value" ;;
+      VTNr) vtnr="$value" ;;
+    esac
+  done <<< "$snapshot"
+  if [[ "$active" == "no" ]]; then
+    echo "Xorg adiado: logind relata sessao tty1 inativa (DRM pode estar pausado)." >&2
+    return 1
+  fi
+  if [[ -n "$vtnr" && "$vtnr" != "1" ]]; then
+    printf 'Xorg adiado: sessao logind esta em VT %s, esperado tty1.\n' "$vtnr" >&2
+    return 1
+  fi
+  return 0
+}
+
 # A separate rootless Xorg session hosts Firefox only during Google OAuth.
 # Xorg returns to tty1 before the normal full-screen FreeRDP session starts.
 local_oauth_login() {
@@ -108,6 +136,10 @@ local_oauth_login() {
   if [[ ! -x "$OAUTH_SESSION" ]] || ! command -v "$STARTX" >/dev/null 2>&1; then
     echo "Navegador OAuth local ou startx ausente da ISO." >&2
     return 4
+  fi
+  if ! xorg_tty1_seat_ready; then
+    echo "Retorne ao tty1 antes de iniciar o navegador grafico." >&2
+    return 7
   fi
   echo "Iniciando Firefox temporario no Dell para autenticar Google..."
   if ! "$STARTX" "$OAUTH_SESSION" -- :0 vt1 -keeptty -nolisten tcp; then
@@ -122,6 +154,11 @@ local_oauth_login() {
 }
 
 # Regression-test entrypoints; injected IAP reads only, never writes GCE.
+if [[ "${1:-}" == "--check-xorg-seat" ]]; then
+  xorg_tty1_seat_ready
+  exit $?
+fi
+
 if [[ "${1:-}" == "--check-network" ]]; then
   network_ready
   exit $?
@@ -234,10 +271,14 @@ while true; do
     # xfreerdp is X11-based. Start a rootless Xorg session directly from
     # tty1, with no LightDM/Openbox/Xterm. When RDP exits, Xorg terminates
     # and the console immediately resumes the retry loop.
-    startx "$(command -v xfreerdp)" /v:"$RDP_ADDRESS" /f \
+    if xorg_tty1_seat_ready; then
+      startx "$(command -v xfreerdp)" /v:"$RDP_ADDRESS" /f \
       /dynamic-resolution /cert:tofu /clipboard /network:auto /sec:tls \
       /sound:sys:pulse /microphone:sys:pulse \
       -- :0 vt1 -keeptty -nolisten tcp || true
+    else
+      echo "Xorg/RDP adiado ate tty1 voltar a ficar ativo." >&2
+    fi
     printf '\n  Sessao encerrada. Reconectando...\n'
   else
     printf '\n  Nao foi possivel conectar ao servidor.\n'
