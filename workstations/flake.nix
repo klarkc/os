@@ -27,12 +27,12 @@
         void (*lpklarkc_force_abi_relocation)(void) =
           lpklarkc_missing_xorg_abi_symbol;
         EOF
-        cc -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
+        cc -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkcabinegative.so" broken.c
       '';
       # Explicit test-only Xorg configuration for the negative ELF loader.
       xorgAbiNegativeConfig = pkgs.writeText "lpklarkc-xorg-abi-negative.conf" ''
         Section "Module"
-          Load "lpklarkc_abi_negative"
+          Load "lpklarkcabinegative"
         EndSection
         Section "Device"
           Identifier "qemu-modesetting"
@@ -287,7 +287,7 @@
             # Xorg/DRM checks above remain independent of this negative :2.
             client.succeed("""
               bash -e -c '
-                fixture=${xorgAbiNegativeModule}/lib/xorg/modules/liblpklarkc_abi_negative.so
+                fixture=${xorgAbiNegativeModule}/lib/xorg/modules/liblpklarkcabinegative.so
                 test -r "$fixture"
                 ${pkgs.binutils}/bin/readelf -Ws "$fixture" |
                   grep -Eq "UND.*lpklarkc_missing_xorg_abi_symbol"
@@ -295,7 +295,7 @@
                 ${pkgs.binutils}/bin/readelf -rW "$fixture" |
                   grep -Eq "R_X86_64_(64|GLOB_DAT).*lpklarkc_missing_xorg_abi_symbol"
                 mkdir -p /tmp/lpklarkc-xorg-negative
-                ${pkgs.coreutils}/bin/timeout 20s ${pkgs.xorg.xorgserver}/bin/Xorg :2 -config ${xorgAbiNegativeConfig} -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
+                ${pkgs.coreutils}/bin/timeout 20s ${pkgs.xorg.xorgserver}/bin/Xorg :2 -config ${xorgAbiNegativeConfig} -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules,${pkgs.xorg.xorgserver}/lib/xorg/modules -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
                 log=/tmp/lpklarkc-xorg-negative/Xorg.2.log
                 if ! test -r "$log" ||
                    ! grep -Eiq "undefined symbol.*lpklarkc_missing_xorg_abi_symbol" "$log"; then
