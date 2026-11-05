@@ -14,6 +14,17 @@
           pkg: builtins.elem (nixpkgs.lib.getName pkg)
             [ "firefox-bin" "firefox-bin-unwrapped" ];
       };
+      # Test-only broken ELF module; never part of the published ISO.
+      xorgAbiNegativeModule = pkgs.runCommand "lpklarkc-xorg-abi-negative" {} ''
+        mkdir -p "$out/lib/xorg/modules"
+        cat > broken.c <<'EOF'
+        extern void lpklarkc_missing_xorg_abi_symbol(void);
+        void lpklarkc_require_missing_xorg_abi(void) {
+          lpklarkc_missing_xorg_abi_symbol();
+        }
+        EOF
+        $CC -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
+      '';
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
       # General-purpose live boot: use the supported NixOS hardware profile
       # instead of a Dell-specific, manually curated firmware derivation.
@@ -135,6 +146,8 @@
               # fail closed instead of touching an internal VM disk.
               virtualisation.memorySize = 2048;
               virtualisation.graphics = true;
+              # Test-only broken ELF fixture accessible in the guest.
+              environment.systemPackages = [ xorgAbiNegativeModule ];
               # Exercise the SAME auto-detected Xorg driver list as the actual
               # portable live ISO. Do not force modesetting in the QEMU test.
               # Exercise rootless Xorg via getty@tty1 and startx without any
@@ -253,6 +266,42 @@
                   grep -Ein "LoadModule:|Loading /|UnloadModule:|module ABI|modesetting|intel|nouveau|amdgpu|vesa|drm|screen" "$log" | tail -n 120 || true
                   exit 1
                 fi
+              '
+            """)
+            # RED: execute the real Xorg loader against a test-only ELF
+            # module with an unresolved symbol. The primary :0 positive
+            # Xorg/DRM checks above remain independent of this negative :2.
+            client.succeed("""
+              bash -e -c '
+                fixture=${xorgAbiNegativeModule}/lib/xorg/modules/liblpklarkc_abi_negative.so
+                test -r "$fixture"
+                ${pkgs.binutils}/bin/readelf -Ws "$fixture" |
+                  grep -Eq "UND.*lpklarkc_missing_xorg_abi_symbol"
+                mkdir -p /tmp/lpklarkc-xorg-negative
+                cat > /tmp/lpklarkc-xorg-negative/xorg.conf <<"EOF"
+Section "Module"
+  Load "lpklarkc_abi_negative"
+EndSection
+Section "Device"
+  Identifier "qemu-modesetting"
+  Driver "modesetting"
+EndSection
+EOF
+                ${pkgs.coreutils}/bin/timeout 20s \\
+                  ${pkgs.xorg.xorgserver}/bin/Xorg :2 \\
+                  -config /tmp/lpklarkc-xorg-negative/xorg.conf \\
+                  -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules \\
+                  -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log \\
+                  -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
+                log=/tmp/lpklarkc-xorg-negative/Xorg.2.log
+                if ! test -r "$log" ||
+                   ! grep -Eiq "undefined symbol.*lpklarkc_missing_xorg_abi_symbol" "$log"; then
+                  echo "XORG_ABI_NEGATIVE_CONTROL_NOT_OBSERVED" >&2
+                  cat /tmp/lpklarkc-xorg-negative/console.log >&2
+                  test ! -r "$log" || tail -n 100 "$log" >&2
+                  exit 1
+                fi
+                grep -Ei "undefined symbol.*lpklarkc_missing_xorg_abi_symbol" "$log"
               '
             """)
             # User PipeWire runs with tty1 autologin; no physical audio card
