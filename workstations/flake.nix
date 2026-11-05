@@ -25,6 +25,16 @@
         EOF
         $CC -shared -fPIC -o "$out/lib/xorg/modules/liblpklarkc_abi_negative.so" broken.c
       '';
+      # Explicit test-only Xorg configuration for the negative ELF loader.
+      xorgAbiNegativeConfig = pkgs.writeText "lpklarkc-xorg-abi-negative.conf" ''
+        Section "Module"
+          Load "lpklarkc_abi_negative"
+        EndSection
+        Section "Device"
+          Identifier "qemu-modesetting"
+          Driver "modesetting"
+        EndSection
+      '';
       mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
       # General-purpose live boot: use the supported NixOS hardware profile
       # instead of a Dell-specific, manually curated firmware derivation.
@@ -278,21 +288,7 @@
                 ${pkgs.binutils}/bin/readelf -Ws "$fixture" |
                   grep -Eq "UND.*lpklarkc_missing_xorg_abi_symbol"
                 mkdir -p /tmp/lpklarkc-xorg-negative
-                cat > /tmp/lpklarkc-xorg-negative/xorg.conf <<"EOF"
-Section "Module"
-  Load "lpklarkc_abi_negative"
-EndSection
-Section "Device"
-  Identifier "qemu-modesetting"
-  Driver "modesetting"
-EndSection
-EOF
-                ${pkgs.coreutils}/bin/timeout 20s \\
-                  ${pkgs.xorg.xorgserver}/bin/Xorg :2 \\
-                  -config /tmp/lpklarkc-xorg-negative/xorg.conf \\
-                  -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules \\
-                  -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log \\
-                  -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
+                ${pkgs.coreutils}/bin/timeout 20s ${pkgs.xorg.xorgserver}/bin/Xorg :2 -config ${xorgAbiNegativeConfig} -modulepath ${xorgAbiNegativeModule}/lib/xorg/modules -logfile /tmp/lpklarkc-xorg-negative/Xorg.2.log -nolisten tcp > /tmp/lpklarkc-xorg-negative/console.log 2>&1 || true
                 log=/tmp/lpklarkc-xorg-negative/Xorg.2.log
                 if ! test -r "$log" ||
                    ! grep -Eiq "undefined symbol.*lpklarkc_missing_xorg_abi_symbol" "$log"; then
