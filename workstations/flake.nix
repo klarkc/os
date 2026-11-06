@@ -293,6 +293,55 @@
               '
             """)
             print("QEMU DRM/KMS device evidence: " + drm_binding)
+            # Tie actual Xorg :0 startup to the kernel-bound major-226 DRM
+            # device enumerated above; merely finding some cardN is not enough.
+            # The Dell had i915/card1, a paused logind FD, then a missing card0.
+            selected_card = drm_binding.split()[0].split("=", 1)[1]
+            assert selected_card.startswith("card") and selected_card[4:].isdigit(), \
+                "DRM binding result did not contain a cardN ordinal"
+
+            def xorg_selected_card_without_paused_fd(log_text, card):
+                lines = log_text.splitlines()
+                expected_probe = "xfree86: Adding drm device (/dev/dri/" + card + ")"
+                if not any(expected_probe in line for line in lines):
+                    return False
+                if any("systemd-logind: got fd for /dev/dri/" + card in line
+                       and "paused 1" in line for line in lines):
+                    return False
+                if any("Error systemd-logind returned paused fd for drm node" in line
+                       or ("open /dev/dri/card" in line
+                           and "No such file or directory" in line)
+                       for line in lines):
+                    return False
+                return True
+
+            # The test gate itself must accept a synthetic card1-only Xorg
+            # probe, reject wrong-card fallback and refuse a paused DRM FD.
+            # These fixtures DO NOT virtualize Intel i915 or card1 hardware.
+            synthetic_card1 = (
+                "(II) xfree86: Adding drm device (/dev/dri/card1)\n"
+                "(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 11 paused 0"
+            )
+            assert xorg_selected_card_without_paused_fd(synthetic_card1, "card1"), \
+                "synthetic card1-only Xorg selection was rejected"
+            assert not xorg_selected_card_without_paused_fd(synthetic_card1, "card0"), \
+                "the probe failed to reject a mismatched card0"
+            assert not xorg_selected_card_without_paused_fd(
+                synthetic_card1.replace("paused 0", "paused 1"), "card1"
+            ), "the probe accepted a paused card1 logind FD"
+            assert not xorg_selected_card_without_paused_fd(
+                synthetic_card1 + "\n(EE) open /dev/dri/card0: No such file or directory",
+                "card1"
+            ), "the probe accepted missing-card0 Xorg fallback"
+            print("XORG_DRM_CARD1_SELECTION_GATE_FIXTURES_PASS", flush=True)
+
+            xorg_real_log = client.succeed(
+                "cat /home/nixos/.local/share/xorg/Xorg.0.log"
+            )
+            assert xorg_selected_card_without_paused_fd(xorg_real_log, selected_card), \
+                "Xorg did not select the bound DRM " + selected_card + \
+                " cleanly; check Xorg.0.log and logind paused-fd diagnostics"
+            print("QEMU_XORG_BOUND_DRM_NODE_MATCH_PASS card=" + selected_card, flush=True)
             # Preserve the negative DDX ABI/no-screens gate. On failure
             # capture the *actual* matching lines and related loader context
             # before returning nonzero, so CI distinguishes a rejected
