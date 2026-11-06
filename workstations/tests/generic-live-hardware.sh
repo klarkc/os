@@ -80,7 +80,19 @@ trap 'rm -f "$mock_loginctl"' EXIT
 cat > "$mock_loginctl" <<'MOCK'
 #!/bin/sh
 [ "${LPKLARKC_TEST_LOGINCTL_FAIL:-0}" != "1" ] || exit 1
-printf 'Active=%s\nVTNr=%s\n' "${LPKLARKC_TEST_ACTIVE:-yes}" "${LPKLARKC_TEST_VTNR:-1}"
+if [ "${LPKLARKC_TEST_EMPTY_OUTPUT:-0}" = "1" ]; then
+  exit 0
+fi
+if [ "${LPKLARKC_TEST_OMIT_ACTIVE:-0}" != "1" ]; then
+  printf 'Active=%s\n' "${LPKLARKC_TEST_ACTIVE-yes}"
+fi
+if [ "${LPKLARKC_TEST_DUPLICATE_ACTIVE:-0}" = "1" ]; then
+  printf 'Active=yes\n'
+fi
+if [ "${LPKLARKC_TEST_OMIT_VTNR:-0}" != "1" ]; then
+  printf 'VTNr=%s\n' "${LPKLARKC_TEST_VTNR-1}"
+fi
+exit 0
 MOCK
 chmod +x "$mock_loginctl"
 if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=yes LPKLARKC_TEST_VTNR=1 bash scripts/thin-client.sh --check-xorg-seat; then
@@ -93,6 +105,34 @@ if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=no LPKLARKC_TEST_
 fi
 if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=yes LPKLARKC_TEST_VTNR=2 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
   echo 'FAIL: wrong VT was allowed to launch vt1 Xorg' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_OMIT_ACTIVE=1 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: successful logind reply missing Active was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_OMIT_VTNR=1 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: successful logind reply missing VTNr was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_EMPTY_OUTPUT=1 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: successful empty logind reply was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE=unknown bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: unknown successful logind Active value was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_ACTIVE= bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: empty successful logind Active value was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_VTNR= bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: empty successful logind VTNr was allowed' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_ACTIVE=1 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: duplicate logind Active property was allowed' >&2
   exit 1
 fi
 if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_LOGINCTL_FAIL=1 bash scripts/thin-client.sh --check-xorg-seat; then

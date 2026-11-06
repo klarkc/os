@@ -103,23 +103,45 @@ rdp_responding() {
 # logind EXPLICITLY reports an inactive tty1 session or another VT.
 # A failed/unavailable read remains diagnostic-only, not a hard kiosk lock.
 xorg_tty1_seat_ready() {
-  local snapshot active="" vtnr="" key value
+  local snapshot active="" vtnr="" key value seen_active=0 seen_vtnr=0
   if ! snapshot="$("$LOGINCTL" show-session self --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
     echo "Aviso: estado logind indisponivel; tentando Xorg sem inferir DRM ativo." >&2
     return 0
   fi
   while IFS='=' read -r key value; do
     case "$key" in
-      Active) active="$value" ;;
-      VTNr) vtnr="$value" ;;
+      Active)
+        if (( seen_active )); then
+          echo "Xorg adiado: logind retornou Active duplicado." >&2
+          return 1
+        fi
+        active="$value"
+        seen_active=1
+        ;;
+      VTNr)
+        if (( seen_vtnr )); then
+          echo "Xorg adiado: logind retornou VTNr duplicado." >&2
+          return 1
+        fi
+        vtnr="$value"
+        seen_vtnr=1
+        ;;
     esac
   done <<< "$snapshot"
   if [[ "$active" == "no" ]]; then
     echo "Xorg adiado: logind relata sessao tty1 inativa (DRM pode estar pausado)." >&2
     return 1
   fi
+  if [[ "$active" != "yes" ]]; then
+    echo "Xorg adiado: logind nao confirmou Active=yes para tty1." >&2
+    return 1
+  fi
   if [[ -n "$vtnr" && "$vtnr" != "1" ]]; then
     printf 'Xorg adiado: sessao logind esta em VT %s, esperado tty1.\n' "$vtnr" >&2
+    return 1
+  fi
+  if [[ "$vtnr" != "1" ]]; then
+    echo "Xorg adiado: logind nao confirmou VTNr=1." >&2
     return 1
   fi
   return 0
