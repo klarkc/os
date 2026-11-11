@@ -182,7 +182,7 @@ jobs:
             2>&1 | tee ../vm-logs/nixos-vm-tests.log
       - name: Upload VM logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nixos-vm-failure-logs
           path: vm-logs/
@@ -217,7 +217,7 @@ jobs:
           mkdir -p "$GITHUB_WORKSPACE/dist"
           cp /tmp/thin-client-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.iso > SHA256SUMS)
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: thin-client-iso
           path: dist/
@@ -254,7 +254,7 @@ jobs:
             2>&1 | tee ../vm-logs/nixos-gce-vm-test.log
       - name: Upload workstation VM logs on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nixos-gce-vm-failure-logs
           path: vm-logs/
@@ -293,7 +293,7 @@ jobs:
           tar -tzf "${images[0]}" | grep -Fx disk.raw
           (cd "$GITHUB_WORKSPACE/gce-dist" && sha256sum *.raw.tar.gz > SHA256SUMS)
       - name: Upload versioned image (no cloud import)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: wsklarkc-gce-image-${{ github.sha }}
           path: gce-dist/
