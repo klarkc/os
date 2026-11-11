@@ -1,14 +1,13 @@
+# Retired 2026-11-11 by operator decision: main-only, no generated
+# branches or PRs. Historical automation is preserved in Git history.
+# Re-enable only after a main-only release/dependency workflow is designed,
+# validated and explicitly authorized. This workflow has no write effects.
+name: release-please retired — no PR creation
 on:
-  push:
-    branches:
-      - main
-name: release
+  workflow_dispatch:
 jobs:
-  release:
+  disabled:
+    if: ${{ false }}
     runs-on: ubuntu-latest
     steps:
-      - uses: google-github-actions/release-please-action@v3
-        id: release
-        with:
-          release-type: simple
-          package-name: os
+      - run: echo "Retired: no feature branches, release PRs or automated updates."
