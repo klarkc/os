@@ -31,6 +31,10 @@ in
   time.timeZone = "America/Bahia";
   i18n.defaultLocale = "en_US.UTF-8";
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
+  # Enpass is proprietary; allow only this explicit application. Brave is MPL-2.0.
+  # This does not authorize unrelated unfree packages (CUDA/NVIDIA/vLLM).
+  nixpkgs.config.allowUnfreePredicate = pkg:
+    lib.getName pkg == "enpass";
   nix.settings.trusted-users = [ "root" "klarkc" ];
   nix.settings.extra-substituters = [ "https://install.determinate.systems" ];
   nix.settings.extra-trusted-public-keys = [
@@ -138,11 +142,21 @@ in
     };
   };
 
+  fonts.packages = with pkgs; [ fira-code noto-fonts-color-emoji ];
+
   environment.systemPackages = with pkgs; [
     git curl wget openssh tmux direnv bashInteractive
     xterm alacritty
     xorg.xauth xorg.xsetroot xorg.xmodmap
     xclip dbus dunst
+    # P0 SoloSIG browser and password vault, installed declaratively for
+    # the GCE image. The vault, browser profile and credentials remain
+    # private runtime state; neither application is configured with secrets.
+    brave enpass
+    # CPU-only portable baseline for the existing Arch dotfiles and SoloSIG.
+    # Do not use dotfiles#default: it includes NVIDIA/nixGL/CUDA/vLLM.
+    git-lfs jq ripgrep fd lsd bat fzf zoxide btop yazi
+    xorg.xset xorg.xrandr xorg.xmessage
     # pactl is a PulseAudio-protocol CLI client used by the real user/E2E
     # to inspect PipeWire's sink/source; the PulseAudio daemon stays disabled.
     pulseaudio

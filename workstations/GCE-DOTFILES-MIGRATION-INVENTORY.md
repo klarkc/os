@@ -89,7 +89,9 @@ declarative NixOS options and explicit Nixpkgs packages.
 | `bat git-delta ripgrep btdu btop` | Nixpkgs `bat`, `delta`, `ripgrep`, `btdu`, `btop` | P1 | Ferramentas CLI podem ser mantidas com empacotamento declarativo Nix. |
 | `handlr` | Optional Nixpkgs equivalent/desktop MIME configuration | P2 | Associações MIME podem usar XDG; não incluir gestor extra sem uso demonstrado. |
 | `ollama-cuda` | **Do not migrate locally**; CPU-only VM. Use authorized remote LLM endpoint | Hard exclusion | ollama-cuda depende de GPU NVIDIA; usuário decidiu desabilitar GPU, CUDA e vLLM até nova ordem. |
-| `discord enpass-bin` | Optional per-user GUI installs, not required for workstation bootstrap | P2/privacy | Discord e Enpass exigem credenciais pessoais; migração opcional após garantir sessão RDP e segredo seguro. |
+| `Brave` / Chromium | `pkgs.brave` in versioned GCE `environment.systemPackages` | **P0 / SoloSIG mandatory**; verify browser/XRDP login and integration with Enpass; no browser profile or OAuth inside Git/image | Brave e um navegador funcional são requisitos confirmados pelo operador para trabalhar com SoloSIG. |
+| `enpass-bin` | `pkgs.enpass` in versioned GCE `environment.systemPackages`; scoped Nixpkgs unfree allowlist | **P0 / SoloSIG mandatory**; operator-unlocked vault, sync and Brave native messaging remain unproven | Enpass é requisito indispensável, não P2/opcional; nunca incluir cofre ou credenciais na derivação ou imagem. |
+| `discord` | Optional independent GUI package | P2 / not required for SoloSIG | Aplicativo adicional não bloqueia produtividade inicial. |
 | `lumen fzf mdcat` | fzf/mdcat via Nixpkgs; Lumen optional after Nix packaging check | Optional | fzf/mdcat são portáveis; Lumen depende de pacote verificado e uso confirmado. |
 | `yazi` | Nixpkgs Yazi; helpers `7zip jq poppler fd fzf zoxide resvg imagemagick xclip xsel chafa` | P1 file manager | Yazi exige auxiliares para previews; migrar conjunto para não deixar funções parcialmente quebradas. |
 
@@ -204,11 +206,15 @@ never install the existing `#default` wholesale.
 2. **P0 / first user session:** protected `/home/klarkc` direct Git
    bootstrap; safe shell Git prompt; XMonad-only cloud config and pre-HOME
    bootstrap launcher; real XRDP login through IAP; ensure no public 3389.
-3. **P1 / portable developer baseline:** explicitly install shell
-   essentials, fonts, editors, Yazi and helpers from Nixpkgs; create
-   separate `dotfiles#cpu-gce` profile *on a dedicated dotfiles branch*
-   rather than the existing NVIDIA default. Compare resolved
-   executable paths and check service unit syntax.
+3. **P0/P1 / declarative portable developer baseline:** Brave and Enpass
+   are **P0 blocking** for SoloSIG and belong in the versioned GCE NixOS
+   `environment.systemPackages` alongside the CPU-only shell essentials,
+   fonts and helpers. Check guest executables with QEMU before rollout;
+   validate real Brave/XRDP, Enpass vault unlock and browser integration
+   separately. A future separate `dotfiles#cpu-gce` profile may replace
+   duplicated system applications once reviewed. Never install the NVIDIA
+   `dotfiles#default`, use shell-driven `nix profile install`, or overwrite
+   the operator's existing HOME.
 4. **P1 / SoloSIG:** restore Sources/worktrees through verified backup;
    activate project Nix/devenv; run smoke tests per service, not
    a blanket installation of the original Arch package list.

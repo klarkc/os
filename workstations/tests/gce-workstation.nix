@@ -68,6 +68,13 @@ pkgs.testers.runNixOSTest {
     # Fail if any XFCE session or Lemurs launcher was installed.
     server.succeed("test -x /run/current-system/sw/bin/xmonad")
     server.succeed("test -x /run/current-system/sw/bin/xterm")
+    # Real guest closure, not a textual assertion that apps were requested.
+    # Headless QEMU cannot prove interactive Brave/Enpass login or autofill.
+    server.succeed("test -x /run/current-system/sw/bin/brave")
+    server.succeed("test -x /run/current-system/sw/bin/Enpass")
+    server.succeed("test -x /run/current-system/sw/bin/lsd")
+    server.succeed("test -x /run/current-system/sw/bin/git-lfs")
+    server.succeed("test ! -e /run/current-system/sw/bin/nvidia-smi")
     server.succeed("grep -F 'wsklarkc-xrdp-session' /etc/xrdp/startwm.sh")
     # A preserved GCE RAM image is useless if sesman has destroyed XMonad.
     # These are necessary configuration checks, not reconnection E2E proof.

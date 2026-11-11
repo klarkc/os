@@ -53,3 +53,28 @@ The dotfiles checkout belongs directly at `/home/klarkc/.git`, not
 `/home/klarkc/dotfiles`. The bootstrap script refuses collisions.
 The existing `klarkc/dotfiles#default` profile is not yet safe for
 CPU-only NixOS without separate GPU/Arch-specific dependency review.
+
+## Declarative CPU-only application baseline (GCE)
+
+The SoloSIG workflow requires **Brave and Enpass (P0)**. Both are part of the
+versioned `gcp-workstation.nix` system package closure, together with portable
+shell/developer tools and fonts. Nixpkgs unfree acceptance is restricted to
+the Enpass derivation; this image does not install Arch/AUR, GPU, CUDA or vLLM
+software. No manual `nix profile install`, `pacman`, `yay` or blanket
+`make` is part of the deployment contract.
+
+The dedicated GCE QEMU test checks the actual installed Brave/Enpass
+executables in the guest. Browser startup inside **real XRDP/XMonad**, vault
+unlock/synchronization, browser-extension/native-messaging autofill and
+SoloSIG website authentication are separate operator-assisted acceptance
+tests; no vault contents, OAuth tokens or browser profile are embedded in
+NixOS, Git, CI, metadata or the image.
+
+**Important:** a Git commit or rebuilt GCE image does not automatically
+update the already-running `wsklarkc` instance. This source delta must be
+deployed through a separately reviewed, in-place NixOS generation switch
+without replacing its persistent disk or existing XRDP password. The direct
+`/home/klarkc/.git` dotfiles checkout remains a separate conflict-guarded
+bootstrap (`scripts/bootstrap-dotfiles.sh`); it must not overwrite an
+existing home, activate the legacy Arch shell/desktop blindly or install the
+GPU-oriented `dotfiles#default` profile. Bidirectional RDP audio is deferred.
