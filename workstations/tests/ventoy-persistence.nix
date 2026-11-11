@@ -24,7 +24,7 @@ pkgs.testers.runNixOSTest {
     users.users.nixos = {
       isNormalUser = true;
       extraGroups = [ "wheel" "networkmanager" "video" ];
-      initialPassword = "test-only";
+      initialHashedPassword = "!";
     };
     security.sudo.wheelNeedsPassword = false;
 

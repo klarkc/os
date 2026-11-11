@@ -50,7 +50,7 @@
               users.users.nixos = {
                 isNormalUser = true;
                 extraGroups = [ "wheel" "networkmanager" "video" ];
-                initialPassword = "test-only";
+                initialHashedPassword = "!";
               };
               security.sudo.wheelNeedsPassword = false;
               # Real USB devices are intentionally absent; persistence must
