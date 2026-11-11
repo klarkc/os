@@ -1,4 +1,4 @@
-name: NixOS thin client + workstation CI
+name: Deployment - NixOS images and optional cloud E2E
 on:
   workflow_dispatch:
     inputs:
@@ -10,16 +10,16 @@ on:
   push:
     paths:
       - "workstations/**"
-      - ".github/workflows/build-thin-client.yml"
+      - ".github/workflows/deployment.yml"
   pull_request:
     paths:
       - "workstations/**"
-      - ".github/workflows/build-thin-client.yml"
+      - ".github/workflows/deployment.yml"
 
 concurrency:
   group: nixos-workstations-${{ github.ref }}
   # Do not cancel a live GCE provisioning job halfway through resource creation.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/feat/wsklarkc-gce' }}
+  cancel-in-progress: false
 
 permissions:
   contents: read
@@ -68,7 +68,7 @@ jobs:
             found_job && /^  [a-zA-Z][a-zA-Z0-9_-]*:/ { exit 1 }
             found_job && /^    if: .*false/ { valid=1; exit }
             END { if (!valid) exit 1 }
-          ' .github/workflows/build-thin-client.yml
+          ' .github/workflows/deployment.yml
       - name: Validate server-only production and E2E scripts
         run: |
           set -euo pipefail

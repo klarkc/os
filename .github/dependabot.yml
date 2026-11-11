@@ -1,0 +1,20 @@
+version: 2
+updates:
+  - package-ecosystem: nix
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 4
+  - package-ecosystem: nix
+    directory: "/workstations"
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 4
+  - package-ecosystem: github-actions
+    directory: "/"
+    target-branch: main
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 4
