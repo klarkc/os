@@ -22,14 +22,33 @@ concurrency:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
+  ci-gate:
+    name: Require exact-commit Test CI success before any build/deploy
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Confirm Test passed on the identical main commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash workstations/tests/require-passing-ci.sh "$GITHUB_SHA"
+
   evaluate:
     name: Evaluate NixOS configurations
+    needs: ci-gate
     runs-on: ubuntu-24.04
     timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -139,6 +158,9 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -174,6 +196,9 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -207,6 +232,9 @@ jobs:
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -240,6 +268,9 @@ jobs:
     timeout-minutes: 180
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - uses: cachix/install-nix-action@v31
         with:
           extra_nix_config: |
@@ -293,6 +324,9 @@ jobs:
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -326,6 +360,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -356,6 +393,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -386,6 +426,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -421,6 +464,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -451,6 +497,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
@@ -485,6 +534,9 @@ jobs:
       id-token: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
       - name: Authenticate using branch- and workflow-restricted GitHub OIDC
         uses: google-github-actions/auth@v3
         with:
