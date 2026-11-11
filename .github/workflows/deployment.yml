@@ -14,9 +14,11 @@ on:
       - ".github/workflows/deployment.yml"
 
 concurrency:
-  group: nixos-workstations-${{ github.ref }}
-  # Do not cancel a live GCE provisioning job halfway through resource creation.
+  # One complete cold deployment workflow at a time across all refs/triggers.
+  # queue:max retains up to 100 pending runs instead of replacing pending runs.
+  group: workstation-deployment
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read
