@@ -31,10 +31,6 @@ in
   time.timeZone = "America/Bahia";
   i18n.defaultLocale = "en_US.UTF-8";
   nix.settings.experimental-features = [ "nix-command" "flakes" ];
-  # Enpass is proprietary; allow only this explicit application. Brave is MPL-2.0.
-  # This does not authorize unrelated unfree packages (CUDA/NVIDIA/vLLM).
-  nixpkgs.config.allowUnfreePredicate = pkg:
-    lib.getName pkg == "enpass";
   nix.settings.trusted-users = [ "root" "klarkc" ];
   nix.settings.extra-substituters = [ "https://install.determinate.systems" ];
   nix.settings.extra-trusted-public-keys = [

@@ -6,8 +6,19 @@
   outputs = { self, nixpkgs, determinate }:
     let
       system = "x86_64-linux";
-      pkgs = import nixpkgs { inherit system; };
-      mk = modules: nixpkgs.lib.nixosSystem { inherit system modules; };
+      # A single explicitly configured nixpkgs package set is shared with
+      # NixOS and QEMU tests. When the test passes external pkgs,
+      # nixpkgs.config becomes read-only in the guest: set the narrow
+      # Enpass unfree allowlist here, NOT in gcp-workstation.nix.
+      pkgs = import nixpkgs {
+        inherit system;
+        config.allowUnfreePredicate = pkg:
+          nixpkgs.lib.getName pkg == "enpass";
+      };
+      mk = modules: nixpkgs.lib.nixosSystem {
+        inherit system;
+        modules = modules ++ [ { nixpkgs.pkgs = pkgs; } ];
+      };
       isoModule = { modulesPath, ... }: {
         imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
         isoImage.isoName = "solo-thin-client-x86_64.iso";
