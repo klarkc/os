@@ -42,4 +42,4 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = false
       - name: Run generic redacted secret scan from Nix devShell
-        run: nix develop .# --command gitleaks dir . --redact=100 --no-banner
+        run: nix develop .# --command gitleaks detect --no-git --source . --redact --no-banner

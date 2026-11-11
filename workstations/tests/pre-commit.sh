@@ -8,4 +8,4 @@ if ! command -v gitleaks >/dev/null 2>&1; then
 fi
 # This is intentionally a hard security check of staged content.
 # The file-extension check above is advisory only.
-gitleaks git --pre-commit --staged --redact=100 --no-banner
+gitleaks protect --staged --redact --no-banner
