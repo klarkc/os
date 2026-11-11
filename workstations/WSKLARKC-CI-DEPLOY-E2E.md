@@ -156,7 +156,7 @@ read that personal password. The Dell's Google identity must receive
 a scoped IAP/instance-viewer binding separate from the CI E2E
 identity. Afterwards, restore `klarkc/dotfiles` directly into
 `/home/klarkc`, separately recover private state and validate the
-SoloSIG Nix/devenv workloads; do not enable GPU, CUDA or local vLLM.
+private development environments; do not enable GPU, CUDA or local vLLM.
 
 **Current status** (until proved otherwise): code and tests prepared,
 actual Cloud Shell bootstrap and billable VM deployment **pending**.

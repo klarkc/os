@@ -189,13 +189,13 @@ jobs:
         run: |
           set -euo pipefail
           cd workstations
-          nix build -L .#thin-client-iso --out-link /tmp/solo-iso
+          nix build -L .#thin-client-iso --out-link /tmp/thin-client-iso
           mkdir -p "$GITHUB_WORKSPACE/dist"
-          cp /tmp/solo-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
+          cp /tmp/thin-client-iso/iso/*.iso "$GITHUB_WORKSPACE/dist/"
           (cd "$GITHUB_WORKSPACE/dist" && sha256sum *.iso > SHA256SUMS)
       - uses: actions/upload-artifact@v4
         with:
-          name: solo-thin-client-iso
+          name: thin-client-iso
           path: dist/
           if-no-files-found: error
           retention-days: 7

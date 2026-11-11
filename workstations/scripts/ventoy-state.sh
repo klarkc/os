@@ -4,8 +4,8 @@
 # USB is trusted by the owner. Contents are NOT encrypted.
 set -euo pipefail
 
-MOUNT=/run/solo-client/ventoy
-DATA="$MOUNT/solo-client"
+MOUNT=/run/thin-client/ventoy
+DATA="$MOUNT/thin-client"
 NM_DIR=/etc/NetworkManager/system-connections
 TS_STATE=/var/lib/tailscale/tailscaled.state
 
@@ -51,7 +51,7 @@ prepare_usb() {
     echo "Cannot mount Ventoy data partition read/write; no state persisted." >&2
     return 1
   fi
-  if ! (touch "$MOUNT/.solo-client-write-test" && rm "$MOUNT/.solo-client-write-test"); then
+  if ! (touch "$MOUNT/.thin-client-write-test" && rm "$MOUNT/.thin-client-write-test"); then
     echo "Ventoy data partition is not writable." >&2
     umount "$MOUNT" || true
     return 1
@@ -112,7 +112,7 @@ get_host() {
   if is_ready && [[ -s "$DATA/rdp-host" ]]; then
     head -n 1 "$DATA/rdp-host"
   else
-    printf 'solo-workstation\n'
+    printf 'remote-workstation\n'
   fi
 }
 
@@ -121,5 +121,5 @@ case "${1:-}" in
   save) save_state ;;
   set-host) set_host "${2:-}" ;;
   get-host) get_host ;;
-  *) echo "Usage: solo-client-state {restore|save|get-host|set-host HOST}" >&2; exit 2 ;;
+  *) echo "Usage: thin-client-state {restore|save|get-host|set-host HOST}" >&2; exit 2 ;;
 esac

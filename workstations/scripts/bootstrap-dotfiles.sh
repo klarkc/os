@@ -10,7 +10,7 @@ if [[ -e .git || -L .git ]]; then
   echo "Existing HOME Git metadata: manual inspection required" >&2
   exit 1
 fi
-stage="$(mktemp -d /tmp/solo-dotfiles.XXXXXXXX)"
+stage="$(mktemp -d /tmp/legacy-dotfiles.XXXXXXXX)"
 trap 'rm -rf -- "$stage"' EXIT
 git clone --depth 1 --branch main --no-checkout https://github.com/klarkc/dotfiles.git "$stage/repo"
 # Never overwrite or silently move existing HOME files. Tracked paths,

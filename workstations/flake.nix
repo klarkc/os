@@ -21,7 +21,7 @@
       };
       isoModule = { modulesPath, ... }: {
         imports = [ (modulesPath + "/installer/cd-dvd/installation-cd-minimal.nix") ];
-        isoImage.isoName = "solo-thin-client-x86_64.iso";
+        isoImage.isoName = "thin-client-x86_64.iso";
       };
       gceModule = { modulesPath, ... }: {
         imports = [ (modulesPath + "/virtualisation/google-compute-image.nix") ];
@@ -43,7 +43,7 @@
         gce-workstation-security-vm = import ./tests/gce-workstation.nix { inherit pkgs; determinateModule = determinate.nixosModules.default; };
 
         boot-and-network-vm = pkgs.testers.runNixOSTest {
-          name = "solo-thin-client-and-workstation";
+          name = "thin-client-and-workstation";
           nodes = {
             client = { lib, ... }: {
               imports = [ ./thin-client.nix ];
@@ -75,12 +75,12 @@
             server.wait_for_unit("multi-user.target")
             client.succeed("systemctl is-active NetworkManager.service")
             client.succeed("systemctl is-active tailscaled.service")
-            client.succeed("systemctl show -P Result solo-ventoy-state.service | grep -Fx success")
-            client.succeed("test -e /run/current-system/sw/bin/solo-client-state")
+            client.succeed("systemctl show -P Result thin-client-ventoy-state.service | grep -Fx success")
+            client.succeed("test -e /run/current-system/sw/bin/thin-client-state")
             client.succeed("test -e /run/current-system/sw/bin/xfreerdp")
-            client.succeed("! mountpoint -q /run/solo-client/ventoy")
-            client.succeed("test ! -d /run/solo-client/ventoy/solo-client")
-            client.succeed("systemctl start solo-save-state.service")
+            client.succeed("! mountpoint -q /run/thin-client/ventoy")
+            client.succeed("test ! -d /run/thin-client/ventoy/thin-client")
+            client.succeed("systemctl start thin-client-save-state.service")
             server.succeed("systemctl is-active xrdp.service")
             server.succeed("systemctl is-active xrdp-sesman.service")
             server.succeed("test ! -e /run/current-system/sw/bin/tailscale")

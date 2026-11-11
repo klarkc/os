@@ -145,11 +145,11 @@ in
     xterm alacritty
     xorg.xauth xorg.xsetroot xorg.xmodmap
     xclip dbus dunst
-    # P0 SoloSIG browser and password vault, installed declaratively for
+    # P0 desktop browser and password vault, installed declaratively for
     # the GCE image. The vault, browser profile and credentials remain
     # private runtime state; neither application is configured with secrets.
     brave enpass
-    # CPU-only portable baseline for the existing Arch dotfiles and SoloSIG.
+    # CPU-only portable baseline for the legacy user configuration.
     # Do not use dotfiles#default: it includes NVIDIA/nixGL/CUDA/vLLM.
     git-lfs jq ripgrep fd lsd bat fzf zoxide btop yazi
     xorg.xset xorg.xrandr xorg.xmessage

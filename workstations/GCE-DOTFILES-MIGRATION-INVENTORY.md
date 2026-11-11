@@ -1,6 +1,6 @@
 # Current decision (2026-10-29): 256 GiB pd-balanced and R$560/month replace the old 512 GiB/R$400 design. Historical measurements and comparisons below are preserved only as migration evidence. No GCE provisioning is authorized.
 
-# Inventory: solo098 Arch Linux dotfiles to CPU-only NixOS GCE
+# Inventory: legacy Arch host Arch Linux dotfiles to CPU-only NixOS GCE
 
 **Evidence date:** 2026-10-27. Source snapshot: [klarkc/dotfiles main at
 `0f2dbfda51d57a0539317a1ef7c1ff084c5513db`](https://github.com/klarkc/dotfiles/tree/0f2dbfda51d57a0539317a1ef7c1ff084c5513db).
@@ -9,7 +9,7 @@ Target: [BuildGCE branch](https://github.com/klarkc/os/tree/feat/wsklarkc-gce),
 IAP interface: [issue #21](https://github.com/klarkc/os/issues/21).
 
 This is a **source-level inventory**, not an audit of the original
-solo098 machine's installed package database or untracked HOME data.
+legacy Arch host machine's installed package database or untracked HOME data.
 The old machine was sanitized; neither running services nor private
 runtime secrets have been recovered/validated on GCE. Package names
 below are proposed Nixpkgs equivalents, **not a claim that all
@@ -21,9 +21,9 @@ derivations or graphical workflows have already been built or tested**.
   `autoDelete=false`, in `southamerica-east1-b`; **not** 150 GiB.
   The live preflight checks size, type, boot attachment and retention.
 - VM target unchanged: `e2-highmem-4` / 4 vCPU / 32 GiB RAM / CPU only.
-- This is analogous to solo098's *capacity*, not its physical Lexar
+- This is analogous to legacy Arch host's *capacity*, not its physical Lexar
   NVMe. GCE Persistent Disk is network-backed SSD storage.
-- solo098's earlier layout was approximately /boot 1 GiB, swap 8 GiB,
+- legacy Arch host's earlier layout was approximately /boot 1 GiB, swap 8 GiB,
   root/home/log Btrfs subvolumes. The current locked Nixpkgs GCE image
   imports `virtualisation/google-compute-image.nix`, which uses
   `make-disk-image.nix` with **legacy/MBR and ext4**, NOT Btrfs
@@ -53,7 +53,7 @@ Google OS Login is furnished by the NixOS GCE image module.
 **Not proved:** successfully compiling the user's actual
 `~/.config/xmonad/xmonad.hs`, running Taffybar, logging in
 interactively to XRDP with a real password, authenticating to GCP via
-IAP, or executing the SoloSIG toolchain.
+IAP, or executing the private project toolchain.
 
 ## Arch/yay README dependency mapping
 
@@ -81,7 +81,7 @@ declarative NixOS options and explicit Nixpkgs packages.
 | `keyd` | On Dell/client if physical keyboard remap desired, **not** GCE RDP guest | Replace/client scope | keyd remapeia teclado no kernel; o teclado real está no Dell, não no servidor RDP. |
 | `the_silver_searcher` | `pkgs.silver-searcher`; ripgrep also suitable | P1 | Pesquisa de código é portável; silver-searcher mantém CLI, ripgrep é alternativa. |
 | `satty scrot i3lock xss-lock` | Nixpkgs screen capture/locking; test inside XRDP session | P1 | Captura e bloqueio podem funcionar no Xorg remoto, mas precisam de teste de reconexão. |
-| `sword` | Optional SWORD package after requirement confirmation | Optional | SWORD é específico e opcional; não participa do boot, acesso ou desenvolvimento SoloSIG. |
+| `sword` | Optional SWORD package after requirement confirmation | Optional | SWORD é específico e opcional; não participa do boot ou do acesso remoto. |
 | `ffmpeg unzip htop` | Nixpkgs same/equivalent | P1 | Ferramentas CLI independem do Arch e podem vir diretamente do Nixpkgs. |
 | `snapper` | Only after deliberate Btrfs layout design; current GCE image ext4 | Replace/defer | Snapper espera snapshots do filesystem; imagem GCE atual usa ext4, não Btrfs. |
 | `pacreport yay-cache-cleanup-hook` | **Remove**: Nix store GC + NixOS generation retention; never delete GC roots blindly | Replace | pacman/AUR não existem em NixOS; substituir por GC do Nix preservando raízes e gerações. |
@@ -89,9 +89,9 @@ declarative NixOS options and explicit Nixpkgs packages.
 | `bat git-delta ripgrep btdu btop` | Nixpkgs `bat`, `delta`, `ripgrep`, `btdu`, `btop` | P1 | Ferramentas CLI podem ser mantidas com empacotamento declarativo Nix. |
 | `handlr` | Optional Nixpkgs equivalent/desktop MIME configuration | P2 | Associações MIME podem usar XDG; não incluir gestor extra sem uso demonstrado. |
 | `ollama-cuda` | **Do not migrate locally**; CPU-only VM. Use authorized remote LLM endpoint | Hard exclusion | ollama-cuda depende de GPU NVIDIA; usuário decidiu desabilitar GPU, CUDA e vLLM até nova ordem. |
-| `Brave` / Chromium | `pkgs.brave` in versioned GCE `environment.systemPackages` | **P0 / SoloSIG mandatory**; verify browser/XRDP login and integration with Enpass; no browser profile or OAuth inside Git/image | Brave e um navegador funcional são requisitos confirmados pelo operador para trabalhar com SoloSIG. |
-| `enpass-bin` | `pkgs.enpass` in versioned GCE `environment.systemPackages`; scoped Nixpkgs unfree allowlist | **P0 / SoloSIG mandatory**; operator-unlocked vault, sync and Brave native messaging remain unproven | Enpass é requisito indispensável, não P2/opcional; nunca incluir cofre ou credenciais na derivação ou imagem. |
-| `discord` | Optional independent GUI package | P2 / not required for SoloSIG | Aplicativo adicional não bloqueia produtividade inicial. |
+| `Brave` / Chromium | `pkgs.brave` in versioned GCE `environment.systemPackages` | **P0 / workstation required**; verify browser/XRDP login and integration with Enpass; no browser profile or OAuth inside Git/image | Brave e um navegador funcional são requisitos confirmados pelo operador no ambiente gráfico remoto. |
+| `enpass-bin` | `pkgs.enpass` in versioned GCE `environment.systemPackages`; scoped Nixpkgs unfree allowlist | **P0 / workstation required**; operator-unlocked vault, sync and Brave native messaging remain unproven | Enpass é requisito indispensável, não P2/opcional; nunca incluir cofre ou credenciais na derivação ou imagem. |
+| `discord` | Optional independent GUI package | P2 / optional desktop application | Aplicativo adicional não bloqueia produtividade inicial. |
 | `lumen fzf mdcat` | fzf/mdcat via Nixpkgs; Lumen optional after Nix packaging check | Optional | fzf/mdcat são portáveis; Lumen depende de pacote verificado e uso confirmado. |
 | `yazi` | Nixpkgs Yazi; helpers `7zip jq poppler fd fzf zoxide resvg imagemagick xclip xsel chafa` | P1 file manager | Yazi exige auxiliares para previews; migrar conjunto para não deixar funções parcialmente quebradas. |
 
@@ -130,7 +130,7 @@ usa o XMonad do NixOS com D-Bus; depois usa
 `.local/bin/xmonad-session` do HOME. O módulo NixOS habilita
 `xmonad-contrib` para os imports do `xmonad.hs`.
 
-**XFCE foi removido** porque o usuário não o utilizava no solo098.
+**XFCE foi removido** porque o usuário não o utilizava no legacy Arch host.
 Era um desktop duplicado, com closure e serviços adicionais, sem ser
 pré-requisito do XRDP. Também foi removido `xfce4-terminal`.
 **Lemurs não vem** porque era o login manager do TTY local: ele não
@@ -139,7 +139,7 @@ houver demanda por console gráfico local, mas não como requisito RDP.
 
 A configuração XMonad traz comandos fixos de monitores físicos e
 `/opt` do Arch, que devem ser adaptados antes de considerar o
-desktop idêntico ao solo098. O CI não prova login XRDP autenticado.
+desktop idêntico ao ambiente histórico. O CI não prova login XRDP autenticado.
 
 **Migration design:** add a separately named Nix profile, preferably in
 `klarkc/dotfiles` via its own reviewed change, for portable/CPU-only
@@ -169,23 +169,21 @@ never install the existing `#default` wholesale.
 | `.local/bin/cleanup`, `pacman-*`, `.config/systemd/user/pacreport.*` | Arch `yay`, `pacman`, `pacreport`; aggressive Nix GC and deletion | Leave disabled / replace with bounded NixOS GC only | pacman/yay não existem e os scripts removem recursos agressivamente; usar GC seguro. |
 | `.local/bin/home-cleanup-post` | `git stash` + `git clean -fdx` across Sources/worktrees, sudo deletion | **Never auto-enable** on cloud: destructive to uncommitted state/worktrees | git clean -fdx e sudo rm -rf podem destruir Sources/worktrees; nunca ativar automaticamente. |
 | `Makefile` | Default `make` installs `#default`, runs network-fetched theme/icon scripts and npm config | Do not run whole `make`; select safe non-destructive targets | make invoca perfil NVIDIA/CUDA e scripts curl de instalação; usar alvos Nix auditados. |
-| `.config/systemd/user/*.service` | Many services reference `%h/.nix-profile/bin` | Install explicit portable tools first; audit each unit and do not enable en masse | Units dependem de paths, programas e segredos do solo098; habilitar uma a uma após teste. |
+| `.config/systemd/user/*.service` | Many services reference `%h/.nix-profile/bin` | Install explicit portable tools first; audit each unit and do not enable en masse | Units dependem de paths, programas e segredos do legacy Arch host; habilitar uma a uma após teste. |
 
 ## Project workloads and user state
 
-- SoloSIG development depends on the *project's* Nix/devenv environment:
-  Node/npm, Java/Maven, PostgreSQL/PostGIS/Prisma/pgkit, MapStore2,
-  GeoServer/Tomcat, and other modules. These are **project-specific**
-  and should be provided by its pinned flake/devenv, not copied as
-  global pacman dependencies.
-- Runtime requirements to validate: `nix develop`/`devenv up`,
-  user namespace, filesystem permissions, native libraries, ports,
-  GIS dependencies and service orchestration. PostgreSQL development
-  state is **not** included merely by checking out dotfiles.
+- Work-specific repositories, dependencies, environment variables, tooling
+  and architecture are private and must not be documented or reproduced in
+  this public operating-system repository. Each private project owns its
+  own pinned development environment; keep that definition private.
+- Validate generic `nix develop` support, permissions, process isolation,
+  local ports and persistence with synthetic CI fixtures. Restoring user
+  dotfiles alone does not restore private working data or databases.
 - The checkout must be **directly in `/home/klarkc/.git`** (never
   `/home/klarkc/dotfiles/.git`). The guarded bootstrap script already
   refuses conflicting HOME files; it does not restore every untracked
-  file, agent session, private key, model cache or worktree from solo098.
+  file, agent session, private key, model cache or worktree from legacy Arch host.
 - Private `~/.profile_override`, Enpass sync, OpenCode/Codex OAuth,
   OptMem sidecar, SSH/Git credentials, `~/Sources`, Herdr worktrees,
   historical sessions and backups have to be restored by a separate,
@@ -207,7 +205,7 @@ never install the existing `#default` wholesale.
    bootstrap; safe shell Git prompt; XMonad-only cloud config and pre-HOME
    bootstrap launcher; real XRDP login through IAP; ensure no public 3389.
 3. **P0/P1 / declarative portable developer baseline:** Brave and Enpass
-   are **P0 blocking** for SoloSIG and belong in the versioned GCE NixOS
+   are **P0 blocking** for the workstation baseline and belong in the versioned GCE NixOS
    `environment.systemPackages` alongside the CPU-only shell essentials,
    fonts and helpers. Check guest executables with QEMU before rollout;
    validate real Brave/XRDP, Enpass vault unlock and browser integration
@@ -215,7 +213,7 @@ never install the existing `#default` wholesale.
    duplicated system applications once reviewed. Never install the NVIDIA
    `dotfiles#default`, use shell-driven `nix profile install`, or overwrite
    the operator's existing HOME.
-4. **P1 / SoloSIG:** restore Sources/worktrees through verified backup;
+4. **P1 / private work environment:** restore Sources/worktrees through verified backup;
    activate project Nix/devenv; run smoke tests per service, not
    a blanket installation of the original Arch package list.
 5. **P2 / optional agents:** Codex/OpenCode OAuth, Herdr, Kolu

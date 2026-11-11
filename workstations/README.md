@@ -1,4 +1,4 @@
-# Temporary Solo NixOS workstation
+# Temporary NixOS workstation
 
 This self-contained flake does not modify the legacy root `flake.nix`.
 **Canonical integration contract:** https://github.com/klarkc/os/issues/21.
@@ -15,9 +15,9 @@ See [GCE-OPERATIONS.md](GCE-OPERATIONS.md).
 
 **BuildClient** owns the borrowed 4 GiB Dell, Ventoy persistence, Wi-Fi,
 gcloud authentication and FreeRDP tunnel via `localhost:13389`. The
-other branch `feat/solo-thin-client-ci-20261026` implements IAP and
-passed the NixOS/QEMU/ISO gates at commit `94ea18bf`, but real
-IAP/XRDP and the physical Dell still need validation.
+historical thin-client implementation established the initial IAP and
+offline NixOS/QEMU/ISO checks. The Windows IAP/XRDP graphical login has
+since been operator-verified; physical Dell boot remains a separate gate.
 The Dell's disk must not be installed/repartitioned, and the Ventoy USB is
 trusted and unencrypted by user decision. Do not store authentication in
 the ISO, internal HDD, Git or CI. See [BUILDGCE-IAP-HANDOFF.md](BUILDGCE-IAP-HANDOFF.md).
@@ -56,7 +56,7 @@ CPU-only NixOS without separate GPU/Arch-specific dependency review.
 
 ## Declarative CPU-only application baseline (GCE)
 
-The SoloSIG workflow requires **Brave and Enpass (P0)**. Both are part of the
+The workstation baseline requires **Brave and Enpass (P0)**. Both are part of the
 versioned `gcp-workstation.nix` system package closure, together with portable
 shell/developer tools and fonts. Nixpkgs unfree acceptance is restricted to
 the Enpass derivation; this image does not install Arch/AUR, GPU, CUDA or vLLM
@@ -66,7 +66,7 @@ software. No manual `nix profile install`, `pacman`, `yay` or blanket
 The dedicated GCE QEMU test checks the actual installed Brave/Enpass
 executables in the guest. Browser startup inside **real XRDP/XMonad**, vault
 unlock/synchronization, browser-extension/native-messaging autofill and
-SoloSIG website authentication are separate operator-assisted acceptance
+private-site browser authentication are separate operator-assisted acceptance
 tests; no vault contents, OAuth tokens or browser profile are embedded in
 NixOS, Git, CI, metadata or the image.
 

@@ -26,7 +26,7 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 - Persistent boot disk candidate: 256 GiB `pd-balanced`, persistent through suspend/resume (when compatible).
   The disk is provisioned at 256 GiB even when the VM is suspended; plan for
   full-month block-storage charges and set `autoDelete=false` explicitly.
-  The legacy solo098 used a physical 512-GB NVMe with Btrfs subvolumes;
+  The legacy legacy Arch host used a physical 512-GB NVMe with Btrfs subvolumes;
   this is **capacity parity**, not physical NVMe or filesystem parity.
   The standard Google Compute Engine NixOS image filesystem must be checked
   before claiming Btrfs, partition layout or swap equivalence.
@@ -35,7 +35,7 @@ containing peer public keys. The Dell integration is owned by BuildClient.
 - Display: XRDP on TCP 3389 with **XOrg/XMonad only**. When the
   HOME wrapper exists, XRDP launches it; before restoring dotfiles
   the NixOS XMonad starts directly under D-Bus. **No XFCE**, which
-  was unused on solo098, and **no Lemurs**, a local TTY login manager
+  was unused on legacy Arch host, and **no Lemurs**, a local TTY login manager
   that does not handle XRDP authentication. Password initially locked.
 - Both OS firewall and GCE VPC firewall restrict admin ports to the IPv4
   Google IAP source `35.235.240.0/20`. SSH 22 is for OS Login admin only,
@@ -130,7 +130,7 @@ output; the script does not establish an end-to-end tunnel.
 ## Network egress: compare before approval
 
 IAP TCP never requires a VM public IP. For outbound access to GitHub, Nix
-binary caches and SoloSIG, however, a VM without a public IP needs NAT or
+binary caches and private development tools, however, a VM without a public IP needs NAT or
 another existing approved egress path.
 
 - **Recommended for intermittent ~172 hours/month:** ephemeral external
@@ -194,7 +194,7 @@ Use a separate `klarkc/os` checkout to launch the guarded
 the dotfiles Git checkout **directly at HOME**, only if there are no
 conflicting tracked paths. The existing `klarkc/dotfiles#default` profile
 still includes GPU/Arch-specific pieces; do not silently install them on
-the CPU-only workstation. SoloSIG environment/toolchain compatibility
+the CPU-only workstation. private project compatibility
 must be verified separately before claiming full parity.
 
 ## Real Dell IAP/RDP acceptance, owned jointly with BuildClient
@@ -234,7 +234,7 @@ authenticated graphical integration remain E2E acceptance gates.
 https://github.com/klarkc/os/actions/runs/40402732649 passed NixOS
 evaluation, combined/USB QEMU checks, dedicated IAP server QEMU reboot
 test, client ISO build, and GCE raw image build. The CI GCE artifact is
-`solo-gce-image-248df1ff088119a51a7c9b7fe3a23bd172ffe346`,
+an earlier versioned image archive,
 artifact ID `12690415833`. This is a build artifact, **not** an imported
 Compute Engine image and not real IAP/RDP validation.
 
@@ -341,7 +341,7 @@ does that after the WIF bootstrap, not manual `--deploy`.
 
 **Remaining independent acceptance:** authorize the real Dell
 Google login principal, set `klarkc`'s personal XRDP password
-**interactively** (never in CI), restore private HOME and SoloSIG
+**interactively** (never in CI), restore private HOME and private work repositories
 development data, and physically test `lpklarkc`. The CI E2E
 simulates the authenticated graphical login using a **separate
 temporary account**, not the user's private credentials. See
