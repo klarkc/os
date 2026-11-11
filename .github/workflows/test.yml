@@ -42,4 +42,13 @@ jobs:
             experimental-features = nix-command flakes
             accept-flake-config = false
       - name: Run generic redacted secret scan from Nix devShell
-        run: nix develop .# --command gitleaks detect --no-git --source . --redact --no-banner
+        run: |
+          set -euo pipefail
+          report="$RUNNER_TEMP/gitleaks-findings.json"
+          status=0
+          nix develop .# --command gitleaks detect --no-git --source . --redact --no-banner --report-format json --report-path "$report" || status=$?
+          # Only rule, tracked file and line. Do not print matches, values or findings JSON.
+          if [ -s "$report" ]; then
+            nix develop .# --command jq -r '.[] | "Rule: \(.RuleID) | File: \(.File) | Line: \(.StartLine)"' "$report"
+          fi
+          exit "$status"
