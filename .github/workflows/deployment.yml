@@ -8,10 +8,7 @@ on:
         type: boolean
         default: false
   push:
-    paths:
-      - "workstations/**"
-      - ".github/workflows/deployment.yml"
-  pull_request:
+    branches: [main]
     paths:
       - "workstations/**"
       - ".github/workflows/deployment.yml"
