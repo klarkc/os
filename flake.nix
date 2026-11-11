@@ -21,6 +21,12 @@
       os = "linux";
       system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
+      # Nix-managed hook directory; no disallowed extension in Git.
+      gitHooks = pkgs.runCommand "os-local-git-hooks" { } ''
+        mkdir -p "$out"
+        cp ${./workstations/tests/pre-commit.sh} "$out/pre-commit"
+        chmod +x "$out/pre-commit"
+      '';
       lib = {
         secrets = ./secrets;
         mkSystem = options:
@@ -42,6 +48,19 @@
     in
     {
       inherit lib;
+      devShells.${system}.default = pkgs.mkShell {
+        packages = with pkgs; [ bash git gitleaks jq coreutils gnugrep findutils ];
+        shellHook = ''
+          # Declarative hook installation for this checkout only, no global config.
+          if [ -d .git ] && git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            repo_root=$(git rev-parse --show-toplevel)
+            if [ "$repo_root" = "$PWD" ]; then
+              git config --local core.hooksPath ${gitHooks}
+            fi
+          fi
+        '';
+      };
+
 
       nixosModules = {
         inherit (setups.recover.modules) recover;

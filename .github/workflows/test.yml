@@ -30,3 +30,5 @@ jobs:
         run: |
           nix flake check --no-build --show-trace
           (cd workstations && nix flake check --no-build --show-trace)
+      - name: Validate the public checkout with redacted Gitleaks
+        run: nix develop .# --command gitleaks dir . --redact=100 --no-banner
