@@ -5,8 +5,10 @@ case "$mode" in --ci|--hook|--selftest) ;; *) echo 'Usage: repository-file-polic
 allowed() {
   case "$1" in
     AGENTS.md|README.md|LICENSE|.gitignore|flake.lock) return 0 ;;
+    .github/*)
+      case "$1" in *.yml|*.yaml) return 0 ;; *) return 1 ;; esac
+      ;;
     *.nix|*.sh) return 0 ;;
-    .github/*.yml|.github/*.yaml) return 0 ;;
     *) return 1 ;;
   esac
 }
@@ -14,7 +16,7 @@ if [[ "$mode" == --selftest ]]; then
   for item in AGENTS.md README.md LICENSE .gitignore flake.lock flake.nix src/tool.sh .github/workflows/test.yml .github/dependabot.yaml; do
     allowed "$item" || exit 1
   done
-  for item in CHANGELOG.md .github/known_hosts notes.md docs/README.md workstations/flake.lock tests/check.py; do
+  for item in CHANGELOG.md .github/known_hosts .github/script.sh .github/module.nix notes.md docs/README.md workstations/flake.lock tests/check.py; do
     if allowed "$item"; then echo "Unexpected accepted path: $item" >&2; exit 1; fi
   done
   echo "PASS: format-policy selftest"
