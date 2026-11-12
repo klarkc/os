@@ -81,8 +81,17 @@ trap 'rm -f "$mock_loginctl"; rm -rf "$diagnostic_fixture"' EXIT
 cat > "$mock_loginctl" <<'MOCK'
 #!/bin/sh
 [ "${LPKLARKC_TEST_LOGINCTL_FAIL:-0}" != "1" ] || exit 1
+if [ "$1" = "show-seat" ]; then
+  [ "${LPKLARKC_TEST_SEAT_FAIL:-0}" != "1" ] || exit 1
+  [ "${LPKLARKC_TEST_SEAT_EMPTY:-0}" = "1" ] ||
+    printf 'ActiveSession=%s\n' "${LPKLARKC_TEST_SEAT_ACTIVE_SESSION-1}"
+  exit 0
+fi
 if [ "${LPKLARKC_TEST_EMPTY_OUTPUT:-0}" = "1" ]; then
   exit 0
+fi
+if [ "${LPKLARKC_TEST_OMIT_ID:-0}" != "1" ]; then
+  printf 'Id=%s\n' "${LPKLARKC_TEST_SESSION_ID-1}"
 fi
 if [ "${LPKLARKC_TEST_OMIT_ACTIVE:-0}" != "1" ]; then
   printf 'Active=%s\n' "${LPKLARKC_TEST_ACTIVE-yes}"
@@ -168,12 +177,53 @@ for expected in \
   'got fd for /dev/dri/card1 226:1 fd 11 paused 1' \
   'Screen 0 deleted because of no matching config section' \
   'no screens found' \
+  'Correlacao self/seat0: MESMA_SESSAO' \
   'nao prova a sessao no instante'; do
   if [[ "$diagnostic_output" != *"$expected"* ]]; then
     printf 'FAIL: read-only Dell diagnostic did not report %s\n' "$expected" >&2
     exit 1
   fi
 done
+# A different seat owner is evidence, not a hard Xorg/VT gate:
+# invoking from tty2 cannot reconstruct the original paused logind fd.
+diagnostic_mismatch="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=8 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_mismatch" != *'Correlacao self/seat0: DIVERGENTE'* ]]; then
+  echo 'FAIL: diagnostic did not show conflicting self and active seat sessions' >&2
+  exit 1
+fi
+diagnostic_unknown="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_SEAT_FAIL=1 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_unknown" != *'consulta seat0 indisponivel'* ||
+      "$diagnostic_unknown" != *'Correlacao self/seat0: INDETERMINADA'* ]]; then
+  echo 'FAIL: diagnostic inferred seat ownership from failed logind read' >&2
+  exit 1
+fi
+diagnostic_missing_id="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_OMIT_ID=1 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_missing_id" != *'Correlacao self/seat0: INDETERMINADA'* ]]; then
+  echo 'FAIL: diagnostic inferred missing current session ID' >&2
+  exit 1
+fi
+
 diagnostic_empty="$(
   LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
   LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/empty" \

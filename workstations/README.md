@@ -117,6 +117,9 @@ pode executar `lpklarkc --diagnose-xorg` (sem `sudo`). O comando apenas le
 a sessao logind atual, os dispositivos DRM `cardN` e assinaturas do ultimo
 `Xorg.0.log`; nao troca VT, inicia Xorg ou acessa tokens. O retrato atual
 **nao** comprova o estado do logind no instante da falha original.
+A linha `Correlacao self/seat0` compara somente IDs atuais: `DIVERGENTE`
+no tty2 pode ser normal; `INDETERMINADA` nao explica o FD DRM
+`paused 1` observado no Xorg anterior.
 
 
 ### Firmware e hardware

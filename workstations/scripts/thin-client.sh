@@ -156,12 +156,40 @@ diagnose_xorg() {
   local log="${LPKLARKC_DIAG_XORG_LOG:-${HOME:-/home/nixos}/.local/share/xorg/Xorg.0.log}"
   local node card major_minor driver_path driver excerpt found=0
   printf 'Diagnostico Xorg/DRM (somente leitura, estado atual)\n'
+  local self_snapshot="" seat_snapshot="" session_id="" active_session=""
+  local property value seat_candidate
   printf 'Sessao logind deste comando (pode ser tty2, nao o momento da falha):\n'
-  "$LOGINCTL" show-session self --property=Active --property=VTNr --no-pager 2>/dev/null ||
+  if self_snapshot="$("$LOGINCTL" show-session self --property=Id --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
+    printf '%s\n' "$self_snapshot"
+    while IFS='=' read -r property value; do
+      if [[ "$property" == "Id" && "$value" =~ ^[[:alnum:]_-]+$ ]]; then
+        session_id="$value"
+      fi
+    done <<< "$self_snapshot"
+  else
     printf '  consulta logind indisponivel\n'
+  fi
   printf 'Sessao ativa em seat0 (estado atual):\n'
-  "$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null ||
+  if seat_snapshot="$("$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null)"; then
+    printf '%s\n' "$seat_snapshot"
+    while IFS='=' read -r property value; do
+      seat_candidate="${value%% *}"
+      if [[ "$property" == "ActiveSession" && "$seat_candidate" =~ ^[[:alnum:]_-]+$ ]]; then
+        active_session="$seat_candidate"
+      fi
+    done <<< "$seat_snapshot"
+  else
     printf '  consulta seat0 indisponivel\n'
+  fi
+  # Compare only snapshots from this command. From tty2, a different
+  # session can be normal and says nothing about an earlier tty1 Xorg FD.
+  if [[ -z "$session_id" || -z "$active_session" ]]; then
+    printf 'Correlacao self/seat0: INDETERMINADA (consulta incompleta)\n'
+  elif [[ "$session_id" == "$active_session" ]]; then
+    printf 'Correlacao self/seat0: MESMA_SESSAO (instante da consulta)\n'
+  else
+    printf 'Correlacao self/seat0: DIVERGENTE (instante da consulta; tty2 pode ser esperado)\n'
+  fi
   printf 'DRM cardN e driver kernel:\n'
   for node in "$drm_dir"/card[0-9]*; do
     [[ -e "$node" ]] || continue
