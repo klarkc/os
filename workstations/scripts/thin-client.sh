@@ -147,6 +147,48 @@ xorg_tty1_seat_ready() {
   return 0
 }
 
+
+# One-command, read-only field evidence. A tty2 snapshot is NOT proof of
+# logind/DRM ownership at the moment the rootless Xorg :0 session started.
+diagnose_xorg() {
+  local drm_dir="${LPKLARKC_DIAG_DRM_DIR:-/dev/dri}"
+  local sys_drm_dir="${LPKLARKC_DIAG_SYS_DRM_DIR:-/sys/class/drm}"
+  local log="${LPKLARKC_DIAG_XORG_LOG:-${HOME:-/home/nixos}/.local/share/xorg/Xorg.0.log}"
+  local node card major_minor driver_path driver excerpt found=0
+  printf 'Diagnostico Xorg/DRM (somente leitura, estado atual)\n'
+  printf 'Sessao logind deste comando (pode ser tty2, nao o momento da falha):\n'
+  "$LOGINCTL" show-session self --property=Active --property=VTNr --no-pager 2>/dev/null ||
+    printf '  consulta logind indisponivel\n'
+  printf 'Sessao ativa em seat0 (estado atual):\n'
+  "$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null ||
+    printf '  consulta seat0 indisponivel\n'
+  printf 'DRM cardN e driver kernel:\n'
+  for node in "$drm_dir"/card[0-9]*; do
+    [[ -e "$node" ]] || continue
+    card="${node##*/}"
+    [[ "$card" =~ ^card[0-9]+$ ]] || continue
+    major_minor="$(cat "$sys_drm_dir/$card/dev" 2>/dev/null)" || major_minor="?"
+    driver_path="$(readlink -f "$sys_drm_dir/$card/device/driver" 2>/dev/null)" || driver_path=""
+    driver="${driver_path##*/}"
+    [[ -n "$driver" ]] || driver="?"
+    printf '  %s major_minor=%s driver=%s\n' "$card" "$major_minor" "$driver"
+    found=1
+  done
+  (( found )) || printf '  nenhum cardN presente\n'
+  printf 'Assinaturas relevantes do Xorg.0.log:\n'
+  if [[ -r "$log" ]]; then
+    excerpt="$(grep -Ei 'xfree86: Adding drm device|systemd-logind: got fd for /dev/dri/card|Error systemd-logind returned paused fd|open /dev/dri/card[0-9]+: No such file or directory|Screen 0 deleted|Device\(s\) detected, but none match|no screens found|Server terminated with error' "$log" | tail -n 18)" || true
+    if [[ -n "$excerpt" ]]; then
+      printf '%s\n' "$excerpt"
+    else
+      printf '  sem assinaturas Xorg/DRM selecionadas\n'
+    fi
+  else
+    printf '  Xorg.0.log indisponivel neste usuario\n'
+  fi
+  printf 'Observacao: estado atual nao prova a sessao no instante em que Xorg abriu DRM.\n'
+}
+
 # A separate rootless Xorg session hosts Firefox only during Google OAuth.
 # Xorg returns to tty1 before the normal full-screen FreeRDP session starts.
 local_oauth_login() {
@@ -178,6 +220,11 @@ local_oauth_login() {
 # Regression-test entrypoints; injected IAP reads only, never writes GCE.
 if [[ "${1:-}" == "--check-xorg-seat" ]]; then
   xorg_tty1_seat_ready
+  exit $?
+fi
+
+if [[ "${1:-}" == "--diagnose-xorg" ]]; then
+  diagnose_xorg
   exit $?
 fi
 

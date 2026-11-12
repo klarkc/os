@@ -76,7 +76,8 @@ fi
 # It must refuse an explicitly inactive tty1 or wrong VT while allowing
 # an active tty1 and a transiently unqueryable logind to reach existing Xorg.
 mock_loginctl="$(mktemp)"
-trap 'rm -f "$mock_loginctl"' EXIT
+diagnostic_fixture="$(mktemp -d)"
+trap 'rm -f "$mock_loginctl"; rm -rf "$diagnostic_fixture"' EXIT
 cat > "$mock_loginctl" <<'MOCK'
 #!/bin/sh
 [ "${LPKLARKC_TEST_LOGINCTL_FAIL:-0}" != "1" ] || exit 1
@@ -137,6 +138,52 @@ if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_ACTIVE=1 bash 
 fi
 if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_LOGINCTL_FAIL=1 bash scripts/thin-client.sh --check-xorg-seat; then
   echo 'FAIL: transient logind read error deadlocked kiosk' >&2
+  exit 1
+fi
+
+
+# One-command Dell field diagnostic: read-only card1 and logind/Xorg signatures,
+# runnable from tty2 without requiring root, an X server or a physical GPU.
+mkdir -p "$diagnostic_fixture/dev" "$diagnostic_fixture/sys/card1/device" \
+  "$diagnostic_fixture/drivers/i915" "$diagnostic_fixture/empty"
+touch "$diagnostic_fixture/dev/card1"
+printf '226:1\n' > "$diagnostic_fixture/sys/card1/dev"
+ln -s "$diagnostic_fixture/drivers/i915" \
+  "$diagnostic_fixture/sys/card1/device/driver"
+printf '%s\n' \
+  '(II) xfree86: Adding drm device (/dev/dri/card1)' \
+  '(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 11 paused 1' \
+  '(EE) Screen 0 deleted because of no matching config section' \
+  '(EE) no screens found' > "$diagnostic_fixture/Xorg.0.log"
+diagnostic_output="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_ACTIVE=yes LPKLARKC_TEST_VTNR=2 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+for expected in \
+  'card1 major_minor=226:1 driver=i915' \
+  'got fd for /dev/dri/card1 226:1 fd 11 paused 1' \
+  'Screen 0 deleted because of no matching config section' \
+  'no screens found' \
+  'nao prova a sessao no instante'; do
+  if [[ "$diagnostic_output" != *"$expected"* ]]; then
+    printf 'FAIL: read-only Dell diagnostic did not report %s\n' "$expected" >&2
+    exit 1
+  fi
+done
+diagnostic_empty="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/empty" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/missing.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_empty" != *'nenhum cardN presente'* ||
+      "$diagnostic_empty" != *'Xorg.0.log indisponivel'* ]]; then
+  echo 'FAIL: read-only diagnostic did not tolerate absent DRM/log files' >&2
   exit 1
 fi
 

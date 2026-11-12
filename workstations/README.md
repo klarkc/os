@@ -112,6 +112,13 @@ essa sessao Xorg encerra e o console retoma. Apos IAP/XRDP pronto, um
 outro `startx` inicia somente FreeRDP em tela cheia. `Ctrl+Alt+F2`
 permanece como recuperacao local.
 
+Para uma investigacao fisica **autorizada**, o console de recuperacao tty2
+pode executar `lpklarkc --diagnose-xorg` (sem `sudo`). O comando apenas le
+a sessao logind atual, os dispositivos DRM `cardN` e assinaturas do ultimo
+`Xorg.0.log`; nao troca VT, inicia Xorg ou acessa tokens. O retrato atual
+**nao** comprova o estado do logind no instante da falha original.
+
+
 ### Firmware e hardware
 
 O perfil usa `hardware.enableAllHardware` e
