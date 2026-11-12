@@ -311,6 +311,11 @@
                 if any("Error systemd-logind returned paused fd for drm node" in line
                        or ("open /dev/dri/card" in line
                            and "No such file or directory" in line)
+                       # The Dell probed i915/card1 yet subsequently rejected
+                       # Screen 0. A DRM probe alone is not an Xorg screen.
+                       or "Screen 0 deleted because of no matching config section" in line
+                       or "Device(s) detected, but none match those in the config file" in line
+                       or "no screens found" in line.lower()
                        for line in lines):
                     return False
                 return True
@@ -333,6 +338,18 @@
                 synthetic_card1 + "\n(EE) open /dev/dri/card0: No such file or directory",
                 "card1"
             ), "the probe accepted missing-card0 Xorg fallback"
+            # Even after the correct card1 probe and an unpaused logind fd,
+            # failure to create Screen 0 must reject the test. These are
+            # literal patterns observed on the physical Dell, not a claim
+            # that QEMU reproduces its i915/seat0 lifecycle.
+            for fatal_xorg_line in (
+                "(EE) Screen 0 deleted because of no matching config section",
+                "(EE) Device(s) detected, but none match those in the config file",
+                "(EE) no screens found",
+            ):
+                assert not xorg_selected_card_without_paused_fd(
+                    synthetic_card1 + "\n" + fatal_xorg_line, "card1"
+                ), "the probe accepted fatal Xorg screen loss: " + fatal_xorg_line
             print("XORG_DRM_CARD1_SELECTION_GATE_FIXTURES_PASS", flush=True)
 
             xorg_real_log = client.succeed(
