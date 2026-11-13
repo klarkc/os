@@ -85,6 +85,9 @@ if [ "$1" = "show-seat" ]; then
   [ "${LPKLARKC_TEST_SEAT_FAIL:-0}" != "1" ] || exit 1
   [ "${LPKLARKC_TEST_SEAT_EMPTY:-0}" = "1" ] ||
     printf 'ActiveSession=%s\n' "${LPKLARKC_TEST_SEAT_ACTIVE_SESSION-1}"
+  if [ "${LPKLARKC_TEST_DUPLICATE_SEAT:-0}" = "1" ]; then
+    printf 'ActiveSession=99\n'
+  fi
   exit 0
 fi
 if [ "${LPKLARKC_TEST_EMPTY_OUTPUT:-0}" = "1" ]; then
@@ -92,6 +95,9 @@ if [ "${LPKLARKC_TEST_EMPTY_OUTPUT:-0}" = "1" ]; then
 fi
 if [ "${LPKLARKC_TEST_OMIT_ID:-0}" != "1" ]; then
   printf 'Id=%s\n' "${LPKLARKC_TEST_SESSION_ID-1}"
+fi
+if [ "${LPKLARKC_TEST_DUPLICATE_ID:-0}" = "1" ]; then
+  printf 'Id=99\n'
 fi
 if [ "${LPKLARKC_TEST_OMIT_ACTIVE:-0}" != "1" ]; then
   printf 'Active=%s\n' "${LPKLARKC_TEST_ACTIVE-yes}"
@@ -150,6 +156,32 @@ if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_LOGINCTL_FAIL=1 bash s
   exit 1
 fi
 
+
+# This read-only pre-startx check does not change the tty1 launch decision.
+prestart_equal="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=7 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_equal" != *'phase=manual self=7 active=yes vt=1 seat0=7 match=MESMA_SESSAO'* ]]; then
+  echo 'FAIL: prestart matching owner observation missing' >&2; exit 1
+fi
+prestart_diff="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=8 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_diff" != *'self=7 active=yes vt=1 seat0=8 match=DIVERGENTE'* ]]; then
+  echo 'FAIL: prestart differing seat owner was not reported' >&2; exit 1
+fi
+prestart_missing="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SEAT_FAIL=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_missing" != *'seat0=? match=INDETERMINADA'* ]]; then
+  echo 'FAIL: unavailable seat0 query was falsely trusted' >&2; exit 1
+fi
+prestart_dup_id="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_ID=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_dup_id" != *'self=?'* || "$prestart_dup_id" != *'match=INDETERMINADA'* ]]; then
+  echo 'FAIL: duplicate session ids were falsely trusted' >&2; exit 1
+fi
+prestart_dup_seat="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_SEAT=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_dup_seat" != *'seat0=? match=INDETERMINADA'* ]]; then
+  echo 'FAIL: duplicate seat owners were falsely trusted' >&2; exit 1
+fi
+prestart_no_id="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_OMIT_ID=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_no_id" != *'self=?'* || "$prestart_no_id" != *'match=INDETERMINADA'* ]]; then
+  echo 'FAIL: missing session id was falsely trusted' >&2; exit 1
+fi
 
 # One-command Dell field diagnostic: read-only card1 and logind/Xorg signatures,
 # runnable from tty2 without requiring root, an X server or a physical GPU.

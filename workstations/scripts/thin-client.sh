@@ -148,6 +148,43 @@ xorg_tty1_seat_ready() {
 }
 
 
+# Non-gating tty1 snapshot immediately before startx. This is NOT proof
+# that logind's later DRM file descriptor will be active when Xorg opens it.
+xorg_prestart_evidence() {
+  local phase="${1:-manual}" self_output="" seat_output=""
+  local self_id="" active="" vtnr="" seat_id="" candidate="" relation="INDETERMINADA"
+  local key value seen_id=0 seen_seat=0
+  if self_output="$("$LOGINCTL" show-session self --property=Id --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
+    while IFS='=' read -r key value; do
+      case "$key" in
+        Id) (( seen_id += 1 ))
+            if [[ "$value" =~ ^[[:alnum:]_-]+$ ]]; then self_id="$value"; else self_id=""; fi ;;
+        Active)
+            if [[ "$value" == yes || "$value" == no ]]; then active="$value"; fi ;;
+        VTNr)
+            if [[ "$value" =~ ^[0-9]+$ ]]; then vtnr="$value"; fi ;;
+      esac
+    done <<< "$self_output"
+  fi
+  if seat_output="$("$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null)"; then
+    while IFS='=' read -r key value; do
+      if [[ "$key" == ActiveSession ]]; then
+        (( seen_seat += 1 ))
+        candidate="${value%% *}"
+        if [[ "$candidate" =~ ^[[:alnum:]_-]+$ ]]; then seat_id="$candidate"; else seat_id=""; fi
+      fi
+    done <<< "$seat_output"
+  fi
+  if (( seen_id != 1 )); then self_id=""; fi
+  if (( seen_seat != 1 )); then seat_id=""; fi
+  if [[ -n "$self_id" && -n "$seat_id" ]]; then
+    if [[ "$self_id" == "$seat_id" ]]; then relation="MESMA_SESSAO"; else relation="DIVERGENTE"; fi
+  fi
+  printf 'XORG_PRESTART_LOGIND phase=%s self=%s active=%s vt=%s seat0=%s match=%s (snapshot anterior ao DRM fd)\n' \
+    "$phase" "${self_id:-?}" "${active:-?}" "${vtnr:-?}" "${seat_id:-?}" "$relation" >&2
+  return 0
+}
+
 # One-command, read-only field evidence. A tty2 snapshot is NOT proof of
 # logind/DRM ownership at the moment the rootless Xorg :0 session started.
 diagnose_xorg() {
@@ -233,6 +270,7 @@ local_oauth_login() {
     echo "Retorne ao tty1 antes de iniciar o navegador grafico." >&2
     return 7
   fi
+  xorg_prestart_evidence "oauth"
   echo "Iniciando Firefox temporario no Dell para autenticar Google..."
   if ! "$STARTX" "$OAUTH_SESSION" -- :0 vt1 -keeptty -nolisten tcp; then
     echo "OAuth local cancelado/erro de navegador. Corrija a causa e tente novamente." >&2
@@ -248,6 +286,11 @@ local_oauth_login() {
 # Regression-test entrypoints; injected IAP reads only, never writes GCE.
 if [[ "${1:-}" == "--check-xorg-seat" ]]; then
   xorg_tty1_seat_ready
+  exit $?
+fi
+
+if [[ "${1:-}" == "--check-xorg-prestart" ]]; then
+  xorg_prestart_evidence "manual"
   exit $?
 fi
 
@@ -369,6 +412,7 @@ while true; do
     # tty1, with no LightDM/Openbox/Xterm. When RDP exits, Xorg terminates
     # and the console immediately resumes the retry loop.
     if xorg_tty1_seat_ready; then
+      xorg_prestart_evidence "rdp"
       startx "$(command -v xfreerdp)" /v:"$RDP_ADDRESS" /f \
       /dynamic-resolution /cert:tofu /clipboard /network:auto /sec:tls \
       /sound:sys:pulse /microphone:sys:pulse \
