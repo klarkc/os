@@ -120,6 +120,9 @@ a sessao logind atual, os dispositivos DRM `cardN` e assinaturas do ultimo
 A linha `Correlacao self/seat0` compara somente IDs atuais: `DIVERGENTE`
 no tty2 pode ser normal; `INDETERMINADA` nao explica o FD DRM
 `paused 1` observado no Xorg anterior.
+No diagnostico tty2, propriedades logind `Id` ou `ActiveSession`
+ausentes, invalidas ou duplicadas produzem `INDETERMINADA`; o ultimo
+valor observado nao e tratado como prova de propriedade do seat0.
 Imediatamente antes dos dois `startx` (OAuth e RDP), o kiosk imprime no
 console tty1 um `XORG_PRESTART_LOGIND` com IDs de sessao, Active/VTNr e
 correlacao seat0. E apenas observacao; o estado pode mudar antes de Xorg

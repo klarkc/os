@@ -194,13 +194,18 @@ diagnose_xorg() {
   local node card major_minor driver_path driver excerpt found=0
   printf 'Diagnostico Xorg/DRM (somente leitura, estado atual)\n'
   local self_snapshot="" seat_snapshot="" session_id="" active_session=""
-  local property value seat_candidate
+  local property value seat_candidate seen_session_id=0 seen_active_session=0
   printf 'Sessao logind deste comando (pode ser tty2, nao o momento da falha):\n'
   if self_snapshot="$("$LOGINCTL" show-session self --property=Id --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
     printf '%s\n' "$self_snapshot"
     while IFS='=' read -r property value; do
-      if [[ "$property" == "Id" && "$value" =~ ^[[:alnum:]_-]+$ ]]; then
-        session_id="$value"
+      if [[ "$property" == "Id" ]]; then
+        (( seen_session_id += 1 ))
+        if [[ "$value" =~ ^[[:alnum:]_-]+$ ]]; then
+          session_id="$value"
+        else
+          session_id=""
+        fi
       fi
     done <<< "$self_snapshot"
   else
@@ -210,14 +215,22 @@ diagnose_xorg() {
   if seat_snapshot="$("$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null)"; then
     printf '%s\n' "$seat_snapshot"
     while IFS='=' read -r property value; do
-      seat_candidate="${value%% *}"
-      if [[ "$property" == "ActiveSession" && "$seat_candidate" =~ ^[[:alnum:]_-]+$ ]]; then
-        active_session="$seat_candidate"
+      if [[ "$property" == "ActiveSession" ]]; then
+        (( seen_active_session += 1 ))
+        seat_candidate="${value%% *}"
+        if [[ "$seat_candidate" =~ ^[[:alnum:]_-]+$ ]]; then
+          active_session="$seat_candidate"
+        else
+          active_session=""
+        fi
       fi
     done <<< "$seat_snapshot"
   else
     printf '  consulta seat0 indisponivel\n'
   fi
+  # Missing, invalid or repeated properties never prove current ownership.
+  if (( seen_session_id != 1 )); then session_id=""; fi
+  if (( seen_active_session != 1 )); then active_session=""; fi
   # Compare only snapshots from this command. From tty2, a different
   # session can be normal and says nothing about an earlier tty1 Xorg FD.
   if [[ -z "$session_id" || -z "$active_session" ]]; then

@@ -256,6 +256,33 @@ if [[ "$diagnostic_missing_id" != *'Correlacao self/seat0: INDETERMINADA'* ]]; t
   exit 1
 fi
 
+# Duplicate logind properties must be marked ambiguous, even if an
+# otherwise well-formed value was present earlier in the same response.
+diagnostic_duplicate_id="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_DUPLICATE_ID=1 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_duplicate_id" != *'Correlacao self/seat0: INDETERMINADA'* ]]; then
+  echo 'FAIL: recovery diagnostic trusted a duplicate Id property' >&2
+  exit 1
+fi
+diagnostic_duplicate_seat="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+  LPKLARKC_TEST_DUPLICATE_SEAT=1 \
+  LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+  LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+  LPKLARKC_DIAG_XORG_LOG="$diagnostic_fixture/Xorg.0.log" \
+  bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$diagnostic_duplicate_seat" != *'Correlacao self/seat0: INDETERMINADA'* ]]; then
+  echo 'FAIL: recovery diagnostic trusted a duplicate seat0 ActiveSession' >&2
+  exit 1
+fi
+
 diagnostic_empty="$(
   LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
   LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/empty" \
