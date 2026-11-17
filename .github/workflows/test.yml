@@ -36,6 +36,14 @@ jobs:
           grep -Fx 'nix-m0-materialized:checked' "$output/proof"
           printf 'M0_NIX_MATERIALIZED_CHECK_PASS source=%s output=%s\n' "$GITHUB_SHA" "$output"
           nix hash path "$output"
+      - name: Materialize pinned nix-serve-ng Cabal metadata
+        run: |
+          set -euo pipefail
+          output="$(nix build --no-link --print-out-paths .#packages.x86_64-linux.nix-serve-ng-cabal-metadata)"
+          test -s "$output/default.nix"
+          grep -F 'nix-serve-ng' "$output/default.nix" > /dev/null
+          printf 'NIX_SERVE_CABAL_METADATA_MATERIALIZED source=%s output=%s\n' "$GITHUB_SHA" "$output"
+          nix hash path "$output"
       - name: Evaluate root and workstation flakes
         run: |
           nix flake check --no-build --show-trace

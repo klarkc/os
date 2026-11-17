@@ -21,6 +21,21 @@
       os = "linux";
       system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
+      # Materialize only the upstream Haskell Cabal metadata, before an
+      # exhaustive no-build evaluation. Keep the production cache module intact.
+      nixServePkgs = import inputs.nixpkgs {
+        inherit system;
+        overlays = [ inputs.nix-serve-ng.overlays.default ];
+      };
+      nixServeCabalMetadata = nixServePkgs.haskell.packages.ghc94.haskellSrc2nix {
+        name = "nix-serve-ng";
+        src = nixServePkgs.lib.cleanSourceWith {
+          src = inputs.nix-serve-ng.outPath;
+          filter = path: type:
+            nixServePkgs.lib.hasSuffix ".cabal" path
+            || builtins.baseNameOf path == "package.yaml";
+        };
+      };
       # Native Shell is an input; only the built application is executed.
       m0Shell = pkgs.writeShellApplication {
         name = "os-m0-shell";
@@ -96,6 +111,7 @@
         inherit (setups.recover.packages) recover-efi recover-vm;
         inherit (setups.cache.packages) cache-vm;
         m0-shell = m0Shell;
+        nix-serve-ng-cabal-metadata = nixServeCabalMetadata;
       };
     };
 
