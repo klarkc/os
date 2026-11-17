@@ -21,6 +21,12 @@
       os = "linux";
       system = "${platform}-${os}";
       pkgs = import inputs.nixpkgs { inherit system; };
+      # Native Shell is an input; only the built application is executed.
+      m0Shell = pkgs.writeShellApplication {
+        name = "os-m0-shell";
+        runtimeInputs = [ ];
+        text = builtins.readFile ./tests/m0-shell-source.sh;
+      };
       # Nix-managed hook directory; no disallowed extension in Git.
       gitHooks = pkgs.runCommand "os-local-git-hooks" { } ''
         mkdir -p "$out"
@@ -62,6 +68,19 @@
       };
 
 
+      apps.${system}.m0-shell = {
+        type = "app";
+        program = "${m0Shell}/bin/os-m0-shell";
+      };
+
+      checks.${system}.m0-shell-materialized = pkgs.runCommand "os-m0-shell-materialized-check" { } ''
+        test -x "${m0Shell}/bin/os-m0-shell"
+        actual="$("${m0Shell}/bin/os-m0-shell" checked)"
+        test "$actual" = "nix-m0-materialized:checked"
+        mkdir -p "$out"
+        printf '%s\n' "$actual" > "$out/proof"
+      '';
+
       nixosModules = {
         inherit (setups.recover.modules) recover;
         inherit (setups.cache.modules) cache-module;
@@ -76,6 +95,7 @@
         default = cache-vm;
         inherit (setups.recover.packages) recover-efi recover-vm;
         inherit (setups.cache.packages) cache-vm;
+        m0-shell = m0Shell;
       };
     };
 

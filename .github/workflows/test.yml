@@ -32,6 +32,14 @@ jobs:
         run: |
           nix flake check --no-build --show-trace
           (cd workstations && nix flake check --no-build --show-trace)
+      - name: Build and execute M0 Nix-materialized Shell check
+        run: |
+          set -euo pipefail
+          output="$(nix build --no-link --print-out-paths .#checks.x86_64-linux.m0-shell-materialized)"
+          test -s "$output/proof"
+          grep -Fx 'nix-m0-materialized:checked' "$output/proof"
+          printf 'M0_NIX_MATERIALIZED_CHECK_PASS source=%s output=%s\n' "$GITHUB_SHA" "$output"
+          nix hash path "$output"
 
   security:
     runs-on: ubuntu-24.04
