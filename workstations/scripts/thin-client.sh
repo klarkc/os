@@ -153,16 +153,18 @@ xorg_tty1_seat_ready() {
 xorg_prestart_evidence() {
   local phase="${1:-manual}" self_output="" seat_output=""
   local self_id="" active="" vtnr="" seat_id="" candidate="" relation="INDETERMINADA"
-  local key value seen_id=0 seen_seat=0
+  local key value seen_id=0 seen_active=0 seen_vtnr=0 seen_seat=0
   if self_output="$("$LOGINCTL" show-session self --property=Id --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
     while IFS='=' read -r key value; do
       case "$key" in
         Id) (( seen_id += 1 ))
             if [[ "$value" =~ ^[[:alnum:]_-]+$ ]]; then self_id="$value"; else self_id=""; fi ;;
         Active)
-            if [[ "$value" == yes || "$value" == no ]]; then active="$value"; fi ;;
+            (( seen_active += 1 ))
+            if [[ "$value" == yes || "$value" == no ]]; then active="$value"; else active=""; fi ;;
         VTNr)
-            if [[ "$value" =~ ^[0-9]+$ ]]; then vtnr="$value"; fi ;;
+            (( seen_vtnr += 1 ))
+            if [[ "$value" =~ ^[0-9]+$ ]]; then vtnr="$value"; else vtnr=""; fi ;;
       esac
     done <<< "$self_output"
   fi
@@ -176,6 +178,8 @@ xorg_prestart_evidence() {
     done <<< "$seat_output"
   fi
   if (( seen_id != 1 )); then self_id=""; fi
+  if (( seen_active != 1 )); then active=""; fi
+  if (( seen_vtnr != 1 )); then vtnr=""; fi
   if (( seen_seat != 1 )); then seat_id=""; fi
   if [[ -n "$self_id" && -n "$seat_id" ]]; then
     if [[ "$self_id" == "$seat_id" ]]; then relation="MESMA_SESSAO"; else relation="DIVERGENTE"; fi

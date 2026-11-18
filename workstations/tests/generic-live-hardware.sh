@@ -108,6 +108,9 @@ fi
 if [ "${LPKLARKC_TEST_OMIT_VTNR:-0}" != "1" ]; then
   printf 'VTNr=%s\n' "${LPKLARKC_TEST_VTNR-1}"
 fi
+if [ "${LPKLARKC_TEST_DUPLICATE_VTNR:-0}" = "1" ]; then
+  printf 'VTNr=2\n'
+fi
 exit 0
 MOCK
 chmod +x "$mock_loginctl"
@@ -173,6 +176,15 @@ fi
 prestart_dup_id="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_ID=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
 if [[ "$prestart_dup_id" != *'self=?'* || "$prestart_dup_id" != *'match=INDETERMINADA'* ]]; then
   echo 'FAIL: duplicate session ids were falsely trusted' >&2; exit 1
+fi
+# Duplicate Active/VTNr are ambiguous even when the first value was valid.
+prestart_dup_active="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_ACTIVE=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_dup_active" != *'active=?'* ]]; then
+  echo 'FAIL: prestart trusted duplicate logind Active property' >&2; exit 1
+fi
+prestart_dup_vtnr="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_VTNR=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
+if [[ "$prestart_dup_vtnr" != *'vt=?'* ]]; then
+  echo 'FAIL: prestart trusted duplicate logind VTNr property' >&2; exit 1
 fi
 prestart_dup_seat="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_DUPLICATE_SEAT=1 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"
 if [[ "$prestart_dup_seat" != *'seat0=? match=INDETERMINADA'* ]]; then
