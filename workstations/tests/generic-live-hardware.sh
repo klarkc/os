@@ -251,6 +251,45 @@ for expected in \
     exit 1
   fi
 done
+# Classify historical Xorg logind fd acquisitions: paused 1, paused 0,
+# mixed, invalid paused number, and missing log. Never infer live DRM state.
+if [[ "$diagnostic_output" != *'XORG_DRM_FD_LOG=PAUSED_1_ONLY'* ]]; then
+  echo 'FAIL: paused DRM fd in physical-style Xorg log was not identified' >&2
+  exit 1
+fi
+for fd_fixture in paused0 mixed no_fd; do
+  fd_log="$diagnostic_fixture/$fd_fixture.log"
+  case "$fd_fixture" in
+    paused0)
+      printf '%s\n' '(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 11 paused 0' > "$fd_log"
+      fd_expected=PAUSED_0_ONLY
+      ;;
+    mixed)
+      printf '%s\n' \
+        '(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 11 paused 0' \
+        '(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 12 paused 1' > "$fd_log"
+      fd_expected=MIXED_0_AND_1
+      ;;
+    no_fd)
+      printf '%s\n' \
+        '(II) systemd-logind: got fd for /dev/dri/card1 226:1 fd 11 paused 10' \
+        '(EE) no screens found' > "$fd_log"
+      fd_expected=UNKNOWN_NO_FD_SIGNATURE
+      ;;
+  esac
+  fd_output="$(
+    LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+    LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+    LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+    LPKLARKC_DIAG_XORG_LOG="$fd_log" \
+    bash scripts/thin-client.sh --diagnose-xorg
+  )"
+  if [[ "$fd_output" != *"XORG_DRM_FD_LOG=$fd_expected"* ]]; then
+    printf 'FAIL: historical DRM-FD fixture %s not classified as %s\n' "$fd_fixture" "$fd_expected" >&2
+    exit 1
+  fi
+done
+
 # A different seat owner is evidence, not a hard Xorg/VT gate:
 # invoking from tty2 cannot reconstruct the original paused logind fd.
 diagnostic_mismatch="$(
@@ -326,7 +365,8 @@ diagnostic_empty="$(
   bash scripts/thin-client.sh --diagnose-xorg
 )"
 if [[ "$diagnostic_empty" != *'nenhum cardN presente'* ||
-      "$diagnostic_empty" != *'Xorg.0.log indisponivel'* ]]; then
+      "$diagnostic_empty" != *'Xorg.0.log indisponivel'* ||
+      "$diagnostic_empty" != *'XORG_DRM_FD_LOG=UNKNOWN_LOG_UNAVAILABLE'* ]]; then
   echo 'FAIL: read-only diagnostic did not tolerate absent DRM/log files' >&2
   exit 1
 fi

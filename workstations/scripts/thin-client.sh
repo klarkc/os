@@ -235,6 +235,7 @@ diagnose_xorg() {
   local sys_drm_dir="${LPKLARKC_DIAG_SYS_DRM_DIR:-/sys/class/drm}"
   local log="${LPKLARKC_DIAG_XORG_LOG:-${HOME:-/home/nixos}/.local/share/xorg/Xorg.0.log}"
   local node card major_minor driver_path driver excerpt found=0
+  local fd_paused_0=0 fd_paused_1=0 fd_log_state=UNKNOWN_NO_FD_SIGNATURE
   printf 'Diagnostico Xorg/DRM (somente leitura, estado atual)\n'
   local self_snapshot="" seat_snapshot="" session_id="" active_session=""
   local property value seat_candidate seen_session_id=0 seen_active_session=0
@@ -307,6 +308,27 @@ diagnose_xorg() {
   else
     printf '  Xorg.0.log indisponivel neste usuario\n'
   fi
+  # Scan all historical logind DRM-fd acquisitions, not only the displayed
+  # excerpt. Mixed paused states cannot be misreported as an active DRM lease.
+  # This diagnostic never asserts the current logind fd or hardware state.
+  if [[ -r "$log" ]]; then
+    if grep -Eq 'systemd-logind: got fd for /dev/dri/card[0-9]+.*[[:space:]]paused[[:space:]]0([[:space:]]|$)' "$log"; then
+      fd_paused_0=1
+    fi
+    if grep -Eq 'systemd-logind: got fd for /dev/dri/card[0-9]+.*[[:space:]]paused[[:space:]]1([[:space:]]|$)' "$log"; then
+      fd_paused_1=1
+    fi
+    if (( fd_paused_0 && fd_paused_1 )); then
+      fd_log_state=MIXED_0_AND_1
+    elif (( fd_paused_1 )); then
+      fd_log_state=PAUSED_1_ONLY
+    elif (( fd_paused_0 )); then
+      fd_log_state=PAUSED_0_ONLY
+    fi
+  else
+    fd_log_state=UNKNOWN_LOG_UNAVAILABLE
+  fi
+  printf 'XORG_DRM_FD_LOG=%s (assinaturas historicas; nao comprova posse DRM atual)\n' "$fd_log_state"
   printf 'Observacao: estado atual nao prova a sessao no instante em que Xorg abriu DRM.\n'
 }
 
