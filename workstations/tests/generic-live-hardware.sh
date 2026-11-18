@@ -159,6 +159,29 @@ if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_LOGINCTL_FAIL=1 bash s
   exit 1
 fi
 
+# A verified tty1 session must also own active seat0 before Xorg opens DRM.
+# These are deterministic mock-only regressions, not physical i915 emulation.
+if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=7 bash scripts/thin-client.sh --check-xorg-seat; then
+  echo 'FAIL: matching tty1/seat0 session was blocked' >&2
+  exit 1
+fi
+if LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=8 bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+  echo 'FAIL: tty1 session not owning active seat0 was allowed to launch Xorg' >&2
+  exit 1
+fi
+for setting in LPKLARKC_TEST_OMIT_ID LPKLARKC_TEST_DUPLICATE_ID LPKLARKC_TEST_SEAT_EMPTY LPKLARKC_TEST_DUPLICATE_SEAT; do
+  if env LPKLARKC_LOGINCTL_BIN="$mock_loginctl" "$setting=1" bash scripts/thin-client.sh --check-xorg-seat >/dev/null 2>&1; then
+    printf 'FAIL: ambiguous tty1/seat0 owner was accepted: %s\n' "$setting" >&2
+    exit 1
+  fi
+done
+# As with the existing show-session fallback, transient provider failures
+# are not evidence of active DRM, but must not permanently deadlock the kiosk.
+if ! LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SEAT_FAIL=1 bash scripts/thin-client.sh --check-xorg-seat; then
+  echo 'FAIL: transient seat0 read failure deadlocked kiosk' >&2
+  exit 1
+fi
+
 
 # This read-only pre-startx check does not change the tty1 launch decision.
 prestart_equal="$(LPKLARKC_LOGINCTL_BIN="$mock_loginctl" LPKLARKC_TEST_SESSION_ID=7 LPKLARKC_TEST_SEAT_ACTIVE_SESSION=7 bash scripts/thin-client.sh --check-xorg-prestart 2>&1)"

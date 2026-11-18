@@ -103,13 +103,22 @@ rdp_responding() {
 # logind EXPLICITLY reports an inactive tty1 session or another VT.
 # A failed/unavailable read remains diagnostic-only, not a hard kiosk lock.
 xorg_tty1_seat_ready() {
-  local snapshot active="" vtnr="" key value seen_active=0 seen_vtnr=0
-  if ! snapshot="$("$LOGINCTL" show-session self --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
+  local snapshot active="" vtnr="" self_id="" seat_id="" seat_snapshot="" key value
+  local seen_active=0 seen_vtnr=0 seen_id=0 seen_seat=0
+  if ! snapshot="$("$LOGINCTL" show-session self --property=Id --property=Active --property=VTNr --no-pager 2>/dev/null)"; then
     echo "Aviso: estado logind indisponivel; tentando Xorg sem inferir DRM ativo." >&2
     return 0
   fi
   while IFS='=' read -r key value; do
     case "$key" in
+      Id)
+        if (( seen_id )); then
+          echo "Xorg adiado: logind retornou Id duplicado." >&2
+          return 1
+        fi
+        self_id="$value"
+        seen_id=1
+        ;;
       Active)
         if (( seen_active )); then
           echo "Xorg adiado: logind retornou Active duplicado." >&2
@@ -144,9 +153,39 @@ xorg_tty1_seat_ready() {
     echo "Xorg adiado: logind nao confirmou VTNr=1." >&2
     return 1
   fi
+  # A readable logind reply must identify the current tty1 session.
+  # Never print opaque session IDs in diagnostics or exported logs.
+  if (( seen_id != 1 )) || [[ ! "$self_id" =~ ^[[:alnum:]_-]+$ ]]; then
+    echo "Xorg adiado: logind nao confirmou Id da sessao tty1." >&2
+    return 1
+  fi
+  # A different active seat0 owner may leave the DRM fd paused when Xorg
+  # opens it. An actual logind read failure remains a recoverable fallback,
+  # NOT proof of successful DRM ownership.
+  if ! seat_snapshot="$("$LOGINCTL" show-seat seat0 --property=ActiveSession --no-pager 2>/dev/null)"; then
+    echo "Aviso: consulta seat0 indisponivel; tentando Xorg sem inferir posse DRM." >&2
+    return 0
+  fi
+  while IFS='=' read -r key value; do
+    if [[ "$key" == ActiveSession ]]; then
+      if (( seen_seat )); then
+        echo "Xorg adiado: logind retornou ActiveSession duplicado." >&2
+        return 1
+      fi
+      seat_id="${value%% *}"
+      seen_seat=1
+    fi
+  done <<< "$seat_snapshot"
+  if (( seen_seat != 1 )) || [[ ! "$seat_id" =~ ^[[:alnum:]_-]+$ ]]; then
+    echo "Xorg adiado: logind nao confirmou sessao ativa em seat0." >&2
+    return 1
+  fi
+  if [[ "$self_id" != "$seat_id" ]]; then
+    echo "Xorg adiado: sessao tty1 difere da sessao ativa em seat0 (DRM pode estar pausado)." >&2
+    return 1
+  fi
   return 0
 }
-
 
 # Non-gating tty1 snapshot immediately before startx. This is NOT proof
 # that logind's later DRM file descriptor will be active when Xorg opens it.
