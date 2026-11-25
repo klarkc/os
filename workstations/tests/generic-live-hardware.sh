@@ -257,6 +257,10 @@ if [[ "$diagnostic_output" != *'XORG_DRM_FD_LOG=PAUSED_1_ONLY'* ]]; then
   echo 'FAIL: paused DRM fd in physical-style Xorg log was not identified' >&2
   exit 1
 fi
+if [[ "$diagnostic_output" != *'XORG_DRM_PAUSED_ERROR_LOG=ABSENT'* ]]; then
+  echo 'FAIL: absent paused-fd error should not be inferred from a got-fd line' >&2
+  exit 1
+fi
 for fd_fixture in paused0 mixed no_fd; do
   fd_log="$diagnostic_fixture/$fd_fixture.log"
   case "$fd_fixture" in
@@ -289,6 +293,25 @@ for fd_fixture in paused0 mixed no_fd; do
     exit 1
   fi
 done
+
+# Regression: an explicit paused-fd Xorg error can occur without any
+# preceding "got fd ... paused N" log. Report it separately, not as a
+# successful acquisition or live DRM ownership.
+paused_error_log="$diagnostic_fixture/paused-error-only.log"
+printf '%s\n' \
+  '(EE) Error systemd-logind returned paused fd for drm node /dev/dri/card1' > "$paused_error_log"
+paused_error_output="$(
+  LPKLARKC_LOGINCTL_BIN="$mock_loginctl" \
+    LPKLARKC_DIAG_DRM_DIR="$diagnostic_fixture/dev" \
+    LPKLARKC_DIAG_SYS_DRM_DIR="$diagnostic_fixture/sys" \
+    LPKLARKC_DIAG_XORG_LOG="$paused_error_log" \
+    bash scripts/thin-client.sh --diagnose-xorg
+)"
+if [[ "$paused_error_output" != *'XORG_DRM_FD_LOG=UNKNOWN_NO_FD_SIGNATURE'* ||
+      "$paused_error_output" != *'XORG_DRM_PAUSED_ERROR_LOG=PRESENT'* ]]; then
+  echo 'FAIL: error-only logind paused DRM FD diagnostic lost historic evidence' >&2
+  exit 1
+fi
 
 # A different seat owner is evidence, not a hard Xorg/VT gate:
 # invoking from tty2 cannot reconstruct the original paused logind fd.
@@ -366,7 +389,8 @@ diagnostic_empty="$(
 )"
 if [[ "$diagnostic_empty" != *'nenhum cardN presente'* ||
       "$diagnostic_empty" != *'Xorg.0.log indisponivel'* ||
-      "$diagnostic_empty" != *'XORG_DRM_FD_LOG=UNKNOWN_LOG_UNAVAILABLE'* ]]; then
+      "$diagnostic_empty" != *'XORG_DRM_FD_LOG=UNKNOWN_LOG_UNAVAILABLE'* ||
+      "$diagnostic_empty" != *'XORG_DRM_PAUSED_ERROR_LOG=UNKNOWN_LOG_UNAVAILABLE'* ]]; then
   echo 'FAIL: read-only diagnostic did not tolerate absent DRM/log files' >&2
   exit 1
 fi

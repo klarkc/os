@@ -236,6 +236,7 @@ diagnose_xorg() {
   local log="${LPKLARKC_DIAG_XORG_LOG:-${HOME:-/home/nixos}/.local/share/xorg/Xorg.0.log}"
   local node card major_minor driver_path driver excerpt found=0
   local fd_paused_0=0 fd_paused_1=0 fd_log_state=UNKNOWN_NO_FD_SIGNATURE
+  local paused_error_log_state=UNKNOWN_LOG_UNAVAILABLE
   printf 'Diagnostico Xorg/DRM (somente leitura, estado atual)\n'
   local self_snapshot="" seat_snapshot="" session_id="" active_session=""
   local property value seat_candidate seen_session_id=0 seen_active_session=0
@@ -325,10 +326,19 @@ diagnose_xorg() {
     elif (( fd_paused_0 )); then
       fd_log_state=PAUSED_0_ONLY
     fi
+    # Xorg may report the paused DRM error without printing a preceding
+    # "got fd ... paused N" line. Preserve that separate historic signal;
+    # do not infer a current DRM lease or misclassify an acquisition.
+    if grep -Fqi 'Error systemd-logind returned paused fd for drm node' "$log"; then
+      paused_error_log_state=PRESENT
+    else
+      paused_error_log_state=ABSENT
+    fi
   else
     fd_log_state=UNKNOWN_LOG_UNAVAILABLE
   fi
   printf 'XORG_DRM_FD_LOG=%s (assinaturas historicas; nao comprova posse DRM atual)\n' "$fd_log_state"
+  printf 'XORG_DRM_PAUSED_ERROR_LOG=%s (assinatura historica; nao comprova posse DRM atual)\n' "$paused_error_log_state"
   printf 'Observacao: estado atual nao prova a sessao no instante em que Xorg abriu DRM.\n'
 }
 
